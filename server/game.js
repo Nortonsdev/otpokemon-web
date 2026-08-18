@@ -8,6 +8,7 @@ import {
   SPECIES,
   STARTERS,
   STEP_MS,
+  applyRubyHealth,
   behind,
 } from "./species.js";
 import { MAP, hasRoof, inBounds, tileName, walkable } from "./map.js";
@@ -185,18 +186,46 @@ export class World {
     });
   }
 
-  makeMon(species, level = 5) {
+  makeMon(species, level = 5, opts = {}) {
     const spec = SPECIES[species];
-    return {
-      uid: randomUUID(),
+    const ivs = opts.ivs || this.rollIvs();
+    const evs = opts.evs || this.zeroEvs();
+    const mon = {
+      uid: opts.uid || randomUUID(),
       species,
       name: spec.name,
       look: spec.look,
       level,
-      hp: spec.hp,
-      hpMax: spec.hp,
-      ball: "charged",
+      baseHp: spec.baseStats.hp,
+      baseStats: { ...spec.baseStats },
+      ivs,
+      evs,
+      ball: opts.ball || "charged",
     };
+    applyRubyHealth(mon);
+    if (opts.hp != null) mon.hp = Math.max(0, Math.min(opts.hp, mon.hpMax));
+    return mon;
+  }
+
+  rollIvs() {
+    const n = () => randomInt(1, 32);
+    return { hp: n(), atk: n(), def: n(), spa: n(), spd: n(), spe: n() };
+  }
+
+  zeroEvs() {
+    return { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+  }
+
+  ensureMon(mon) {
+    if (!mon) return mon;
+    const spec = SPECIES[mon.species];
+    if (!spec) return mon;
+    if (!mon.baseStats) mon.baseStats = { ...spec.baseStats };
+    if (!mon.baseHp) mon.baseHp = spec.baseStats.hp;
+    if (!mon.ivs) mon.ivs = this.rollIvs();
+    if (!mon.evs) mon.evs = this.zeroEvs();
+    applyRubyHealth(mon);
+    return mon;
   }
 
   enter(client, { name }) {
@@ -221,7 +250,7 @@ export class World {
       walkTo: null,
       charName,
       bag: rec.bag,
-      party: rec.party,
+      party: (rec.party || []).map((p) => this.ensureMon(p)),
       outSlot: rec.out,
       outId: null,
     };
@@ -233,6 +262,7 @@ export class World {
     this.occupy(player);
     client.playerId = player.id;
     client.charName = charName;
+    this.snapshotPlayer(player);
     if (Number.isInteger(player.outSlot) && player.party[player.outSlot]) {
       this.releaseSlot(player, player.outSlot, true);
     }
@@ -413,8 +443,10 @@ export class World {
     y = Number(y);
     const who = this.occupant(x, y);
     let text;
-    if (who) text = `You see ${who.kind === "player" ? who.name : `${who.name} [${who.level || 5}]`}.`;
-    else text = `You see ${tileName(x, y)}.`;
+    if (who) {
+      if (who.kind === "player") text = `You see ${who.name}.`;
+      else text = `You see ${who.name} [${who.level || 5}]. Health: ${who.hp} / ${who.hpMax}.`;
+    } else text = `You see ${tileName(x, y)}.`;
     this.sys(player, text);
   }
 
@@ -529,6 +561,10 @@ export class World {
       hp: mon.hp,
       hpMax: mon.hpMax,
       level: mon.level,
+      baseHp: mon.baseHp,
+      baseStats: mon.baseStats,
+      ivs: mon.ivs,
+      evs: mon.evs,
       masterId: player.id,
       busyUntil: 0,
       uid: mon.uid,
@@ -601,14 +637,36 @@ export class World {
       hp: target.hp,
       hpMax: target.hpMax,
     });
-    this.sys(player, `${poke.name} used ${move.name}!`);
+    this.sys(player, `${poke.name} used ${move.name}! (${target.hp} / ${target.hpMax})`);
     if (target.kind === "pokemon" && target.masterId) {
       const master = this.creatures.get(target.masterId);
       const mon = master?.party.find((p) => p && p.uid === target.uid);
       if (mon) mon.hp = target.hp;
       if (master) this.syncParty(master);
     }
-    if (target.hp <= 0) this.defeat(target);
+    if (target.hp <= 0) {
+      this.defeat(target);
+      return;
+    }
+    if (target.wild) {
+      const specT = SPECIES[target.species];
+      const fleeAt = specT?.runOnHealth || 0;
+      if (fleeAt > 0 && (target.hp * 100) / target.hpMax <= fleeAt) {
+        this.sys(player, `${target.name} fled!`);
+        this.flee(target);
+      }
+    }
+  }
+
+  flee(creature) {
+    if (!creature.wild) return;
+    this.vacate(creature);
+    this.creatures.delete(creature.id);
+    this.broadcastArea({ t: "disappear", id: creature.id });
+    this.wildRespawnAt = this.now() + 8000;
+    for (const c of this.creatures.values()) {
+      if (c.kind === "player" && c.targetId === creature.id) c.targetId = null;
+    }
   }
 
   defeat(creature) {
@@ -632,8 +690,11 @@ export class World {
     const roll = randomInt(1, 101);
     this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id });
     if (roll <= rate) {
-      const mon = this.makeMon(target.species, target.level || 2);
-      mon.hp = Math.max(1, target.hp);
+      const mon = this.makeMon(target.species, target.level || 2, {
+        ivs: target.ivs ? { ...target.ivs } : undefined,
+        evs: target.evs ? { ...target.evs } : this.zeroEvs(),
+        hp: Math.max(1, target.hp),
+      });
       player.party.push(mon);
       this.vacate(target);
       this.creatures.delete(target.id);
@@ -693,6 +754,7 @@ export class World {
     if (!spots.length) return;
     const spot = spots[randomInt(0, spots.length)];
     const spec = SPECIES.caterpie;
+    const stats = this.makeMon("caterpie", 2);
     const wild = {
       id: cid(),
       kind: "wild",
@@ -704,9 +766,13 @@ export class World {
       y: spot.y,
       z: MAP.z,
       dir: DIR.S,
-      hp: spec.hp,
-      hpMax: spec.hp,
-      level: 2,
+      hp: stats.hp,
+      hpMax: stats.hpMax,
+      level: stats.level,
+      baseHp: stats.baseHp,
+      baseStats: { ...spec.baseStats },
+      ivs: stats.ivs,
+      evs: stats.evs,
       busyUntil: 0,
     };
     this.creatures.set(wild.id, wild);

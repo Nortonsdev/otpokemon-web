@@ -34,14 +34,16 @@ JSON over WebSocket `/ws`: `login`, `register`, `create`, `enter`, `walk`, `walk
 - Huntera grass/path/wall/roof + citizen looktype 128: `tools/extract_huntera.py`.
 - HUD chrome from [rubyclient `data/images/game/pokemon`](https://github.com/OLDtherubyproject/rubyclient/tree/master/data/images/game/pokemon).
 
-Species (Kanto XML values used by the server):
+Species (Kanto XML base stats; creature max HP is Ruby `Pokemon::getMaxHealth`, not the raw XML HP):
 
-| Pokémon   | number | look | types        | HP | catchRate | moves              |
-|-----------|--------|------|--------------|----|-----------|--------------------|
-| Bulbasaur | 1      | 1    | grass/poison | 45 | 10        | Vine Whip, Spore   |
-| Charmander| 4      | 4    | fire         | 39 | 50        | Scratch (melee)    |
-| Squirtle  | 7      | 7    | water        | 44 | 50        | Water Gun          |
-| Caterpie  | 10     | 10   | bug          | 45 | 50        | Tackle             |
+| Pokémon    | number | look | types        | base HP | catchRate | moves            |
+|------------|--------|------|--------------|---------|-----------|------------------|
+| Bulbasaur  | 1      | 1    | grass/poison | 45      | 10        | Vine Whip, Spore |
+| Charmander | 4      | 4    | fire         | 39      | 50        | Scratch (melee)  |
+| Squirtle   | 7      | 7    | water        | 44      | 50        | Water Gun        |
+| Caterpie   | 10     | 10   | bug          | 45      | 50        | Tackle           |
+
+Max HP: `hpMax = max(1, ((2*baseHp + ivHp + ivHp + floor(evHp/30)) * level)/100 + level + 10)`. IVs are 1–31 on spawn; wild EVs are 0. A level-5 Charmander is 19–22 HP, a level-2 Caterpie is 13–15. Nameplates show `Nome [level]` plus an HP bar on wilds and the Pokémon that is out. Caterpie flees at 15% HP.
 
 Poké Ball rate = 1. Catch succeeds if `rand(1,100) <= species.catchRate * ball.rate`. Party cap 6.
 

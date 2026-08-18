@@ -23,6 +23,7 @@ export class GameScene extends Phaser.Scene {
     this.payload = payload;
     this.sprites = new Map();
     this.plates = new Map();
+    this.hpBars = new Map();
     this.state = new Map();
     this.youId = null;
     this.mapData = null;
@@ -66,8 +67,13 @@ export class GameScene extends Phaser.Scene {
     this.youId = payload.you.id;
     for (const s of this.sprites.values()) s.destroy();
     for (const p of this.plates.values()) p.destroy();
+    for (const bar of this.hpBars.values()) {
+      bar.bg.destroy();
+      bar.fg.destroy();
+    }
     this.sprites.clear();
     this.plates.clear();
+    this.hpBars.clear();
     this.state.clear();
     this.groundLayer.removeAll(true);
     this.wallLayer.removeAll(true);
@@ -131,20 +137,67 @@ export class GameScene extends Phaser.Scene {
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
     this.state.set(c.id, { ...c, moving: false, phase: 0 });
+    if (c.kind === "pokemon" || c.kind === "wild") {
+      const cx = pos.x + size / 2;
+      const barY = pos.y + 2;
+      const bg = this.add.rectangle(cx, barY, 28, 4, 0x1a1a1a).setOrigin(0.5, 0.5);
+      bg.setStrokeStyle(1, 0x000000, 0.9);
+      bg.setDepth(c.y * 10 + 8);
+      const fg = this.add.rectangle(cx - 13, barY, 26, 2, 0x3dcc4a).setOrigin(0, 0.5);
+      fg.setDepth(c.y * 10 + 9);
+      this.hpBars.set(c.id, { bg, fg });
+      this.setHpBar(c.id, c.hp, c.hpMax);
+    }
   }
 
   despawn(id) {
     this.sprites.get(id)?.destroy();
     this.plates.get(id)?.destroy();
+    const bar = this.hpBars.get(id);
+    bar?.bg.destroy();
+    bar?.fg.destroy();
     this.sprites.delete(id);
     this.plates.delete(id);
+    this.hpBars.delete(id);
     this.state.delete(id);
+  }
+
+  layoutNameplate(id, spriteX, spriteY, depth) {
+    const sprite = this.sprites.get(id);
+    const plate = this.plates.get(id);
+    if (!sprite || !plate) return;
+    const size = sprite.texture.key === "human" ? 64 : 32;
+    const cx = spriteX + size / 2;
+    plate.setPosition(cx, spriteY - 2);
+    plate.setDepth(depth + 1);
+    const bar = this.hpBars.get(id);
+    if (!bar) return;
+    const barY = spriteY + 2;
+    bar.bg.setPosition(cx, barY);
+    bar.bg.setDepth(depth + 2);
+    bar.fg.setPosition(cx - 13, barY);
+    bar.fg.setDepth(depth + 3);
+  }
+
+  setHpBar(id, hp, hpMax) {
+    const st = this.state.get(id);
+    if (st) {
+      if (hp != null) st.hp = hp;
+      if (hpMax != null) st.hpMax = hpMax;
+    }
+    const bar = this.hpBars.get(id);
+    if (!bar) return;
+    const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
+    const ratio = Math.max(0, Math.min(1, (hp ?? st?.hp ?? 0) / max));
+    bar.fg.width = 26 * ratio;
+    if (ratio > 0.5) bar.fg.setFillStyle(0x3dcc4a);
+    else if (ratio > 0.2) bar.fg.setFillStyle(0xe0c040);
+    else bar.fg.setFillStyle(0xcc3d3d);
   }
 
   place(id, x, y, dir, moving) {
     const st = this.state.get(id);
     const sprite = this.sprites.get(id);
-    const plate = this.plates.get(id);
     if (!st || !sprite) return;
     const tex = sprite.texture.key;
     const size = tex === "human" ? 64 : 32;
@@ -152,8 +205,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setPosition(pos.x, pos.y);
     sprite.setFrame(frameIndex(dir, moving, st.phase));
     sprite.setDepth(y * 10 + 6);
-    plate.setPosition(pos.x + size / 2, pos.y - 2);
-    plate.setDepth(y * 10 + 7);
+    this.layoutNameplate(id, pos.x, pos.y, y * 10 + 6);
   }
 
   handleNet(msg) {
@@ -166,22 +218,22 @@ export class GameScene extends Phaser.Scene {
       this.sprites.get(msg.id)?.setFrame(frameIndex(msg.dir, false, 0));
     }
     if (msg.t === "moved") this.animateMove(msg);
-    if (msg.t === "fx") this.flash(msg.to);
+    if (msg.t === "fx") {
+      this.flash(msg.to);
+      if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
+    }
   }
 
   animateMove(msg) {
     const st = this.state.get(msg.id);
     const sprite = this.sprites.get(msg.id);
-    const plate = this.plates.get(msg.id);
     if (!st || !sprite) return;
     st.dir = msg.dir;
     st.x = msg.x;
     st.y = msg.y;
     st.moving = true;
     st.phase = st.phase ? 0 : 1;
-    const tex = sprite.texture.key;
-    const size = tex === "human" ? 64 : 32;
-    const pos = tileWorld(msg.x, msg.y, size);
+    const pos = tileWorld(msg.x, msg.y, sprite.texture.key === "human" ? 64 : 32);
     this.tweens.killTweensOf(sprite);
     this.tweens.add({
       targets: sprite,
@@ -191,8 +243,7 @@ export class GameScene extends Phaser.Scene {
       onUpdate: () => {
         sprite.setFrame(frameIndex(st.dir, true, st.phase));
         sprite.setDepth(Math.round(st.y) * 10 + 6);
-        plate.setPosition(sprite.x + size / 2, sprite.y - 2);
-        plate.setDepth(sprite.depth + 1);
+        this.layoutNameplate(msg.id, sprite.x, sprite.y, sprite.depth);
       },
       onComplete: () => {
         st.moving = false;
