@@ -1,0 +1,50 @@
+:root {
+  --bg: #0b0c10;
+  --panel: #16181d;
+  --ink: #f4f1ea;
+  --muted: #9aa3ad;
+  --accent: #3fac35;
+  --danger: #c44536;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 "Trebuchet MS", sans-serif; }
+#game { position: fixed; inset: 0; }
+#ui { position: fixed; inset: 0; pointer-events: none; }
+.panel { pointer-events: auto; background: var(--panel); border: 2px solid #2a2e36; padding: 20px 24px; width: 360px; border-radius: 6px; }
+.center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.hidden { display: none !important; }
+h1, h2, h3 { margin: 0 0 8px; }
+.muted { color: var(--muted); }
+label { display: block; margin: 10px 0; }
+input { width: 100%; padding: 8px; background: #0e1014; color: var(--ink); border: 1px solid #333; }
+button { background: #2f6fed; color: white; border: 0; padding: 8px 14px; cursor: pointer; margin-right: 8px; }
+button.ghost { background: #333; }
+.row { display: flex; gap: 8px; margin-top: 12px; }
+.msg { color: #f0c14b; min-height: 1.2em; }
+.starters { display: flex; gap: 10px; }
+.starter { pointer-events: auto; cursor: pointer; text-align: center; border: 2px solid transparent; padding: 6px; background: #111; }
+.starter.selected { border-color: var(--accent); }
+.starter img { width: 64px; height: 64px; image-rendering: pixelated; }
+#screen-game { pointer-events: none; }
+#hud-left { pointer-events: auto; position: absolute; top: 12px; right: 12px; width: 220px; }
+.poke-window { background: rgba(20, 22, 28, 0.92); padding: 8px; border: 2px solid #39404a; }
+.hp-row { position: relative; height: 18px; margin-bottom: 6px; }
+.hp-row img { position: absolute; inset: 0; width: 100%; height: 18px; image-rendering: pixelated; }
+.bar-fill { position: absolute; left: 2px; top: 2px; height: 14px; width: 100%; }
+.bar-fill.player { background: #c44536; }
+.bar-fill.poke { background: #3fac35; }
+.hp-row span { position: absolute; inset: 0; text-align: center; font-size: 11px; text-shadow: 0 0 2px #000; }
+#pokecount { width: 100%; image-rendering: pixelated; margin: 6px 0; }
+.slots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+.slot { width: 32px; height: 32px; image-rendering: pixelated; cursor: pointer; position: relative; border: 1px solid #222; background: #111; }
+.slot img.portrait { width: 32px; height: 32px; image-rendering: pixelated; }
+.slot .ball { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; image-rendering: pixelated; }
+.slot.empty { opacity: 0.35; }
+.slot.out { outline: 2px solid #f0c14b; }
+#moves { pointer-events: auto; position: absolute; bottom: 48px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: rgba(0,0,0,0.55); padding: 6px; }
+.move { width: 32px; height: 32px; image-rendering: pixelated; cursor: pointer; border: 1px solid #000; }
+.move.off { filter: grayscale(1); opacity: 0.55; cursor: default; }
+#chat { pointer-events: auto; position: absolute; left: 12px; bottom: 12px; width: 360px; }
+#chat-log { height: 110px; overflow-y: auto; background: rgba(0,0,0,0.55); padding: 6px; font-size: 12px; }
+#chat input { margin-top: 4px; }
+.nameplate { background: rgba(0,0,0,0.55); padding: 1px 4px; font-size: 11px; }

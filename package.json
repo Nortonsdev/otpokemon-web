@@ -1,0 +1,22 @@
+{
+  "name": "otpokemon-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser Pokémon MMORPG milestone: Huntera tiles + human look, Ruby sprites, server-authoritative",
+  "type": "module",
+  "scripts": {
+    "start": "concurrently -k -n server,client -c blue,green \"npm:start:server\" \"npm:start:client\"",
+    "start:server": "node server/index.js",
+    "start:client": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "test:smoke": "node tools/smoketest.mjs"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1",
+    "ws": "^8.18.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "vite": "^6.0.7"
+  }
+}
