@@ -286,7 +286,20 @@ export class World {
   logoutPlayer(client, notify) {
     const player = this.creatures.get(client.playerId);
     if (player) {
-      if (player.outId) this.goback(player, false);
+      if (player.outId) {
+        const poke = this.creatures.get(player.outId);
+        if (poke) {
+          const mon = player.party.find((p) => p && p.uid === poke.uid);
+          if (mon) {
+            mon.hp = poke.hp;
+            mon.ball = "discharged";
+          }
+          this.vacate(poke);
+          this.creatures.delete(poke.id);
+          this.broadcastArea({ t: "disappear", id: poke.id });
+        }
+        player.outId = null;
+      }
       this.snapshotPlayer(player);
       this.vacate(player);
       this.creatures.delete(player.id);
