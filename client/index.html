@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OTPokemon Web</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="ui">
+      <section id="screen-login" class="panel center">
+        <h1>OTPokemon Web</h1>
+        <p class="muted">Server-authoritative milestone. Default login <code>demo/demo</code>.</p>
+        <label>Account <input id="user" value="demo" autocomplete="username" /></label>
+        <label>Password <input id="pass" type="password" value="demo" autocomplete="current-password" /></label>
+        <div class="row">
+          <button id="btn-login">Login</button>
+          <button id="btn-register" class="ghost">Create account</button>
+        </div>
+        <p id="login-msg" class="msg"></p>
+      </section>
+
+      <section id="screen-chars" class="panel center hidden">
+        <h2>Characters</h2>
+        <ul id="char-list"></ul>
+        <hr />
+        <h3>Create character</h3>
+        <label>Name <input id="char-name" maxlength="19" /></label>
+        <p>Starter</p>
+        <div id="starters" class="starters"></div>
+        <button id="btn-create">Create & enter</button>
+        <p id="char-msg" class="msg"></p>
+      </section>
+
+      <section id="screen-game" class="hidden">
+        <aside id="hud-left">
+          <div class="poke-window">
+            <div class="hp-row">
+              <img src="/assets/hud/health_bar.png" alt="" />
+              <div id="player-hp-fill" class="bar-fill player"></div>
+              <span id="player-hp-text">150 / 150</span>
+            </div>
+            <div class="hp-row poke">
+              <img id="poke-hp-icon" src="/assets/hud/pokehealth_bar_off.png" alt="" />
+              <div id="poke-hp-fill" class="bar-fill poke"></div>
+              <span id="poke-hp-text"></span>
+            </div>
+            <img id="pokecount" src="/assets/hud/pokeball0.png" alt="party count" />
+            <div id="slots" class="slots"></div>
+          </div>
+        </aside>
+        <div id="moves"></div>
+        <div id="chat">
+          <div id="chat-log"></div>
+          <input id="chat-input" maxlength="120" placeholder="say / m1–m10 / catch · right-click wild to attack" />
+        </div>
+      </section>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

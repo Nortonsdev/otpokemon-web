@@ -1,0 +1,36 @@
+{
+  "tiles": {
+    "grass": {
+      "id": 106,
+      "sprite": 162582,
+      "w": 32,
+      "h": 32
+    },
+    "path": {
+      "id": 351,
+      "sprite": 162976,
+      "w": 32,
+      "h": 32
+    },
+    "wall": {
+      "id": 2200,
+      "sprite": 227055,
+      "w": 64,
+      "h": 64
+    },
+    "roof": {
+      "id": 1088,
+      "sprite": 226282,
+      "w": 64,
+      "h": 64
+    }
+  },
+  "outfit": {
+    "id": 128,
+    "name": "citizen",
+    "frameW": 64,
+    "frameH": 64,
+    "dirs": 4,
+    "frames": 3
+  }
+}
