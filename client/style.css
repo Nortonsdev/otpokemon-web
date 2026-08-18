@@ -9,6 +9,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.4 "Trebuchet MS", sans-serif; }
 #game { position: fixed; inset: 0; }
+#game canvas { image-rendering: pixelated; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
 .panel { pointer-events: auto; background: var(--panel); border: 2px solid #2a2e36; padding: 20px 24px; width: 360px; border-radius: 6px; }
 .center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }

@@ -18,15 +18,15 @@ Default account: **demo** / **demo** (create a character on first login).
 ## Play
 
 1. Login or register, create a character, pick **Bulbasaur / Charmander / Squirtle**.
-2. Walk with **WASD** or arrows (hold two keys for diagonals). Movement is server-synced.
+2. Walk with **WASD** / arrows (diagonals: two keys) or **left-click** a tile (Tibia-style). Movement is server-synced.
 3. Click a party slot to **release**. Click the same slot to **recall**. Click another occupied slot to swap (recall then release). Never two Pokémon out.
-4. Click a wild **Caterpie** to target it. Press **C** or type `catch` to throw a Poké Ball.
+4. **Right-click** a wild (Caterpie) to target it and attack. The out Pokémon uses M1 / melee. Left-click never attacks. Nothing out → no player punch; target is still set so **C** / `catch` works.
 5. With a Pokémon out, **M1–M10** are that Pokémon’s moves (`m1`… in chat also works). No out → moves do not fire. No target → `Você não tem um alvo.`
 6. Close the tab and log in again: same tile, same party, same Pokémon out.
 
 ## Protocol
 
-JSON over WebSocket `/ws`: `login`, `register`, `create`, `enter`, `walk`, `turn`, `look`, `use`, `say`, `logout`, `pokebar`, `catch`, `target`.
+JSON over WebSocket `/ws`: `login`, `register`, `create`, `enter`, `walk`, `walkTo`, `turn`, `look`, `use`, `say`, `logout`, `pokebar`, `catch`, `target`, `attack`.
 
 ## Assets
 

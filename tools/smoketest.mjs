@@ -60,14 +60,35 @@ const start = { x: map1.you.x, y: map1.you.y };
 if (map1.you.kind !== "player") throw new Error("player must be human, not pokemon");
 if (map1.party.slots[0]?.species !== "charmander") throw new Error("starter missing");
 
+let outId = map1.creatures.find((c) => c.kind === "pokemon" && c.masterId === map1.you.id)?.id || null;
 if (map1.party.out !== 0) {
   a.send({ t: "pokebar", slot: 0 });
   const appear = await a.wait((m) => m.t === "appear" && m.creature?.kind === "pokemon");
   if (appear.creature.look !== 4) throw new Error("released poke look is not Charmander");
   if (appear.creature.masterId !== map1.you.id) throw new Error("master not set");
-} else if (!map1.creatures.some((c) => c.kind === "pokemon" && c.masterId === map1.you.id)) {
+  outId = appear.creature.id;
+} else if (!outId) {
   throw new Error("out slot set but poke missing from map");
 }
+
+const wild = map1.creatures.find((c) => c.wild);
+if (!wild) throw new Error("no wild Caterpie on map");
+
+a.send({ t: "pokebar", slot: 0 });
+await a.wait((m) => m.t === "disappear" && m.id === outId);
+a.send({ t: "attack", id: wild.id });
+const punch = await a.wait((m) => m.t === "fx" || (m.t === "info" && /used /.test(m.text || "")), 400).then(
+  (m) => m,
+  () => null
+);
+if (punch) throw new Error("attacked without an out Pokémon");
+a.send({ t: "pokebar", slot: 0 });
+const reout = await a.wait((m) => m.t === "appear" && m.creature?.kind === "pokemon");
+outId = reout.creature.id;
+
+a.send({ t: "attack", id: wild.id });
+const hit = await a.wait((m) => m.t === "fx" || (m.t === "info" && /used /.test(m.text || "")));
+if (!hit) throw new Error("right-click attack did not fire M1");
 
 let moved = null;
 for (const dir of [2, 4, 6, 0, 3, 1, 5, 7]) {
@@ -80,9 +101,7 @@ for (const dir of [2, 4, 6, 0, 3, 1, 5, 7]) {
 }
 if (!moved) throw new Error("player did not change sqm");
 
-const wild = map1.creatures.find((c) => c.wild);
-if (!wild) throw new Error("no wild Caterpie on map");
-a.send({ t: "target", id: wild.id });
+a.send({ t: "attack", id: wild.id });
 let caught = false;
 for (let i = 0; i < 12; i++) {
   a.send({ t: "catch" });

@@ -54,7 +54,9 @@ export class GameScene extends Phaser.Scene {
     this.creatureLayer = this.add.layer();
     this.roofLayer = this.add.layer();
     this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT");
-    this.input.on("pointerdown", (p) => this.onClick(p));
+    this.input.mouse?.disableContextMenu();
+    document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
+    this.input.on("pointerdown", (p) => this.onPointer(p));
     this.enterWorld(this.payload);
   }
 
@@ -217,16 +219,40 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  onClick(pointer) {
+  creatureAt(worldX, worldY) {
+    let best = null;
+    let bestDepth = -Infinity;
+    for (const [id, sprite] of this.sprites) {
+      if (id === this.youId) continue;
+      const b = sprite.getBounds();
+      if (Phaser.Geom.Rectangle.Contains(b, worldX, worldY)) {
+        if (sprite.depth >= bestDepth) {
+          best = this.state.get(id);
+          bestDepth = sprite.depth;
+        }
+      }
+    }
+    if (best) return best;
+    const tx = Math.floor(worldX / TILE);
+    const ty = Math.floor(worldY / TILE);
+    for (const [, st] of this.state) {
+      if (st.id !== this.youId && st.x === tx && st.y === ty) return st;
+    }
+    return null;
+  }
+
+  onPointer(pointer) {
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const tx = Math.floor(world.x / TILE);
     const ty = Math.floor(world.y / TILE);
-    this.net.send({ t: "look", x: tx, y: ty });
-    for (const [id, st] of this.state) {
-      if (st.x === tx && st.y === ty && id !== this.youId) {
-        this.net.send({ t: "target", id });
-        return;
-      }
+    if (pointer.rightButtonDown()) {
+      const who = this.creatureAt(world.x, world.y);
+      if (who) this.net.send({ t: "attack", id: who.id });
+      else this.net.send({ t: "look", x: tx, y: ty });
+      return;
+    }
+    if (pointer.leftButtonDown()) {
+      this.net.send({ t: "walkTo", x: tx, y: ty });
     }
   }
 

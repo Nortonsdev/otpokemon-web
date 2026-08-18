@@ -98,6 +98,7 @@ export class World {
       const player = this.creatures.get(client.playerId);
       if (!player) return this.err(client, "Player missing.");
       if (t === "walk") return this.walk(player, msg.dir, true);
+      if (t === "walkTo") return this.setWalkTo(player, msg.x, msg.y);
       if (t === "turn") return this.turn(player, msg.dir);
       if (t === "look") return this.look(player, msg.x, msg.y);
       if (t === "use") return this.use(player, msg);
@@ -106,6 +107,7 @@ export class World {
       if (t === "pokebar") return this.pokebar(player, msg.slot);
       if (t === "catch") return this.catchBall(player);
       if (t === "target") return this.setTarget(player, msg.id);
+      if (t === "attack") return this.attack(player, msg.id);
     } catch (err) {
       console.error(err);
       this.err(client, "Server error.");
@@ -216,6 +218,7 @@ export class World {
       look: "human",
       busyUntil: 0,
       targetId: null,
+      walkTo: null,
       charName,
       bag: rec.bag,
       party: rec.party,
@@ -369,6 +372,7 @@ export class World {
   walk(creature, dir, fromClient) {
     dir = Number(dir);
     if (!Number.isInteger(dir) || dir < 0 || dir > 7) return;
+    if (fromClient && creature.kind === "player") creature.walkTo = null;
     const t = this.now();
     if (t < creature.busyUntil) return;
     creature.dir = dir;
@@ -442,6 +446,52 @@ export class World {
     player.targetId = id;
     const client = this.clientOf(player);
     if (client) this.send(client.ws, { t: "target", id });
+  }
+
+  attack(player, id) {
+    id = Number(id);
+    const c = this.creatures.get(id);
+    if (!c || c.id === player.id) {
+      this.sys(player, "Você não tem um alvo.");
+      return;
+    }
+    player.targetId = id;
+    const client = this.clientOf(player);
+    if (client) this.send(client.ws, { t: "target", id });
+    if (!c.wild) return;
+    if (!this.outPokemon(player)) return;
+    this.useMove(player, 1);
+  }
+
+  setWalkTo(player, x, y) {
+    x = Number(x);
+    y = Number(y);
+    if (!inBounds(x, y)) return;
+    player.walkTo = { x, y };
+  }
+
+  tickClickWalk() {
+    for (const c of this.creatures.values()) {
+      if (c.kind !== "player" || !c.walkTo) continue;
+      if (this.now() < c.busyUntil) continue;
+      const { x, y } = c.walkTo;
+      if (c.x === x && c.y === y) {
+        c.walkTo = null;
+        continue;
+      }
+      const destOcc = this.occupant(x, y);
+      const dist = Math.max(Math.abs(x - c.x), Math.abs(y - c.y));
+      if (destOcc && dist <= 1) {
+        c.walkTo = null;
+        continue;
+      }
+      const dir = this.greedyDir(c.x, c.y, x, y, c.id);
+      if (dir == null) {
+        c.walkTo = null;
+        continue;
+      }
+      this.walk(c, dir, false);
+    }
   }
 
   pokebar(player, slot) {
@@ -674,6 +724,7 @@ export class World {
 
   tick() {
     const t = this.now();
+    this.tickClickWalk();
     for (const c of this.creatures.values()) {
       if (c.kind === "pokemon" && c.masterId && t >= c.busyUntil) this.followStep(c);
     }
