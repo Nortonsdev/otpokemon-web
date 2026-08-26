@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = process.env.VERCEL ? "/tmp/otpokemon" : path.join(__dirname, "data");
 const SAVE_PATH = path.join(DATA_DIR, "save.json");
 
 function empty() {

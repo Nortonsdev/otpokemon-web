@@ -1,8 +1,8 @@
 # OTPokemon Web
 
-Brand-new browser Pokémon MMORPG milestone. The **Node server owns game truth** (walk, follow, catch, login, persistence). The Phaser 3 client only renders and sends intents — it never teleports the local player.
+Brand-new browser Pokémon MMORPG milestone. **Looks and plays like Tibia/Huntera from above** (32px sqm grid, outfit + Pokémon looktypes, window frames), with Ruby Pokémon systems. The **Node server owns game truth** (walk, follow, catch, login, persistence). The Phaser 3 client only renders and sends intents — it never teleports the local player.
 
-Tiles and the human trainer come from the public Huntera catalog. Pokémon looks are exported from official `Ruby.dat` / `Ruby.spr` (looktypes 1, 4, 7, 10). This is not a clone or port of Huntera, Ruby Client, or OTClient.
+Tiles, citizen looktype 128, and UI frames come from the public Huntera catalog. Pokémon looks are exported from official `Ruby.dat` / `Ruby.spr` (looktypes 1, 4, 7, 10). This is not a clone or port of Huntera, Ruby Client, or OTClient.
 
 ## Run
 
@@ -15,23 +15,28 @@ Open [http://localhost:5173](http://localhost:5173).
 
 Default account: **demo** / **demo** (create a character on first login).
 
+The account screens sit on the live top-down map, Huntera-style (`#111` chrome, `frame-window` / `frame-button` / `frame-slot` / `frame-bar`).
+
 ## Play
 
 1. Login or register, create a character, pick **Bulbasaur / Charmander / Squirtle**.
-2. Walk with **WASD** / arrows (diagonals: two keys) or **left-click** a tile (Tibia-style). Movement is server-synced.
-3. Click a party slot to **release**. Click the same slot to **recall**. Click another occupied slot to swap (recall then release). Never two Pokémon out.
-4. **Right-click** a wild (Caterpie) to target it and attack. The out Pokémon uses M1 / melee. Left-click never attacks. Nothing out → no player punch; target is still set so **C** / `catch` works.
-5. With a Pokémon out, **M1–M10** are that Pokémon’s moves (`m1`… in chat also works). No out → moves do not fire. No target → `Você não tem um alvo.`
+2. Walk with **WASD** / arrows (diagonals: two keys) or **left-click** a tile. You always steer the human — there is no idle auto-hunt. Movement is server-synced. Human uses 8 directions and a 3-frame Citizen 128 outfit; Pokémon use 4-dir 32×32 Ruby looks.
+3. Click a **Lista de Pokemon** row (left pokebar) to **release**. Click the same row to **recall**. Click another occupied row to swap (recall then release). Never two Pokémon out. Wrench on the header (hover) reorders the six slots. The out Pokémon follows on the tiles behind you. Nameplates are green `Nome [level]` with an HP bar under the name.
+4. **Right-click** a wild (Caterpie) to put a **red circle** on it and fire M1. Left-click walks, never attacks. Nothing out → `Você precisa ter um Pokémon fora.` No target → `Você não tem um alvo.` Damage logs `Seu Charmander causou N de dano em um Caterpie.`
+5. With a Pokémon out, **M1–M10** (keys **1–0**, HUD clicks, or `m1` in chat) are that Pokémon’s moves. No out → moves do not fire. No target → `Você não tem um alvo.`
 6. Close the tab and log in again: same tile, same party, same Pokémon out.
+
+Layers: ground, item (flowers / gold), creature, wall, roof (roof dims when you walk under). No map/item/sprite editor on the play screen.
 
 ## Protocol
 
-JSON over WebSocket `/ws`: `login`, `register`, `create`, `enter`, `walk`, `walkTo`, `turn`, `look`, `use`, `say`, `logout`, `pokebar`, `catch`, `target`, `attack`.
+JSON over WebSocket `/ws`: `login`, `register`, `create`, `enter`, `walk`, `walkTo`, `turn`, `look`, `use`, `say`, `logout`, `pokebar`, `catch`, `target`, `attack`, `move`.
 
 ## Assets
 
 - Pokémon sheets: `tools/extract_ruby_sprites.py` (Ruby.spr Alpha-RLE, DAT frame-groups).
-- Huntera grass/path/wall/roof + citizen looktype 128: `tools/extract_huntera.py`.
+- Huntera grass/path/stone/wall/roof + flowers/gold + citizen looktype 128: `tools/extract_huntera.py`.
+- UI frames: `client/public/assets/ui/frames/` (Huntera `frame-window`, `frame-button`, `frame-slot`, `frame-bar`).
 - HUD chrome from [rubyclient `data/images/game/pokemon`](https://github.com/OLDtherubyproject/rubyclient/tree/master/data/images/game/pokemon).
 
 Species (Kanto XML base stats; creature max HP is Ruby `Pokemon::getMaxHealth`, not the raw XML HP):
@@ -47,8 +52,25 @@ Max HP: `hpMax = max(1, ((2*baseHp + ivHp + ivHp + floor(evHp/30)) * level)/100 
 
 Poké Ball rate = 1. Catch succeeds if `rand(1,100) <= species.catchRate * ball.rate`. Party cap 6.
 
+## Deploy (Vercel)
+
+This is a Vite static client plus a Node WebSocket world on Vercel Fluid Compute.
+
+```bash
+npx vercel --prod
+```
+
+Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` already rewrites `/ws` → `/api/ws`.
+
+Limits of this host: the world is in-memory on one Function instance. Connections drop at the plan `maxDuration` (Hobby default 300s; anonymous/temp deploys cap at 60s) and the client reconnects. A reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
+
+Anonymous `vercel deploy --temporary` URLs expire unless you [claim the deployment](https://vercel.com/docs/deployments/claim-deployments). For a lasting project, log in with `vercel login` or import this GitHub repo in the Vercel dashboard.
+
+Default account after a cold start: **demo** / **demo**.
+
 ## Layout
 
-- `server/` authoritative world, SQLite-free JSON persist in `server/data/save.json`
-- `client/` Vite + Phaser 3 (ground, wall, creature, roof layers)
-- `client/public/assets/` committed PNG sheets and HUD
+- `server/` authoritative world, JSON persist in `server/data/save.json` (or `/tmp/otpokemon` on Vercel)
+- `client/` Vite + Phaser 3 (ground, item, creature, wall, roof layers; top-down sqm camera)
+- `client/public/assets/` committed PNG sheets, Huntera frames, and HUD
+- `api/ws.js` Vercel Function that exports the game HTTP + WebSocket server
