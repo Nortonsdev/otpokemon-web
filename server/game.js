@@ -12,7 +12,7 @@ import {
   applyRubyHealth,
   behind,
 } from "./species.js";
-import { MAP, hasRoof, inBounds, tileName, walkable } from "./map.js";
+import { MAP, WILD_GROUPS, hasRoof, inBounds, tileName, walkable } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 
 let nextId = 1;
@@ -961,35 +961,37 @@ export class World {
   }
 
   ensureWild() {
-    const existing = [...this.creatures.values()].filter((c) => c.wild && !c.dead).length;
-    const want = 2;
-    for (let i = existing; i < want; i++) this.spawnWild();
+    for (const group of WILD_GROUPS) {
+      const living = [...this.creatures.values()].filter(
+        (c) => c.wild && !c.dead && c.species === group.species
+      ).length;
+      for (let i = living; i < group.want; i++) this.spawnWild(group.species, group.spots);
+    }
   }
 
-  spawnWild() {
-    const spots = MAP.wildSpawns.filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y));
-    if (!spots.length) return;
-    const spot = spots[randomInt(0, spots.length)];
-    const spec = SPECIES.caterpie;
-    const stats = this.makeMon("caterpie", 2);
+  spawnWild(species = "caterpie", spots = MAP.wildSpawns) {
+    const spec = SPECIES[species];
+    if (!spec) return;
+    const free = (spots || MAP.wildSpawns).filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y));
+    if (!free.length) return;
+    const spot = free[randomInt(0, free.length)];
+    const catHp = this.makeMon("caterpie", 2);
     const wild = {
       id: cid(),
       kind: "wild",
       wild: true,
-      species: "caterpie",
+      species,
       name: spec.name,
       look: spec.look,
       x: spot.x,
       y: spot.y,
       z: MAP.z,
       dir: DIR.S,
-      hp: stats.hp,
-      hpMax: stats.hpMax,
-      level: stats.level,
-      baseHp: stats.baseHp,
-      baseStats: { ...spec.baseStats },
-      ivs: stats.ivs,
-      evs: stats.evs,
+      hp: catHp.hp,
+      hpMax: catHp.hpMax,
+      level: 2,
+      baseHp: SPECIES.caterpie.baseStats.hp,
+      baseStats: { ...SPECIES.caterpie.baseStats },
       busyUntil: 0,
     };
     this.creatures.set(wild.id, wild);

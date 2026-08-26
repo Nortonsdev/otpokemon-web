@@ -87,12 +87,18 @@ if (map1.party.out !== 0) {
   }
 }
 
-const wild = map1.creatures.find((c) => c.wild);
+const wild = map1.creatures.find((c) => c.wild && (c.species === "caterpie" || c.look === 10));
 if (!wild) throw new Error("no wild Caterpie on map");
 if (wild.hpMax !== 13) {
   throw new Error(`wild hpMax ${wild.hpMax} (Caterpie lv2 without IVs should be 13)`);
 }
 if (!String(wild.plate || "").startsWith("Caterpie [2]")) throw new Error(`wild plate ${wild.plate}`);
+const wildZard = map1.creatures.find((c) => c.wild && (c.species === "charizard" || c.look === 6));
+const wildDash = map1.creatures.find((c) => c.wild && (c.species === "rapidash" || c.look === 78));
+if (!wildZard) throw new Error("no wild Charizard on map");
+if (!wildDash) throw new Error("no wild Rapidash on map");
+if (wildZard.hpMax !== wild.hpMax) throw new Error(`wild Charizard hpMax ${wildZard.hpMax} != Caterpie`);
+if (wildDash.hpMax !== wild.hpMax) throw new Error(`wild Rapidash hpMax ${wildDash.hpMax} != Caterpie`);
 
 a.send({ t: "pokebar", slot: 0 });
 await a.wait((m) => m.t === "disappear" && m.id === outId);

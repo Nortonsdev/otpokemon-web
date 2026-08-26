@@ -83,7 +83,7 @@ export const SPECIES = {
   venusaur: mon(3, 3, "Venusaur", ["grass", "poison"], 80, 82, 83, 100, 100, 80, 45, M1("Vine Whip")),
   charmander: mon(4, 4, "Charmander", ["fire"], 39, 52, 43, 60, 50, 65, 45, M1("Scratch")),
   charmeleon: mon(5, 5, "Charmeleon", ["fire"], 58, 64, 58, 80, 65, 80, 45, M1("Scratch")),
-  charizard: mon(6, 6, "Charizard", ["fire", "flying"], 78, 84, 78, 109, 85, 100, 45, M1("Scratch"), ["fly"]),
+  charizard: mon(6, 6, "Charizard", ["fire", "flying"], 78, 84, 78, 109, 85, 100, 50, M1("Scratch"), ["fly"]),
   squirtle: mon(7, 7, "Squirtle", ["water"], 44, 48, 65, 50, 64, 43, 45, M1("Water Gun")),
   wartortle: mon(8, 8, "Wartortle", ["water"], 59, 63, 80, 65, 80, 58, 45, M1("Water Gun")),
   blastoise: mon(9, 9, "Blastoise", ["water"], 79, 83, 100, 85, 105, 78, 45, M1("Water Gun"), ["surf"]),
@@ -97,7 +97,7 @@ export const SPECIES = {
   pidgeotto: mon(17, 17, "Pidgeotto", ["normal", "flying"], 63, 60, 55, 50, 50, 71, 45, M1("Tackle")),
   pidgeot: mon(18, 18, "Pidgeot", ["normal", "flying"], 83, 80, 75, 70, 70, 101, 45, M1("Tackle")),
   raticate: mon(20, 20, "Raticate", ["normal"], 55, 81, 60, 50, 70, 97, 45, M1("Tackle")),
-  rapidash: mon(78, 78, "Rapidash", ["fire"], 65, 100, 70, 80, 80, 105, 45, M1("Tackle"), ["ride"]),
+  rapidash: mon(78, 78, "Rapidash", ["fire"], 65, 100, 70, 80, 80, 105, 50, M1("Tackle"), ["ride"]),
 };
 
 export const LOOK_NAME = Object.fromEntries(Object.values(SPECIES).map((s) => [s.look, s.name.toLowerCase()]));

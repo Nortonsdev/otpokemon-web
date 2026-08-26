@@ -98,6 +98,31 @@ export function buildMap() {
 
 export const MAP = buildMap();
 
+/** Fixed wild packs: Caterpie in the cave, Charizard/Rapidash on grass (near + further). */
+export const WILD_GROUPS = [
+  { species: "caterpie", want: 2, spots: MAP.wildSpawns },
+  {
+    species: "charizard",
+    want: 4,
+    spots: [
+      { x: 5, y: 9 },
+      { x: 12, y: 8 },
+      { x: 3, y: 2 },
+      { x: 23, y: 19 },
+    ],
+  },
+  {
+    species: "rapidash",
+    want: 4,
+    spots: [
+      { x: 4, y: 15 },
+      { x: 17, y: 9 },
+      { x: 24, y: 4 },
+      { x: 2, y: 20 },
+    ],
+  },
+];
+
 export function inBounds(x, y) {
   return x >= 0 && y >= 0 && x < MAP.w && y < MAP.h;
 }
