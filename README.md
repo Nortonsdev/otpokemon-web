@@ -52,8 +52,23 @@ Max HP: `hpMax = max(1, ((2*baseHp + ivHp + ivHp + floor(evHp/30)) * level)/100 
 
 Poké Ball rate = 1. Catch succeeds if `rand(1,100) <= species.catchRate * ball.rate`. Party cap 6.
 
+## Deploy (Vercel)
+
+This is a Vite static client plus a Node WebSocket world on Vercel Fluid Compute.
+
+```bash
+npx vercel --prod
+```
+
+Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` already rewrites `/ws` → `/api/ws`.
+
+Limits of this host: the world is in-memory on one Function instance. Connections drop at `maxDuration` (300s) and reconnect; a reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
+
+Default account after a cold start: **demo** / **demo**.
+
 ## Layout
 
-- `server/` authoritative world, SQLite-free JSON persist in `server/data/save.json`
+- `server/` authoritative world, JSON persist in `server/data/save.json` (or `/tmp/otpokemon` on Vercel)
 - `client/` Vite + Phaser 3 (ground, item, creature, wall, roof layers; top-down sqm camera)
 - `client/public/assets/` committed PNG sheets, Huntera frames, and HUD
+- `api/ws.js` Vercel Function that exports the game HTTP + WebSocket server

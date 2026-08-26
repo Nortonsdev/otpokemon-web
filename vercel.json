@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "fluid": true,
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/ws", "destination": "/api/ws" },
+    { "source": "/health", "destination": "/api/ws" }
+  ],
+  "functions": {
+    "api/ws.js": {
+      "maxDuration": 300,
+      "includeFiles": "server/**"
+    }
+  }
+}

@@ -14,6 +14,7 @@ const STARTERS = [
 
 let selectedStarter = "charmander";
 let game = null;
+const session = { user: "", pass: "", charName: "", inWorld: false, rejoining: false };
 
 function show(id) {
   for (const el of document.querySelectorAll("#ui > section")) el.classList.add("hidden");
@@ -33,7 +34,10 @@ function renderChars(chars) {
     const li = document.createElement("li");
     const btn = document.createElement("button");
     btn.textContent = `Enter ${name}`;
-    btn.onclick = () => net.send({ t: "enter", name });
+    btn.onclick = () => {
+      session.charName = name;
+      net.send({ t: "enter", name });
+    };
     li.appendChild(btn);
     list.appendChild(li);
   }
@@ -71,15 +75,27 @@ function ensureGame() {
 
 net.on("hello", () => {});
 net.on("err", (m) => {
+  if (session.rejoining) {
+    session.rejoining = false;
+    session.inWorld = false;
+    show("screen-chars");
+  }
   msg("login-msg", m.text);
   msg("char-msg", m.text);
   hud.log(m.text);
 });
 net.on("welcome", (m) => {
+  if (session.rejoining && session.charName) {
+    net.send({ t: "enter", name: session.charName });
+    return;
+  }
   show("screen-chars");
   renderChars(m.chars || []);
 });
 net.on("map", (m) => {
+  session.rejoining = false;
+  session.inWorld = true;
+  if (m.you?.name) session.charName = m.you.name;
   show("screen-game");
   hud.bindGame();
   const g = ensureGame();
@@ -87,9 +103,21 @@ net.on("map", (m) => {
   if (scene && scene.enterWorld) scene.enterWorld(m);
 });
 net.on("loggedOut", () => {
+  session.inWorld = false;
+  session.charName = "";
+  session.rejoining = false;
   show("screen-login");
   const scene = game?.scene.getScene("game");
   scene?.enterPreview();
+});
+net.on("_open", ({ reconnect }) => {
+  if (!reconnect || !session.user || !session.pass) return;
+  session.rejoining = session.inWorld && Boolean(session.charName);
+  if (session.rejoining) hud.log("Reconectando ao servidor...");
+  net.send({ t: "login", user: session.user, pass: session.pass });
+});
+net.on("_close", () => {
+  if (session.inWorld) hud.log("Conexão perdida. Tentando reconectar...");
 });
 net.on("*", (m) => {
   if (game) {
@@ -99,26 +127,23 @@ net.on("*", (m) => {
   hud.handle(m);
 });
 
+function rememberAccount() {
+  session.user = document.getElementById("user").value;
+  session.pass = document.getElementById("pass").value;
+}
+
 document.getElementById("btn-login").onclick = () => {
-  net.send({
-    t: "login",
-    user: document.getElementById("user").value,
-    pass: document.getElementById("pass").value,
-  });
+  rememberAccount();
+  net.send({ t: "login", user: session.user, pass: session.pass });
 };
 document.getElementById("btn-register").onclick = () => {
-  net.send({
-    t: "register",
-    user: document.getElementById("user").value,
-    pass: document.getElementById("pass").value,
-  });
+  rememberAccount();
+  net.send({ t: "register", user: session.user, pass: session.pass });
 };
 document.getElementById("btn-create").onclick = () => {
-  net.send({
-    t: "create",
-    name: document.getElementById("char-name").value,
-    starter: selectedStarter,
-  });
+  const name = document.getElementById("char-name").value;
+  session.charName = name;
+  net.send({ t: "create", name, starter: selectedStarter });
 };
 
 ensureGame();
