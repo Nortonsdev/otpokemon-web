@@ -196,7 +196,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setDepth(c.y * 10 + 6);
     this.creatureLayer.add(sprite);
     const plate = this.add
-      .text(pos.x + size / 2, pos.y - 2, c.plate || c.name, {
+      .text(pos.x + size / 2, tex === "human" ? pos.y + 10 : pos.y - 2, c.plate || c.name, {
         fontFamily: "system-ui, sans-serif",
         fontSize: "10px",
         color: "#ddd",
@@ -239,7 +239,7 @@ export class GameScene extends Phaser.Scene {
     if (!sprite || !plate) return;
     const size = sprite.texture.key === "human" ? 64 : 32;
     const cx = spriteX + size / 2;
-    plate.setPosition(cx, spriteY - 2);
+    plate.setPosition(cx, size === 64 ? spriteY + 10 : spriteY - 2);
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
