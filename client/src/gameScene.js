@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { MAP } from "../../server/map.js";
 
 const TILE = 32;
 const SPRITE_COL = [0, 1, 1, 2, 2, 3, 3, 0];
@@ -15,12 +16,24 @@ function frameIndex(dir, moving, phase) {
   return row * 4 + col;
 }
 
+function isTyping() {
+  const el = document.activeElement;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+}
+
+function groundTexture(cell) {
+  if (cell === 1) return "path";
+  if (cell === 2) return "stone";
+  return "grass";
+}
+
 export class GameScene extends Phaser.Scene {
-  constructor(net, hud, payload) {
+  constructor(net, hud) {
     super("game");
     this.net = net;
     this.hud = hud;
-    this.payload = payload;
     this.sprites = new Map();
     this.plates = new Map();
     this.hpBars = new Map();
@@ -30,16 +43,23 @@ export class GameScene extends Phaser.Scene {
     this.keys = null;
     this.roofSprites = [];
     this.groundLayer = null;
+    this.itemLayer = null;
     this.wallLayer = null;
     this.roofLayer = null;
     this.creatureLayer = null;
+    this.live = false;
+    this.pendingWorld = null;
   }
 
   preload() {
     this.load.image("grass", "/assets/tiles/grass.png");
     this.load.image("path", "/assets/tiles/path.png");
+    this.load.image("stone", "/assets/tiles/stone.png");
     this.load.image("wall", "/assets/tiles/wall.png");
     this.load.image("roof", "/assets/tiles/roof.png");
+    this.load.image("flower", "/assets/tiles/flower.png");
+    this.load.image("rose", "/assets/tiles/rose.png");
+    this.load.image("gold", "/assets/tiles/gold.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
     for (const name of Object.values(LOOK)) {
       this.load.spritesheet(name, `/assets/pokemon/${name}/sheet.png`, {
@@ -51,20 +71,27 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.groundLayer = this.add.layer();
+    this.itemLayer = this.add.layer();
     this.wallLayer = this.add.layer();
     this.creatureLayer = this.add.layer();
     this.roofLayer = this.add.layer();
-    this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT");
+    this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO");
+    this.input.keyboard.enabled = false;
     this.input.mouse?.disableContextMenu();
     document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
     this.input.on("pointerdown", (p) => this.onPointer(p));
-    this.enterWorld(this.payload);
+    this.cameras.main.setRoundPixels(true);
+    this.cameras.main.setBackgroundColor(0x111111);
+    if (this.pendingWorld) {
+      const payload = this.pendingWorld;
+      this.pendingWorld = null;
+      this.enterWorld(payload);
+    } else {
+      this.enterPreview();
+    }
   }
 
-  enterWorld(payload) {
-    this.payload = payload;
-    this.mapData = payload.map;
-    this.youId = payload.you.id;
+  clearWorld() {
     for (const s of this.sprites.values()) s.destroy();
     for (const p of this.plates.values()) p.destroy();
     for (const bar of this.hpBars.values()) {
@@ -76,22 +103,60 @@ export class GameScene extends Phaser.Scene {
     this.hpBars.clear();
     this.state.clear();
     this.groundLayer.removeAll(true);
+    this.itemLayer.removeAll(true);
     this.wallLayer.removeAll(true);
     this.roofLayer.removeAll(true);
     this.roofSprites = [];
+    this.youId = null;
+  }
+
+  enterPreview() {
+    if (!this.groundLayer) return;
+    this.live = false;
+    if (this.input?.keyboard) this.input.keyboard.enabled = false;
+    this.clearWorld();
+    this.mapData = {
+      w: MAP.w,
+      h: MAP.h,
+      z: MAP.z,
+      ground: MAP.ground,
+      walls: MAP.walls,
+      roofs: MAP.roofs,
+      items: MAP.items,
+    };
+    this.drawMap();
+    this.cameras.main.stopFollow();
+    this.cameras.main.setZoom(2);
+    this.cameras.main.centerOn(8 * TILE + 16, 12 * TILE + 16);
+    this.cameras.main.setRoundPixels(true);
+  }
+
+  enterWorld(payload) {
+    if (!this.groundLayer) {
+      this.pendingWorld = payload;
+      return;
+    }
+    this.live = true;
+    if (this.input?.keyboard) this.input.keyboard.enabled = true;
+    this.clearWorld();
+    this.mapData = payload.map;
+    this.youId = payload.you.id;
     this.drawMap();
     for (const c of payload.creatures) this.spawn(c);
     this.cameras.main.setZoom(2);
+    this.cameras.main.setRoundPixels(true);
     const you = this.sprites.get(this.youId);
-    if (you) this.cameras.main.startFollow(you, true, 0.15, 0.15);
+    if (you) this.cameras.main.startFollow(you, true, 1, 1);
     this.updateRoofs();
   }
 
   drawMap() {
-    const { w, h, ground, walls, roofs } = this.mapData;
+    const { w, h, ground, walls, roofs, items } = this.mapData;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const g = this.add.image(x * TILE, y * TILE, ground[y][x] === 1 ? "path" : "grass").setOrigin(0, 0);
+        const g = this.add
+          .image(x * TILE, y * TILE, groundTexture(ground[y][x]))
+          .setOrigin(0, 0);
         g.setDepth(y);
         this.groundLayer.add(g);
         if (walls[y][x]) {
@@ -108,6 +173,11 @@ export class GameScene extends Phaser.Scene {
           this.roofSprites.push(roof);
         }
       }
+    }
+    for (const it of items || []) {
+      const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
+      spr.setDepth(it.y * 10 + 2);
+      this.itemLayer.add(spr);
     }
   }
 
@@ -127,12 +197,13 @@ export class GameScene extends Phaser.Scene {
     this.creatureLayer.add(sprite);
     const plate = this.add
       .text(pos.x + size / 2, pos.y - 2, c.plate || c.name, {
-        fontFamily: "Trebuchet MS",
+        fontFamily: "system-ui, sans-serif",
         fontSize: "10px",
-        color: "#fff",
-        backgroundColor: "#00000088",
+        color: "#ddd",
+        backgroundColor: "#111111cc",
       })
-      .setOrigin(0.5, 1);
+      .setOrigin(0.5, 1)
+      .setPadding(2, 1, 2, 1);
     plate.setDepth(c.y * 10 + 7);
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
@@ -140,7 +211,7 @@ export class GameScene extends Phaser.Scene {
     if (c.kind === "pokemon" || c.kind === "wild") {
       const cx = pos.x + size / 2;
       const barY = pos.y + 2;
-      const bg = this.add.rectangle(cx, barY, 28, 4, 0x1a1a1a).setOrigin(0.5, 0.5);
+      const bg = this.add.rectangle(cx, barY, 28, 4, 0x111111).setOrigin(0.5, 0.5);
       bg.setStrokeStyle(1, 0x000000, 0.9);
       bg.setDepth(c.y * 10 + 8);
       const fg = this.add.rectangle(cx - 13, barY, 26, 2, 0x3dcc4a).setOrigin(0, 0.5);
@@ -209,6 +280,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   handleNet(msg) {
+    if (!this.live && msg.t !== "map") return;
     if (msg.t === "appear") this.spawn(msg.creature);
     if (msg.t === "disappear") this.despawn(msg.id);
     if (msg.t === "turn") {
@@ -293,6 +365,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   onPointer(pointer) {
+    if (!this.live) return;
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const tx = Math.floor(world.x / TILE);
     const ty = Math.floor(world.y / TILE);
@@ -324,9 +397,32 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
+  moveKey() {
+    const k = this.keys;
+    if (Phaser.Input.Keyboard.JustDown(k.ONE)) return 1;
+    if (Phaser.Input.Keyboard.JustDown(k.TWO)) return 2;
+    if (Phaser.Input.Keyboard.JustDown(k.THREE)) return 3;
+    if (Phaser.Input.Keyboard.JustDown(k.FOUR)) return 4;
+    if (Phaser.Input.Keyboard.JustDown(k.FIVE)) return 5;
+    if (Phaser.Input.Keyboard.JustDown(k.SIX)) return 6;
+    if (Phaser.Input.Keyboard.JustDown(k.SEVEN)) return 7;
+    if (Phaser.Input.Keyboard.JustDown(k.EIGHT)) return 8;
+    if (Phaser.Input.Keyboard.JustDown(k.NINE)) return 9;
+    if (Phaser.Input.Keyboard.JustDown(k.ZERO)) return 10;
+    return null;
+  }
+
   update() {
+    if (!this.live) return;
+    if (isTyping()) {
+      this.input.keyboard.enabled = false;
+      return;
+    }
+    this.input.keyboard.enabled = true;
     const dir = this.currentDir();
     if (dir != null) this.net.send({ t: "walk", dir });
     if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.net.send({ t: "catch" });
+    const move = this.moveKey();
+    if (move != null) this.net.send({ t: "move", n: move });
   }
 }

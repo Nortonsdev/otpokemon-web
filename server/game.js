@@ -109,6 +109,7 @@ export class World {
       if (t === "catch") return this.catchBall(player);
       if (t === "target") return this.setTarget(player, msg.id);
       if (t === "attack") return this.attack(player, msg.id);
+      if (t === "move") return this.useMove(player, Number(msg.n));
     } catch (err) {
       console.error(err);
       this.err(client, "Server error.");
@@ -244,7 +245,7 @@ export class World {
       dir: rec.dir ?? DIR.S,
       hp: rec.hp,
       hpMax: rec.hpMax,
-      look: "human",
+      look: 128,
       busyUntil: 0,
       targetId: null,
       walkTo: null,
@@ -275,6 +276,7 @@ export class World {
         ground: MAP.ground,
         walls: MAP.walls,
         roofs: MAP.roofs,
+        items: MAP.items,
       },
       you: this.publicCreature(player),
       creatures: [...this.creatures.values()].map((c) => this.publicCreature(c)),

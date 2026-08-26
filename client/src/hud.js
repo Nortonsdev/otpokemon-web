@@ -85,10 +85,12 @@ export class Hud {
       const el = document.createElement("div");
       el.className = "slot" + (p ? "" : " empty") + (this.party.out === i ? " out" : "");
       const look = p ? LOOK_FILE[p.look] : null;
+      const ratio = p ? Math.max(0, Math.min(1, p.hp / Math.max(1, p.hpMax))) : 0;
       el.innerHTML = p
-        ? `<img class="portrait" src="/assets/pokemon/${look}/portrait.png" alt="${p.name}" />`
+        ? `<img class="portrait" src="/assets/pokemon/${look}/portrait.png" alt="${p.name}" />
+           <div class="slot-hp"><div class="slot-hp-fill" style="width:${ratio * 100}%"></div></div>`
         : `<img class="portrait" src="/assets/hud/slots/pokeball.png" alt="empty" />`;
-      el.title = p ? `${p.name} [${p.level}] (${p.ball})` : "empty";
+      el.title = p ? `${p.name} [${p.level}] ${p.hp}/${p.hpMax}` : "empty";
       el.onclick = () => this.net.send({ t: "pokebar", slot: i });
       slots.appendChild(el);
     }
@@ -98,12 +100,13 @@ export class Hud {
     const known = out ? moveCount(out.species) : 0;
     for (let i = 1; i <= 10; i++) {
       const on = out && i <= known;
-      const img = document.createElement("img");
-      img.className = "move" + (on ? "" : " off");
-      img.src = `/assets/hud/moves/${i}_${on ? "on" : "off"}.png`;
-      img.title = on ? `m${i}` : "";
-      if (on) img.onclick = () => this.net.send({ t: "say", text: `m${i}` });
-      moves.appendChild(img);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "move" + (on ? "" : " off");
+      btn.title = on ? `M${i}` : `M${i}`;
+      btn.innerHTML = `<img src="/assets/hud/moves/${i}_${on ? "on" : "off"}.png" alt="M${i}" /><span>M${i}</span>`;
+      if (on) btn.onclick = () => this.net.send({ t: "move", n: i });
+      moves.appendChild(btn);
     }
   }
 }

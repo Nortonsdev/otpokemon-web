@@ -3,15 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OTPokemon Web</title>
+    <title>OTPokemon</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
     <div id="game"></div>
+    <div id="world-scrim"></div>
     <div id="ui">
-      <section id="screen-login" class="panel center">
-        <h1>OTPokemon Web</h1>
-        <p class="muted">Server-authoritative milestone. Default login <code>demo/demo</code>.</p>
+      <section id="screen-login" class="panel account-card center">
+        <div class="brand">
+          <span class="gem" aria-hidden="true"></span>
+          <h1>OTPokemon</h1>
+        </div>
+        <p class="muted">Create your account</p>
         <label>Account <input id="user" value="demo" autocomplete="username" /></label>
         <label>Password <input id="pass" type="password" value="demo" autocomplete="current-password" /></label>
         <div class="row">
@@ -19,9 +23,10 @@
           <button id="btn-register" class="ghost">Create account</button>
         </div>
         <p id="login-msg" class="msg"></p>
+        <p class="hint">Default login <code>demo/demo</code></p>
       </section>
 
-      <section id="screen-chars" class="panel center hidden">
+      <section id="screen-chars" class="panel character-card center hidden">
         <h2>Characters</h2>
         <ul id="char-list"></ul>
         <hr />
@@ -29,12 +34,12 @@
         <label>Name <input id="char-name" maxlength="19" /></label>
         <p>Starter</p>
         <div id="starters" class="starters"></div>
-        <button id="btn-create">Create & enter</button>
+        <button id="btn-create">Create character</button>
         <p id="char-msg" class="msg"></p>
       </section>
 
       <section id="screen-game" class="hidden">
-        <aside id="hud-left">
+        <aside id="hud-left" class="hud-window">
           <div class="poke-window">
             <div class="hp-row">
               <img src="/assets/hud/health_bar.png" alt="" />
@@ -51,9 +56,9 @@
           </div>
         </aside>
         <div id="moves"></div>
-        <div id="chat">
+        <div id="chat" class="hud-window">
           <div id="chat-log"></div>
-          <input id="chat-input" maxlength="120" placeholder="say / m1–m10 / catch · right-click wild to attack" />
+          <input id="chat-input" maxlength="120" placeholder="say / m1–m10 / catch · 1–0 moves · C catch · right-click wild" />
         </div>
       </section>
     </div>

@@ -15,7 +15,16 @@ from PIL import Image
 from extract_huntera_parse import parse_appearances
 
 BASE_URL = "https://huntera.com.br/things/1332"
-TILE_IDS = {"grass": 106, "path": 351, "wall": 2200, "roof": 1088}
+TILE_IDS = {
+    "grass": 106,
+    "path": 351,
+    "wall": 2200,
+    "roof": 1088,
+    "flower": 102,
+    "rose": 3658,
+    "gold": 3031,
+    "stone": 26121,
+}
 OUTFIT_ID = 128
 SPRITE_TYPES = {
     0: (32, 32, 12, 12),

@@ -18,6 +18,8 @@ let game = null;
 function show(id) {
   for (const el of document.querySelectorAll("#ui > section")) el.classList.add("hidden");
   document.getElementById(id).classList.remove("hidden");
+  document.body.classList.toggle("in-game", id === "screen-game");
+  document.getElementById("world-scrim").classList.toggle("hidden", id === "screen-game");
 }
 
 function msg(el, text) {
@@ -49,6 +51,24 @@ function renderChars(chars) {
   }
 }
 
+function ensureGame() {
+  if (game) return game;
+  game = new Phaser.Game({
+    type: Phaser.AUTO,
+    parent: "game",
+    width: window.innerWidth,
+    height: window.innerHeight,
+    backgroundColor: "#111111",
+    pixelArt: true,
+    roundPixels: true,
+    antialias: false,
+    scene: [new GameScene(net, hud)],
+    scale: { mode: Phaser.Scale.RESIZE },
+    render: { pixelArt: true, roundPixels: true, antialias: false },
+  });
+  return game;
+}
+
 net.on("hello", () => {});
 net.on("err", (m) => {
   msg("login-msg", m.text);
@@ -63,27 +83,14 @@ net.on("welcome", (m) => {
 net.on("map", (m) => {
   show("screen-game");
   hud.bindGame();
-  if (!game) {
-    game = new Phaser.Game({
-      type: Phaser.AUTO,
-      parent: "game",
-      width: window.innerWidth,
-      height: window.innerHeight,
-      backgroundColor: "#000",
-      pixelArt: true,
-      scene: [new GameScene(net, hud, m)],
-      scale: { mode: Phaser.Scale.RESIZE },
-    });
-  } else {
-    game.scene.getScene("game").enterWorld(m);
-  }
+  const g = ensureGame();
+  const scene = g.scene.getScene("game");
+  if (scene && scene.enterWorld) scene.enterWorld(m);
 });
 net.on("loggedOut", () => {
   show("screen-login");
-  if (game) {
-    game.destroy(true);
-    game = null;
-  }
+  const scene = game?.scene.getScene("game");
+  scene?.enterPreview();
 });
 net.on("*", (m) => {
   if (game) {
@@ -115,4 +122,5 @@ document.getElementById("btn-create").onclick = () => {
   });
 };
 
+ensureGame();
 net.connect().catch((err) => msg("login-msg", err.message));
