@@ -1,4 +1,4 @@
-const STORAGE_KEY = "otpokemon-hud-v2";
+const STORAGE_KEY = "otpokemon-hud-v3";
 
 export const WINDOW_DEFS = [
   { id: "minimap", title: "Minimapa" },
@@ -19,8 +19,10 @@ const DEFAULTS = {
   battle: { x: 10, y: 0, open: true, locked: true, min: false, bottom: 168 },
   status: { x: 0, y: 50, open: true, locked: true, min: false, right: 10 },
   inv: { x: 0, y: 248, open: true, locked: true, min: false, right: 10 },
-  chat: { x: 0, y: 0, open: true, locked: true, min: false, bottom: 10, center: true, wide: true },
+  chat: { open: true, dock: true },
 };
+
+const DOCKED = new Set(["chat"]);
 
 function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
@@ -52,6 +54,10 @@ export class WindowManager {
     for (const def of WINDOW_DEFS) {
       const src = saved[def.id];
       if (!src || typeof src !== "object") continue;
+      if (DOCKED.has(def.id)) {
+        this.layout[def.id] = { ...DEFAULTS[def.id], open: src.open !== false };
+        continue;
+      }
       this.layout[def.id] = { ...this.layout[def.id], ...src };
     }
   }
@@ -72,6 +78,7 @@ export class WindowManager {
   }
 
   decorate(el, def) {
+    if (DOCKED.has(def.id)) return;
     const head = el.querySelector(".win-head") || el.querySelector("header");
     if (!head) return;
     head.classList.add("win-head");
@@ -120,6 +127,7 @@ export class WindowManager {
   }
 
   onHeadDown(id, e) {
+    if (DOCKED.has(id)) return;
     if (e.target.closest("[data-act]")) return;
     if (e.button !== 0) return;
     const w = this.layout[id];
@@ -160,6 +168,10 @@ export class WindowManager {
     const el = document.querySelector(`[data-win="${id}"]`);
     const w = this.layout[id];
     if (!el || !w) return;
+    if (DOCKED.has(id)) {
+      el.classList.toggle("win-closed", !w.open);
+      return;
+    }
     el.classList.toggle("win-closed", !w.open);
     el.classList.toggle("win-min", !!w.min);
     el.classList.toggle("win-locked", !!w.locked);

@@ -16,8 +16,14 @@ function creatureSize(tex) {
 }
 
 function tileWorld(x, y, size) {
-  if (size > TILE) return { x: x * TILE - (size - TILE), y: y * TILE - (size - TILE) };
+  if (size > TILE) {
+    return { x: x * TILE - (size - TILE), y: y * TILE - (size - TILE) };
+  }
   return { x: x * TILE, y: y * TILE };
+}
+
+function creatureFootprint(size) {
+  return size > TILE ? 2 : 1;
 }
 
 function frameIndex(dir, moving, phase) {
@@ -382,13 +388,19 @@ export class GameScene extends Phaser.Scene {
       sprite.setOrigin(0.5, 0.5);
       sprite.setAngle(0);
       sprite.setScale(1);
-      sprite.setPosition(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2 + (size > 32 ? 8 : 4));
+      const foot = creatureFootprint(size);
+      sprite.setPosition(
+        d.x * TILE + (foot * TILE) / 2,
+        d.y * TILE + (foot * TILE) / 2 + (size > TILE ? 4 : 0)
+      );
       this.plates.get(id)?.setVisible(false);
       const bar = this.hpBars.get(id);
       bar?.bg.setVisible(false);
       bar?.fg.setVisible(false);
-    } else {
-      sprite.setVisible(true);
+      sprite.setDepth(depth);
+      return;
+    }
+    sprite.setVisible(true);
       this.plates.get(id)?.setVisible(true);
       const bar = this.hpBars.get(id);
       bar?.bg.setVisible(true);
@@ -412,9 +424,8 @@ export class GameScene extends Phaser.Scene {
       }
       sprite.setPosition(px, py);
       sprite.setFrame(frameIndex(st.dir || 4, walking, st.phase));
-    }
-    sprite.setDepth(depth);
-    this.layoutNameplate(id, pos.x, pos.y, depth);
+      this.layoutNameplate(id, px, py, depth);
+      sprite.setDepth(depth);
   }
 
   layoutAll() {

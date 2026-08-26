@@ -141,22 +141,18 @@
           <div id="hotbar" class="hotbar-circle"></div>
         </div>
 
-        <div id="chat" class="float-window" data-win="chat">
-          <header class="win-head"><span class="win-title">Chat</span></header>
-          <div class="win-body">
-            <div class="chat-tabs" id="chat-tabs">
-              <button type="button" data-ch="global">Global</button>
-              <button type="button" data-ch="local" class="active">Local</button>
-              <button type="button" data-ch="sistema">Sistema</button>
-              <button type="button" data-ch="combate">Combate</button>
-            </div>
-            <div id="chat-log"></div>
-            <div class="chat-send">
-              <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10" />
-              <button type="button" id="chat-send">Enviar</button>
-            </div>
+        <footer id="chat-dock" class="chat-dock" data-win="chat">
+          <div class="chat-tabs" id="chat-tabs">
+            <button type="button" data-ch="global">Servidor</button>
+            <button type="button" data-ch="local" class="active">Padrão</button>
+            <button type="button" data-ch="sistema">Sistema</button>
+            <button type="button" data-ch="combate">Combate</button>
           </div>
-        </div>
+          <div id="chat-log"></div>
+          <div class="chat-input-row">
+            <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10" autocomplete="off" />
+          </div>
+        </footer>
       </section>
     </div>
     <script type="module" src="/src/main.js"></script>

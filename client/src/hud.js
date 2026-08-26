@@ -60,7 +60,6 @@ export class Hud {
     document.getElementById("chat-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") sendChat();
     });
-    document.getElementById("chat-send").onclick = sendChat;
     document.getElementById("chat-tabs").addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-ch]");
       if (!btn) return;
