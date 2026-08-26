@@ -175,8 +175,7 @@ const swapped = await a.wait((m) => m.t === "appear" && m.creature?.kind === "po
 if (swapped.creature.look !== 10) throw new Error(`swap out look ${swapped.creature.look}, expected Caterpie`);
 if (swapped.creature.masterId !== map1.you.id) throw new Error("swap out master not player");
 a.send({ t: "partyOrder", from: catSlot, to: 0 });
-const ordered = await a.wait("party");
-if (ordered.party.slots[0]?.species !== "caterpie") throw new Error("partyOrder did not move Caterpie to slot 0");
+const ordered = await a.wait((m) => m.t === "party" && m.party?.slots?.[0]?.species === "caterpie");
 if (ordered.party.out !== 0) throw new Error("out slot did not follow partyOrder");
 
 a.ws.close();
