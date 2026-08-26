@@ -178,6 +178,12 @@ a.send({ t: "partyOrder", from: catSlot, to: 0 });
 const ordered = await a.wait((m) => m.t === "party" && m.party?.slots?.[0]?.species === "caterpie");
 if (ordered.party.out !== 0) throw new Error("out slot did not follow partyOrder");
 
+const hudLayout = {
+  pokebar: { x: 44, y: 88, open: true, locked: false, min: false },
+};
+a.send({ t: "hud", layout: hudLayout });
+await new Promise((r) => setTimeout(r, 250));
+
 a.ws.close();
 await new Promise((r) => setTimeout(r, 400));
 
@@ -194,6 +200,9 @@ if (map2.you.x !== moved.x || map2.you.y !== moved.y) {
 if (!map2.party.slots.some((s) => s?.species === "charmander")) throw new Error("party lost");
 if (!map2.party.slots.some((s) => s?.species === "caterpie")) throw new Error("caught Caterpie not persisted");
 if (map2.party.slots[0]?.species !== "caterpie") throw new Error("partyOrder not persisted");
+if (map2.hud?.pokebar?.x !== 44 || map2.hud?.pokebar?.locked !== false) {
+  throw new Error("hud layout not persisted");
+}
 const out = map2.creatures.find((c) => c.kind === "pokemon" && c.masterId === map2.you.id);
 if (!out) throw new Error("out pokemon was not restored");
 console.log("SMOKE OK", {

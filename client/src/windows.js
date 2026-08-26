@@ -7,7 +7,7 @@ export const WINDOW_DEFS = [
   { id: "battle", title: "Batalha" },
   { id: "inv", title: "Inventário" },
   { id: "chat", title: "Chat" },
-  { id: "vitals", title: "Vitals" },
+  { id: "vitals", title: "Status" },
 ];
 
 const DEFAULTS = {
@@ -77,10 +77,10 @@ export class WindowManager {
       const tools = document.createElement("span");
       tools.className = "win-tools";
       tools.innerHTML = `
-        <button type="button" data-act="lock" title="Lock">🔒</button>
-        ${def.wrench ? `<button type="button" data-act="wrench" title="Reorder">🔧</button>` : ""}
-        <button type="button" data-act="min" title="Minimize">−</button>
-        <button type="button" data-act="close" title="Close">×</button>
+        <button type="button" data-act="lock" title="Trancar">🔒</button>
+        ${def.wrench ? `<button type="button" data-act="wrench" title="Reordenar party">🔧</button>` : ""}
+        <button type="button" data-act="min" title="Minimizar">−</button>
+        <button type="button" data-act="close" title="Fechar">×</button>
       `;
       head.appendChild(tools);
     }
@@ -178,9 +178,15 @@ export class WindowManager {
       el.style.bottom = `${w.bottom}px`;
     }
     const lockBtn = el.querySelector('[data-act="lock"]');
-    if (lockBtn) lockBtn.classList.toggle("lock-on", !!w.locked);
+    if (lockBtn) {
+      lockBtn.classList.toggle("lock-on", !!w.locked);
+      lockBtn.title = w.locked ? "Trancada (clique para mover)" : "Destrancada — arraste o título";
+    }
     const wrenchBtn = el.querySelector('[data-act="wrench"]');
-    if (wrenchBtn) wrenchBtn.classList.toggle("on", this.reorder && id === "pokebar");
+    if (wrenchBtn) {
+      wrenchBtn.classList.toggle("on", this.reorder && id === "pokebar");
+      wrenchBtn.title = this.reorder ? "Reordenando (arraste as linhas)" : "Reordenar party";
+    }
   }
 
   renderTaskbar() {

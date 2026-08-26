@@ -161,7 +161,11 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   color: #c0caf5;
   white-space: nowrap;
 }
-.task-btn.closed { color: #787c99; opacity: 0.75; }
+.task-btn.closed {
+  color: #e0af68;
+  opacity: 1;
+  outline: 1px solid #e0af6866;
+}
 .task-btn.open { color: #7dce6a; }
 
 .float-window {
