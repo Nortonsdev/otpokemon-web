@@ -114,7 +114,7 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
     const onRight = (e) => {
       if (!this.live) return;
-      if (e.target?.closest?.(".float-window, .panel, input, button, select, textarea")) return;
+      if (e.target?.closest?.(".ot-window, .panel, input, button, select, textarea")) return;
       e.preventDefault();
       this.handleWorldClick(e.clientX, e.clientY, "right");
     };

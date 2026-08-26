@@ -1,24 +1,22 @@
-const STORAGE_KEY = "otpokemon-hud-v3";
+const STORAGE_KEY = "otpokemon-hud-v4";
 
 export const WINDOW_DEFS = [
   { id: "minimap", title: "Minimapa" },
   { id: "vip", title: "Lista VIP" },
-  { id: "nature", title: "Pokémon" },
   { id: "pokebar", title: "Lista de Pokemon", wrench: true },
   { id: "battle", title: "Batalha" },
-  { id: "status", title: "Status" },
+  { id: "status", title: "PokeInfo" },
   { id: "inv", title: "Inventário" },
   { id: "chat", title: "Chat" },
 ];
 
 const DEFAULTS = {
-  minimap: { x: 10, y: 50, open: true, locked: true, min: false },
-  vip: { x: 10, y: 248, open: true, locked: true, min: false },
-  nature: { x: 10, y: 360, open: true, locked: true, min: false },
-  pokebar: { x: 10, y: 430, open: true, locked: true, min: false },
-  battle: { x: 10, y: 0, open: true, locked: true, min: false, bottom: 168 },
-  status: { x: 0, y: 50, open: true, locked: true, min: false, right: 10 },
-  inv: { x: 0, y: 248, open: true, locked: true, min: false, right: 10 },
+  minimap: { x: 6, y: 28, open: true, locked: true, min: false },
+  vip: { x: 6, y: 196, open: true, locked: true, min: false },
+  pokebar: { x: 6, y: 268, open: true, locked: true, min: false },
+  battle: { x: 6, y: 0, open: true, locked: true, min: false, bottom: 118 },
+  status: { x: 0, y: 28, open: true, locked: true, min: false, right: 6 },
+  inv: { x: 0, y: 168, open: true, locked: true, min: false, right: 6 },
   chat: { open: true, dock: true },
 };
 
@@ -58,7 +56,7 @@ export class WindowManager {
         this.layout[def.id] = { ...DEFAULTS[def.id], open: src.open !== false };
         continue;
       }
-      this.layout[def.id] = { ...this.layout[def.id], ...src };
+      this.layout[def.id] = { ...DEFAULTS[def.id], ...this.layout[def.id], ...src };
     }
   }
 
@@ -149,7 +147,7 @@ export class WindowManager {
     if (!this.drag) return;
     const w = this.layout[this.drag.id];
     w.x = Math.max(0, e.clientX - this.drag.dx);
-    w.y = Math.max(42, e.clientY - this.drag.dy);
+    w.y = Math.max(24, e.clientY - this.drag.dy);
     this.applyOne(this.drag.id);
   }
 
@@ -175,24 +173,12 @@ export class WindowManager {
     el.classList.toggle("win-closed", !w.open);
     el.classList.toggle("win-min", !!w.min);
     el.classList.toggle("win-locked", !!w.locked);
-    el.classList.toggle("win-wide", !!w.wide);
     el.style.left = `${w.x}px`;
     el.style.top = `${w.y}px`;
     el.style.right = "auto";
     el.style.bottom = "auto";
     el.style.transform = "none";
-    if (w.wide && w.center && w.bottom != null) {
-      el.style.left = "50%";
-      el.style.top = "auto";
-      el.style.bottom = `${w.bottom}px`;
-      el.style.transform = "translateX(-50%)";
-      el.style.width = "min(720px, calc(100vw - 280px))";
-    } else if (w.center && w.bottom != null) {
-      el.style.left = "50%";
-      el.style.top = "auto";
-      el.style.bottom = `${w.bottom}px`;
-      el.style.transform = "translateX(-50%)";
-    } else if (w.right != null && w.x === 0) {
+    if (w.right != null && w.x === 0) {
       el.style.left = "auto";
       el.style.right = `${w.right}px`;
     } else if (w.bottom != null && w.y === 0) {

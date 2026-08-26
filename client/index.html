@@ -40,47 +40,28 @@
 
       <section id="screen-game" class="hidden">
         <header id="hud-top">
-          <div class="hud-identity">
-            <div id="hud-name">—</div>
-            <div class="hud-meta">
-              <span>LV <b id="hud-level">1</b></span>
-              <span id="hud-vocation">Treinador</span>
-            </div>
-          </div>
           <div id="hud-taskbar" class="hud-taskbar"></div>
-          <div class="hud-top-center">
-            <span class="gold-chip" title="Gold">● <b id="hud-gold">0</b></span>
-            <button type="button" class="loja" disabled title="Fora do marco jogável">Loja</button>
-          </div>
         </header>
 
-        <aside id="hud-minimap" class="float-window" data-win="minimap">
+        <aside id="hud-minimap" class="ot-window" data-win="minimap">
           <header class="win-head"><span class="win-title">Minimapa</span></header>
           <div class="win-body minimap-body">
+            <canvas id="minimap-canvas" width="106" height="130"></canvas>
             <div class="minimap-tools">
               <button type="button" id="minimap-zoom-in" title="Zoom +">+</button>
               <button type="button" id="minimap-zoom-out" title="Zoom −">−</button>
             </div>
-            <canvas id="minimap-canvas" width="120" height="160"></canvas>
           </div>
         </aside>
 
-        <aside id="hud-vip" class="float-window" data-win="vip">
+        <aside id="hud-vip" class="ot-window" data-win="vip">
           <header class="win-head"><span class="win-title">Lista VIP</span></header>
           <div class="win-body">
             <ul id="vip-list" class="vip-list"></ul>
           </div>
         </aside>
 
-        <aside id="hud-nature" class="float-window" data-win="nature">
-          <header class="win-head"><span class="win-title">Pokémon</span></header>
-          <div class="win-body nature-body">
-            <div><span class="muted">Nature</span> <b id="out-nature">—</b></div>
-            <div><span class="muted">Ability</span> <b id="out-ability">—</b></div>
-          </div>
-        </aside>
-
-        <aside id="hud-pokebar" class="float-window" data-win="pokebar">
+        <aside id="hud-pokebar" class="ot-window" data-win="pokebar">
           <header class="win-head">
             <span class="win-title">Lista de Pokemon</span>
             <span class="win-stages">Stages</span>
@@ -90,55 +71,90 @@
           </div>
         </aside>
 
-        <aside id="hud-battle" class="float-window" data-win="battle">
-          <header class="win-head"><span class="win-title">Batalha</span></header>
+        <aside id="hud-battle" class="ot-window" data-win="battle">
+          <header class="win-head">
+            <span class="win-title">Batalha</span>
+            <span class="battle-filters" aria-hidden="true">
+              <span class="bf-icon on" title="Monstros">☠</span>
+              <span class="bf-icon on" title="Jogadores">👤</span>
+              <span class="bf-icon" title="NPCs">💬</span>
+              <span class="bf-icon on" title="Party">♥</span>
+            </span>
+          </header>
           <div class="win-body">
             <div id="battle-list"></div>
           </div>
         </aside>
 
-        <aside id="hud-status" class="float-window" data-win="status">
-          <header class="win-head"><span class="win-title">Status</span></header>
-          <div class="win-body status-body">
-            <img id="player-portrait" class="status-portrait" src="/assets/human/portrait.png" alt="" />
-            <div class="status-meta">
-              <div class="status-lv">Lv <b id="status-level">1</b></div>
-              <div class="stat-row hp"><span>HP</span><div class="stat-bar"><div id="player-hp-fill" class="stat-fill"></div></div><span id="player-hp-pct">100%</span></div>
-              <div class="stat-row exp"><span>EXP</span><div class="stat-bar"><div id="hud-xp-fill" class="stat-fill"></div></div><span id="hud-xp-pct">0%</span></div>
-              <div class="stat-row fish"><span>FISH</span><div class="stat-bar"><div id="hud-fish-fill" class="stat-fill"></div></div><span id="hud-fish-pct">0%</span></div>
-              <div class="stat-row stm"><span>STM</span><div class="stat-bar"><div id="hud-stm-fill" class="stat-fill"></div></div><span id="hud-stm-pct">100%</span></div>
-              <div class="status-chips">
-                <span class="chip" title="Pokébolas">⚪ <b id="hud-balls">0</b></span>
-                <span class="chip gold" title="Gold">● <b id="hud-gold-side">0</b></span>
+        <aside id="hud-pokeinfo" class="ot-window" data-win="status">
+          <header class="win-head"><span class="win-title">PokeInfo</span></header>
+          <div class="win-body pokeinfo-body">
+            <div class="pokeinfo-portrait-wrap">
+              <img id="player-portrait" class="pokeinfo-portrait" src="/assets/human/portrait.png" alt="" />
+              <span class="pokeinfo-lv-badge">Lv <b id="status-level">1</b></span>
+            </div>
+            <div class="pokeinfo-meta">
+              <div id="pokeinfo-name" class="pokeinfo-name">—</div>
+              <div class="stat-row hp">
+                <span class="stat-ico">♥</span><span class="stat-lbl">HP</span>
+                <div class="stat-bar"><div id="player-hp-fill" class="stat-fill"></div></div>
+                <span id="player-hp-pct" class="stat-pct">100%</span>
+              </div>
+              <div class="stat-row exp">
+                <span class="stat-ico">★</span><span class="stat-lbl">EXP</span>
+                <div class="stat-bar"><div id="hud-xp-fill" class="stat-fill"></div></div>
+                <span id="hud-xp-pct" class="stat-pct">0%</span>
+              </div>
+              <div class="stat-row fish">
+                <span class="stat-ico">🎣</span><span class="stat-lbl">FISH</span>
+                <div class="stat-bar"><div id="hud-fish-fill" class="stat-fill"></div></div>
+                <span id="hud-fish-pct" class="stat-pct">0%</span>
+              </div>
+              <div class="stat-row stm">
+                <span class="stat-ico">⚡</span><span class="stat-lbl">STM</span>
+                <div class="stat-bar"><div id="hud-stm-fill" class="stat-fill"></div></div>
+                <span id="hud-stm-pct" class="stat-pct">100%</span>
+              </div>
+              <div class="pokeinfo-currency">
+                <span class="cur" title="Troféus">🏆 <b id="hud-trophies">0</b></span>
+                <span class="cur" title="Pokébolas">⚪ <b id="hud-balls">0</b></span>
+                <span class="cur gold" title="Gold">● <b id="hud-gold-side">0</b></span>
               </div>
             </div>
           </div>
         </aside>
 
-        <aside id="hud-inv" class="float-window" data-win="inv">
+        <aside id="hud-inv" class="ot-window" data-win="inv">
           <header class="win-head"><span class="win-title">Inventário</span></header>
           <div class="win-body">
             <div class="equip-grid">
               <div class="eq-slot" style="grid-area:head" title="Head"></div>
               <div class="eq-slot" style="grid-area:neck" title="Neck"></div>
-              <div class="eq-slot" style="grid-area:armor" title="Armor"></div>
+              <div class="eq-slot has-icon" style="grid-area:armor" title="Armor">🎒</div>
               <div class="eq-slot" style="grid-area:pack" title="Backpack"></div>
-              <div class="eq-slot" style="grid-area:lhand" title="Left hand"></div>
+              <div class="eq-slot has-icon" style="grid-area:lhand" title="Old Rod">🎣</div>
               <div class="eq-slot" style="grid-area:rhand" title="Right hand"></div>
-              <div class="eq-slot" style="grid-area:legs" title="Legs"></div>
+              <div class="eq-slot has-icon" style="grid-area:legs" title="Bike">🚲</div>
               <div class="eq-slot" style="grid-area:ring" title="Ring"></div>
               <div class="eq-slot" style="grid-area:feet" title="Feet"></div>
             </div>
-            <div class="inv-label">Bolsa</div>
+            <div class="inv-shortcuts">
+              <button type="button" class="inv-btn on">BAG</button>
+              <button type="button" class="inv-btn">COINS</button>
+              <button type="button" class="inv-btn">BADGES</button>
+              <button type="button" class="inv-btn">POKEBAG</button>
+              <button type="button" class="inv-btn">CATCH</button>
+              <button type="button" class="inv-btn">ORDER</button>
+              <button type="button" class="inv-btn">POKEDEX</button>
+            </div>
             <div id="bolsa" class="bag-grid"></div>
-            <div class="cap-row">Capacidade <span id="hud-cap">0.00 oz</span></div>
           </div>
         </aside>
 
         <div id="order-bar" class="order-bar hidden"></div>
 
         <div id="hud-hotdock" class="hotdock">
-          <div id="hotbar" class="hotbar-circle"></div>
+          <div id="hotbar" class="hotbar-rows"></div>
         </div>
 
         <footer id="chat-dock" class="chat-dock" data-win="chat">

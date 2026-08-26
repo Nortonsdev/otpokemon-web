@@ -243,11 +243,10 @@ export class Hud {
   }
 
   render() {
-    const nameEl = document.getElementById("hud-name");
+    const nameEl = document.getElementById("pokeinfo-name");
     if (!nameEl) return;
     nameEl.textContent = this.you?.name || "—";
     const lv = this.you?.level || 1;
-    document.getElementById("hud-level").textContent = lv;
     document.getElementById("status-level").textContent = lv;
 
     const hp = this.you?.hp ?? 150;
@@ -266,23 +265,19 @@ export class Hud {
 
     const balls = this.bag.find((i) => i.item === "pokeball")?.count || 0;
     document.getElementById("hud-balls").textContent = balls;
-    const gold = document.getElementById("hud-gold");
     const goldSide = document.getElementById("hud-gold-side");
     const goldVal = this.you?.gold ?? 0;
-    if (gold) gold.textContent = goldVal.toFixed(2);
     if (goldSide) goldSide.textContent = goldVal.toFixed(2);
+    const trophies = document.getElementById("hud-trophies");
+    if (trophies) trophies.textContent = "0";
 
-    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     const portrait = document.getElementById("player-portrait");
-    if (portrait) portrait.src = out ? portraitUrl(out) : "/assets/human/portrait.png";
-    document.getElementById("out-nature").textContent = out?.nature || "—";
-    const spec = out ? SPECIES[out.species] : null;
-    const abs = spec?.abilities || [];
-    document.getElementById("out-ability").textContent = abs.length ? abs.join(", ") : "—";
+    if (portrait) portrait.src = "/assets/human/portrait.png";
 
     this.renderPokebar();
     this.renderBattle();
     this.renderBags();
+    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
     this.renderOrders();
   }
@@ -433,20 +428,27 @@ export class Hud {
     const known = out ? moveCount(out.species) : 0;
     bar.innerHTML = "";
     const slots = [
-      { key: "Tab", label: "M1", move: 1 },
-      { key: "1", label: "M2", move: 2 },
-      { key: "2", label: "M3", move: 3 },
-      { key: "F", label: "M4", move: 4 },
-      { key: "E", label: "M5", move: 5 },
-      { key: "R", label: "M6", move: 6 },
-      { key: "3", label: "M7", move: 7 },
-      { key: "4", label: "M8", move: 8 },
-      { key: "A", label: "M9", move: 9 },
-      { key: "S", label: "M10", move: 10 },
+      { key: "Tab", move: 1 },
+      { key: "1", move: 2 },
+      { key: "2", move: 3 },
+      { key: "3", move: 4 },
+      { key: "4", move: 5 },
+      { key: "F", move: 6 },
+      { key: "E", move: 7 },
+      { key: "R", move: 8 },
+      { key: "A", move: 9 },
+      { key: "S", move: 10 },
       { key: "ball", item: "pokeball" },
       { key: "pot", item: "small_potion" },
     ];
+    const row1 = document.createElement("div");
+    row1.className = "hot-row";
+    const row2 = document.createElement("div");
+    row2.className = "hot-row";
+    bar.appendChild(row1);
+    bar.appendChild(row2);
     slots.forEach((slot, i) => {
+      const row = i < 7 ? row1 : row2;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "hot-slot";
@@ -477,12 +479,7 @@ export class Hud {
           btn.onclick = () => count && this.net.send({ t: "use", item: slot.item });
         }
       }
-      const angle = (i / slots.length) * Math.PI * 2 - Math.PI / 2;
-      const rx = 88 + Math.cos(angle) * 72;
-      const ry = 44 + Math.sin(angle) * 28;
-      btn.style.left = `${rx}px`;
-      btn.style.top = `${ry}px`;
-      bar.appendChild(btn);
+      row.appendChild(btn);
     });
   }
 }
