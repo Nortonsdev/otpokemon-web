@@ -26,8 +26,12 @@ function creatureFootprint(size) {
   return size > TILE ? 2 : 1;
 }
 
+function facingDir(dir) {
+  return dir ?? 4;
+}
+
 function frameIndex(dir, moving, phase) {
-  const col = SPRITE_COL[dir] ?? 2;
+  const col = SPRITE_COL[facingDir(dir)] ?? 2;
   const row = moving ? (phase === 0 ? 1 : 2) : 0;
   return row * 4 + col;
 }
@@ -259,7 +263,7 @@ export class GameScene extends Phaser.Scene {
     const tex = this.textureFor(c);
     const size = creatureSize(tex);
     const pos = tileWorld(c.x, c.y, size);
-    const sprite = this.add.sprite(pos.x, pos.y, tex, frameIndex(c.dir || 4, false, 0));
+    const sprite = this.add.sprite(pos.x, pos.y, tex, frameIndex(c.dir, false, 0));
     sprite.setOrigin(0, 0);
     sprite.setDepth(c.y * 10 + 6);
     this.creatureLayer.add(sprite);
@@ -423,7 +427,7 @@ export class GameScene extends Phaser.Scene {
         sprite.setScale(1);
       }
       sprite.setPosition(px, py);
-      sprite.setFrame(frameIndex(st.dir || 4, walking, st.phase));
+      sprite.setFrame(frameIndex(st.dir, walking, st.phase));
       this.layoutNameplate(id, px, py, depth);
       sprite.setDepth(depth);
   }
