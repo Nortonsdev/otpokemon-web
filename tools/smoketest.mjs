@@ -97,6 +97,8 @@ if (wild.plate !== "Caterpie [2]") throw new Error(`wild plate ${wild.plate}`);
 a.send({ t: "pokebar", slot: 0 });
 await a.wait((m) => m.t === "disappear" && m.id === outId);
 a.send({ t: "attack", id: wild.id });
+const noOut = await a.wait((m) => m.t === "info" && /Pokémon fora/.test(m.text || ""), 800);
+if (!noOut) throw new Error("expected precisa ter um Pokémon fora");
 const punch = await a.wait((m) => m.t === "fx" || (m.t === "info" && /used /.test(m.text || "")), 400).then(
   (m) => m,
   () => null

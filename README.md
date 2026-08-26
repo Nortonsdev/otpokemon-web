@@ -20,9 +20,9 @@ The account screens sit on the live top-down map, Huntera-style (`#111` chrome, 
 ## Play
 
 1. Login or register, create a character, pick **Bulbasaur / Charmander / Squirtle**.
-2. Walk with **WASD** / arrows (diagonals: two keys) or **left-click** a tile (Tibia-style). Movement is server-synced. Human uses 8 directions and a 3-frame Citizen 128 outfit; Pokémon use 4-dir 32×32 Ruby looks.
-3. Click a party slot to **release**. Click the same slot to **recall**. Click another occupied slot to swap (recall then release). Never two Pokémon out. Nameplates are `Nome [level]`.
-4. **Right-click** a wild (Caterpie) to target it and attack. The out Pokémon uses M1 / melee. Left-click never attacks. Nothing out → no player punch; target is still set so **C** / `catch` works.
+2. Walk with **WASD** / arrows (diagonals: two keys) or **left-click** a tile. You always steer the human — there is no idle auto-hunt. Movement is server-synced. Human uses 8 directions and a 3-frame Citizen 128 outfit; Pokémon use 4-dir 32×32 Ruby looks.
+3. Click a party slot to **release**. Click the same slot to **recall**. Click another occupied slot to swap (recall then release). Never two Pokémon out. The out Pokémon follows on the tiles behind you. Nameplates are green `Nome [level]` with an HP bar under the name.
+4. **Right-click** a wild (Caterpie) to put a **red square** on its tile and fire M1. Left-click walks, never attacks. Nothing out → `Você precisa ter um Pokémon fora.` No target → `Você não tem um alvo.`
 5. With a Pokémon out, **M1–M10** (keys **1–0**, HUD clicks, or `m1` in chat) are that Pokémon’s moves. No out → moves do not fire. No target → `Você não tem um alvo.`
 6. Close the tab and log in again: same tile, same party, same Pokémon out.
 

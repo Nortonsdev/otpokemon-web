@@ -75,7 +75,6 @@ net.on("err", (m) => {
   msg("char-msg", m.text);
   hud.log(m.text);
 });
-net.on("info", (m) => hud.log(m.text));
 net.on("welcome", (m) => {
   show("screen-chars");
   renderChars(m.chars || []);

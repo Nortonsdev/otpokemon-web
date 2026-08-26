@@ -24,6 +24,10 @@ TILE_IDS = {
     "rose": 3658,
     "gold": 3031,
     "stone": 26121,
+    "water": 4597,
+    "wood": 42337,
+    "cave": 44092,
+    "marble": 23720,
 }
 OUTFIT_ID = 128
 SPRITE_TYPES = {

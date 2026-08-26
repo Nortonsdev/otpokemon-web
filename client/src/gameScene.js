@@ -26,6 +26,9 @@ function isTyping() {
 function groundTexture(cell) {
   if (cell === 1) return "path";
   if (cell === 2) return "stone";
+  if (cell === 3) return "wood";
+  if (cell === 4) return "water";
+  if (cell === 5) return "cave";
   return "grass";
 }
 
@@ -60,6 +63,9 @@ export class GameScene extends Phaser.Scene {
     this.load.image("flower", "/assets/tiles/flower.png");
     this.load.image("rose", "/assets/tiles/rose.png");
     this.load.image("gold", "/assets/tiles/gold.png");
+    this.load.image("water", "/assets/tiles/water.png");
+    this.load.image("wood", "/assets/tiles/wood.png");
+    this.load.image("cave", "/assets/tiles/cave.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
     for (const name of Object.values(LOOK)) {
       this.load.spritesheet(name, `/assets/pokemon/${name}/sheet.png`, {
@@ -80,6 +86,13 @@ export class GameScene extends Phaser.Scene {
     this.input.mouse?.disableContextMenu();
     document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
     this.input.on("pointerdown", (p) => this.onPointer(p));
+    this.targetId = null;
+    this.targetMark = this.add
+      .rectangle(0, 0, TILE, TILE, 0xff1a1a, 0)
+      .setStrokeStyle(2, 0xe02020, 1)
+      .setOrigin(0, 0)
+      .setVisible(false)
+      .setDepth(4);
     this.cameras.main.setRoundPixels(true);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
@@ -108,6 +121,8 @@ export class GameScene extends Phaser.Scene {
     this.roofLayer.removeAll(true);
     this.roofSprites = [];
     this.youId = null;
+    this.targetId = null;
+    this.targetMark?.setVisible(false);
   }
 
   enterPreview() {
@@ -195,30 +210,30 @@ export class GameScene extends Phaser.Scene {
     sprite.setOrigin(0, 0);
     sprite.setDepth(c.y * 10 + 6);
     this.creatureLayer.add(sprite);
+    const plateY = tex === "human" ? pos.y + 8 : pos.y - 2;
     const plate = this.add
-      .text(pos.x + size / 2, tex === "human" ? pos.y + 10 : pos.y - 2, c.plate || c.name, {
+      .text(pos.x + size / 2, plateY, c.plate || c.name, {
         fontFamily: "system-ui, sans-serif",
-        fontSize: "10px",
-        color: "#ddd",
-        backgroundColor: "#111111cc",
+        fontSize: "11px",
+        fontStyle: "bold",
+        color: "#7dce6a",
+        stroke: "#000000",
+        strokeThickness: 3,
       })
-      .setOrigin(0.5, 1)
-      .setPadding(2, 1, 2, 1);
+      .setOrigin(0.5, 1);
     plate.setDepth(c.y * 10 + 7);
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
     this.state.set(c.id, { ...c, moving: false, phase: 0 });
-    if (c.kind === "pokemon" || c.kind === "wild") {
-      const cx = pos.x + size / 2;
-      const barY = pos.y + 2;
-      const bg = this.add.rectangle(cx, barY, 28, 4, 0x111111).setOrigin(0.5, 0.5);
-      bg.setStrokeStyle(1, 0x000000, 0.9);
-      bg.setDepth(c.y * 10 + 8);
-      const fg = this.add.rectangle(cx - 13, barY, 26, 2, 0x3dcc4a).setOrigin(0, 0.5);
-      fg.setDepth(c.y * 10 + 9);
-      this.hpBars.set(c.id, { bg, fg });
-      this.setHpBar(c.id, c.hp, c.hpMax);
-    }
+    const cx = pos.x + size / 2;
+    const barY = plateY + 3;
+    const bg = this.add.rectangle(cx, barY, 28, 4, 0x111111).setOrigin(0.5, 0);
+    bg.setStrokeStyle(1, 0x000000, 0.9);
+    bg.setDepth(c.y * 10 + 8);
+    const fg = this.add.rectangle(cx - 13, barY + 1, 26, 2, 0x3dcc4a).setOrigin(0, 0);
+    fg.setDepth(c.y * 10 + 9);
+    this.hpBars.set(c.id, { bg, fg });
+    this.setHpBar(c.id, c.hp, c.hpMax);
   }
 
   despawn(id) {
@@ -239,14 +254,15 @@ export class GameScene extends Phaser.Scene {
     if (!sprite || !plate) return;
     const size = sprite.texture.key === "human" ? 64 : 32;
     const cx = spriteX + size / 2;
-    plate.setPosition(cx, size === 64 ? spriteY + 10 : spriteY - 2);
+    const plateY = size === 64 ? spriteY + 8 : spriteY - 2;
+    plate.setPosition(cx, plateY);
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const barY = spriteY + 2;
+    const barY = plateY + 3;
     bar.bg.setPosition(cx, barY);
     bar.bg.setDepth(depth + 2);
-    bar.fg.setPosition(cx - 13, barY);
+    bar.fg.setPosition(cx - 13, barY + 1);
     bar.fg.setDepth(depth + 3);
   }
 
@@ -289,11 +305,35 @@ export class GameScene extends Phaser.Scene {
       st.dir = msg.dir;
       this.sprites.get(msg.id)?.setFrame(frameIndex(msg.dir, false, 0));
     }
-    if (msg.t === "moved") this.animateMove(msg);
+    if (msg.t === "moved") {
+      this.animateMove(msg);
+      if (msg.id === this.targetId) this.layoutTarget();
+    }
     if (msg.t === "fx") {
       this.flash(msg.to);
       if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
     }
+    if (msg.t === "target") this.setTarget(msg.id);
+    if (msg.t === "disappear" && msg.id === this.targetId) this.setTarget(null);
+  }
+
+  setTarget(id) {
+    this.targetId = id || null;
+    const st = id ? this.state.get(id) : null;
+    this.hud?.setTarget(st || null);
+    this.layoutTarget();
+  }
+
+  layoutTarget() {
+    if (!this.targetMark) return;
+    const st = this.targetId ? this.state.get(this.targetId) : null;
+    if (!st) {
+      this.targetMark.setVisible(false);
+      return;
+    }
+    this.targetMark.setPosition(st.x * TILE, st.y * TILE);
+    this.targetMark.setDepth(st.y * 10 + 4);
+    this.targetMark.setVisible(true);
   }
 
   animateMove(msg) {

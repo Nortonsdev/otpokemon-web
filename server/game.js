@@ -479,7 +479,7 @@ export class World {
     }
     player.targetId = id;
     const client = this.clientOf(player);
-    if (client) this.send(client.ws, { t: "target", id });
+    if (client) this.send(client.ws, { t: "target", id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
   }
 
   attack(player, id) {
@@ -491,9 +491,8 @@ export class World {
     }
     player.targetId = id;
     const client = this.clientOf(player);
-    if (client) this.send(client.ws, { t: "target", id });
+    if (client) this.send(client.ws, { t: "target", id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
     if (!c.wild) return;
-    if (!this.outPokemon(player)) return;
     this.useMove(player, 1);
   }
 
@@ -619,7 +618,10 @@ export class World {
   useMove(player, n) {
     if (n < 1 || n > 10) return;
     const poke = this.outPokemon(player);
-    if (!poke) return;
+    if (!poke) {
+      this.sys(player, "Você precisa ter um Pokémon fora.");
+      return;
+    }
     const spec = SPECIES[poke.species];
     const move = spec.moves[n - 1];
     if (!move) return;
