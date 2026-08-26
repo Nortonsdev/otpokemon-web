@@ -106,6 +106,8 @@ export class World {
       if (t === "say") return this.say(player, msg.text);
       if (t === "logout") return this.logoutPlayer(client, true);
       if (t === "pokebar") return this.pokebar(player, msg.slot);
+      if (t === "partyOrder") return this.partyOrder(player, msg);
+      if (t === "hud") return this.saveHud(player, msg);
       if (t === "catch") return this.catchBall(player);
       if (t === "target") return this.setTarget(player, msg.id);
       if (t === "attack") return this.attack(player, msg.id);
@@ -196,6 +198,7 @@ export class World {
       species,
       name: spec.name,
       look: spec.look,
+      gender: opts.gender || (randomInt(0, 2) ? "m" : "f"),
       level,
       baseHp: spec.baseStats.hp,
       baseStats: { ...spec.baseStats },
@@ -263,6 +266,7 @@ export class World {
     this.occupy(player);
     client.playerId = player.id;
     client.charName = charName;
+    player.hud = rec.hud || null;
     this.snapshotPlayer(player);
     if (Number.isInteger(player.outSlot) && player.party[player.outSlot]) {
       this.releaseSlot(player, player.outSlot, true);
@@ -282,6 +286,7 @@ export class World {
       creatures: [...this.creatures.values()].map((c) => this.publicCreature(c)),
       party: this.partyPayload(player),
       bag: player.bag,
+      hud: player.hud || rec.hud || null,
     });
     this.broadcastArea({ t: "appear", creature: this.publicCreature(player) }, client.ws);
     if (player.outId) {
@@ -315,6 +320,7 @@ export class World {
     rec.bag = player.bag;
     rec.party = player.party;
     rec.out = player.outSlot;
+    rec.hud = player.hud || rec.hud;
     this.persist();
   }
 
@@ -380,6 +386,7 @@ export class World {
               hp: p.hp,
               hpMax: p.hpMax,
               level: p.level,
+              gender: p.gender || (String(p.uid || "a").charCodeAt(0) % 2 ? "m" : "f"),
               ball: i === player.outSlot ? "discharged" : p.ball || "charged",
             }
           : null
@@ -540,6 +547,31 @@ export class World {
     this.releaseSlot(player, slot, false);
   }
 
+  saveHud(player, msg) {
+    if (!msg?.layout || typeof msg.layout !== "object") return;
+    player.hud = msg.layout;
+    this.snapshotPlayer(player);
+  }
+
+  partyOrder(player, { from, to }) {
+    from = Number(from);
+    to = Number(to);
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return;
+    if (from < 0 || to < 0 || from >= PARTY_CAP || to >= PARTY_CAP || from === to) return;
+    const party = player.party.slice();
+    while (party.length < PARTY_CAP) party.push(null);
+    const [mon] = party.splice(from, 1);
+    party.splice(to, 0, mon);
+    player.party = party.slice(0, PARTY_CAP);
+    if (player.outSlot === from) player.outSlot = to;
+    else if (player.outSlot != null) {
+      if (from < player.outSlot && to >= player.outSlot) player.outSlot -= 1;
+      else if (from > player.outSlot && to <= player.outSlot) player.outSlot += 1;
+    }
+    this.syncParty(player);
+    this.snapshotPlayer(player);
+  }
+
   releaseSlot(player, slot, restoring) {
     const mon = player.party[slot];
     if (!mon) return;
@@ -641,7 +673,7 @@ export class World {
       hp: target.hp,
       hpMax: target.hpMax,
     });
-    this.sys(player, `${poke.name} used ${move.name}! (${target.hp} / ${target.hpMax})`);
+    this.sys(player, `Seu ${poke.name} causou ${dmg} de dano em um ${target.name}.`);
     if (target.kind === "pokemon" && target.masterId) {
       const master = this.creatures.get(target.masterId);
       const mon = master?.party.find((p) => p && p.uid === target.uid);

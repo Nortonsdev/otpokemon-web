@@ -21,8 +21,8 @@ The account screens sit on the live top-down map, Huntera-style (`#111` chrome, 
 
 1. Login or register, create a character, pick **Bulbasaur / Charmander / Squirtle**.
 2. Walk with **WASD** / arrows (diagonals: two keys) or **left-click** a tile. You always steer the human — there is no idle auto-hunt. Movement is server-synced. Human uses 8 directions and a 3-frame Citizen 128 outfit; Pokémon use 4-dir 32×32 Ruby looks.
-3. Click a party slot to **release**. Click the same slot to **recall**. Click another occupied slot to swap (recall then release). Never two Pokémon out. The out Pokémon follows on the tiles behind you. Nameplates are green `Nome [level]` with an HP bar under the name.
-4. **Right-click** a wild (Caterpie) to put a **red square** on its tile and fire M1. Left-click walks, never attacks. Nothing out → `Você precisa ter um Pokémon fora.` No target → `Você não tem um alvo.`
+3. Click a **Lista de Pokemon** row (left pokebar) to **release**. Click the same row to **recall**. Click another occupied row to swap (recall then release). Never two Pokémon out. Wrench on the header (hover) reorders the six slots. The out Pokémon follows on the tiles behind you. Nameplates are green `Nome [level]` with an HP bar under the name.
+4. **Right-click** a wild (Caterpie) to put a **red circle** on it and fire M1. Left-click walks, never attacks. Nothing out → `Você precisa ter um Pokémon fora.` No target → `Você não tem um alvo.` Damage logs `Seu Charmander causou N de dano em um Caterpie.`
 5. With a Pokémon out, **M1–M10** (keys **1–0**, HUD clicks, or `m1` in chat) are that Pokémon’s moves. No out → moves do not fire. No target → `Você não tem um alvo.`
 6. Close the tab and log in again: same tile, same party, same Pokémon out.
 
@@ -62,7 +62,9 @@ npx vercel --prod
 
 Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` already rewrites `/ws` → `/api/ws`.
 
-Limits of this host: the world is in-memory on one Function instance. Connections drop at `maxDuration` (300s) and reconnect; a reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
+Limits of this host: the world is in-memory on one Function instance. Connections drop at the plan `maxDuration` (Hobby default 300s; anonymous/temp deploys cap at 60s) and the client reconnects. A reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
+
+Anonymous `vercel deploy --temporary` URLs expire unless you [claim the deployment](https://vercel.com/docs/deployments/claim-deployments). For a lasting project, log in with `vercel login` or import this GitHub repo in the Vercel dashboard.
 
 Default account after a cold start: **demo** / **demo**.
 

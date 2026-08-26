@@ -116,7 +116,11 @@ button.ghost { color: #9aa5ce; }
 #char-list li { margin: 6px 0; }
 hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
 
-#screen-game { pointer-events: none; }
+#screen-game {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
 #hud-top {
   pointer-events: auto;
   position: absolute;
@@ -143,15 +147,22 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   color: #e8d5a3;
   opacity: 0.7;
 }
-.hud-top-icons { display: flex; gap: 6px; }
-.top-ico {
-  width: 26px; height: 26px;
-  display: grid; place-items: center;
-  background: #16161eb8;
-  border: 8px solid transparent;
-  border-image: var(--frame-icon-button) 11 stretch;
-  font-size: 12px;
+.hud-taskbar {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  overflow-x: auto;
+  pointer-events: auto;
 }
+.task-btn {
+  margin: 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #c0caf5;
+  white-space: nowrap;
+}
+.task-btn.closed { color: #787c99; opacity: 0.75; }
+.task-btn.open { color: #7dce6a; }
 
 .float-window {
   pointer-events: auto;
@@ -170,19 +181,111 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   border-image: var(--frame-window) 26 stretch;
   z-index: 4;
 }
+.float-window > .win-head,
 .float-window > header {
-  padding: 10px 14px 4px;
+  padding: 8px 12px 4px;
   color: #7aa2f7;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+  position: relative;
+  z-index: 5;
 }
+.win-title { flex: 1; }
+.win-stages { font-size: 10px; color: #9aa5ce; text-transform: none; font-weight: 600; }
+.win-tools {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.win-head:hover .win-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+.win-tools button {
+  margin: 0;
+  padding: 0 4px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 11px;
+  line-height: 1;
+  border-image: none;
+  border: 0;
+  background: #16161e;
+  color: #c0caf5;
+}
+.win-tools button.lock-on { color: #f87171; text-decoration: underline; }
+.win-tools button.on { color: #7dce6a; }
+.float-window.win-locked .win-head { cursor: default; }
+.float-window:not(.win-locked) .win-head { cursor: grab; }
+.float-window.win-closed { display: none !important; }
+.float-window.win-min .win-body { display: none; }
 
-#hud-loot { top: 52px; left: 10px; width: 170px; min-height: 72px; }
+#hud-loot { top: 292px; left: 10px; width: 228px; min-height: 56px; }
 .loot-empty { padding: 4px 14px 12px; color: #565f89; font-size: 12px; }
 
-#hud-inv { top: 52px; right: 10px; width: 214px; padding-bottom: 10px; }
+#hud-pokebar { top: 50px; left: 10px; width: 228px; }
+#pokebar-list { padding: 4px 8px 10px; display: flex; flex-direction: column; gap: 3px; }
+.poke-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: #0a1224cc;
+  cursor: pointer;
+  min-height: 34px;
+}
+.poke-row.out { background: #2f9e448f; box-shadow: inset 0 0 0 1px #7dce6a; }
+.poke-row.empty { opacity: 0.35; cursor: default; min-height: 28px; background: #0a122488; }
+.poke-ico {
+  width: 28px; height: 28px; border-radius: 50%;
+  object-fit: cover; image-rendering: pixelated;
+  background: #111; flex: none;
+}
+.poke-gender { color: #7aa2f7; font-size: 12px; width: 12px; }
+.poke-meta { flex: 1; min-width: 0; }
+.poke-name { color: #e8eaf2; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.poke-hp { height: 6px; background: #1a1a1a; margin-top: 2px; }
+.poke-hp-fill { height: 100%; background: #3fac35; }
+.poke-pct { font-size: 10px; color: #c0caf5; width: 34px; text-align: right; flex: none; }
+body.pokebar-reorder .poke-row { cursor: grab; }
+
+#hud-outstatus { top: 50px; left: 248px; width: 220px; }
+.out-body { display: flex; gap: 8px; align-items: center; padding: 6px 12px 12px; }
+.out-portrait { width: 40px; height: 40px; border-radius: 8px; image-rendering: pixelated; background: #111; }
+.out-meta { flex: 1; min-width: 0; }
+#out-title { font-size: 12px; color: #7dce6a; margin-bottom: 4px; }
+
+#hud-battle { left: 10px; bottom: 168px; width: 228px; }
+#battle-list { padding: 4px 10px 8px; display: flex; flex-direction: column; gap: 3px; }
+.battle-empty { color: #565f89; font-size: 12px; padding: 4px 0; }
+.battle-row {
+  margin: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  padding: 4px 6px;
+  background: #0e1014;
+  color: #c0caf5;
+  font-size: 12px;
+  border-image: none;
+  border: 1px solid #3b4261;
+  text-align: left;
+}
+.battle-row.targeted { border-color: #ff4040; color: #ffb4b4; }
+.battle-hp { height: 4px; background: #1a1a1a; }
+.battle-hp > span { display: block; height: 100%; background: #3fac35; }
+
+#hud-inv { top: 50px; right: 10px; width: 214px; padding-bottom: 10px; }
 .equip-grid {
   display: grid;
   grid-template-columns: 42px 42px 42px;
@@ -214,24 +317,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   gap: 3px;
   padding: 0 12px 8px;
 }
-.party-slots { grid-template-columns: repeat(6, 1fr); }
 .bag-grid { grid-template-columns: repeat(5, 1fr); }
-.slot {
-  width: 30px; height: 34px;
-  cursor: pointer;
-  position: relative;
-  background: #0e1014;
-  border: 6px solid transparent;
-  border-image: var(--frame-slot) 10 stretch;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.slot.out { border-image: var(--frame-slot-active) 10 stretch; }
-.slot img.portrait { width: 24px; height: 24px; image-rendering: pixelated; }
-.slot.empty { opacity: 0.45; }
-.slot-hp { width: 24px; height: 3px; background: #1a1a1a; }
-.slot-hp-fill { height: 100%; background: #3fac35; }
 .bag-count { position: absolute; right: 2px; bottom: 1px; font-size: 9px; color: #e8eaf2; }
 .cap-row { padding: 0 14px 8px; font-size: 11px; color: #9aa5ce; }
 
@@ -274,12 +360,16 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   left: 50%;
   bottom: 10px;
   transform: translateX(-50%);
+  display: block;
+  background: #0d0e14e6;
+  border: 1px solid rgba(59, 66, 97, 0.85);
+  padding: 0;
+}
+.vitals-body {
   display: flex;
   align-items: flex-end;
   gap: 10px;
-  background: #0d0e14e6;
-  border: 1px solid rgba(59, 66, 97, 0.85);
-  padding: 8px 10px;
+  padding: 8px 10px 10px;
 }
 #hud-vitals:after {
   content: "";

@@ -99,7 +99,7 @@ await a.wait((m) => m.t === "disappear" && m.id === outId);
 a.send({ t: "attack", id: wild.id });
 const noOut = await a.wait((m) => m.t === "info" && /Pokémon fora/.test(m.text || ""), 800);
 if (!noOut) throw new Error("expected precisa ter um Pokémon fora");
-const punch = await a.wait((m) => m.t === "fx" || (m.t === "info" && /used /.test(m.text || "")), 400).then(
+const punch = await a.wait((m) => m.t === "fx" || (m.t === "info" && /causou |used /.test(m.text || "")), 400).then(
   (m) => m,
   () => null
 );
@@ -113,8 +113,10 @@ if (reout.creature.hpMax < 19 || reout.creature.hpMax > 22) {
 }
 
 a.send({ t: "attack", id: wild.id });
-const hit = await a.wait((m) => m.t === "fx" || (m.t === "info" && /used /.test(m.text || "")));
+const hit = await a.wait((m) => m.t === "fx" || (m.t === "info" && /causou |used /.test(m.text || "")));
 if (!hit) throw new Error("right-click attack did not fire M1");
+if (hit.t === "fx" && hit.from === map1.you.id) throw new Error("damage must come from the out Pokémon");
+if (hit.t === "fx" && hit.from !== outId) throw new Error("M1 fromId is not the out Pokémon");
 
 let prey = wild;
 const fled = await a
@@ -143,15 +145,19 @@ const catCount = (slots) => (slots || []).filter((s) => s?.species === "caterpie
 const catsBefore = catCount(map1.party.slots);
 a.send({ t: "target", id: prey.id });
 let caught = false;
+let partyState = map1.party;
 for (let i = 0; i < 12; i++) {
   a.send({ t: "catch" });
   const msg = await a.wait((m) => m.t === "info" || m.t === "party" || m.t === "disappear" || m.t === "appear");
+  if (msg.t === "party") partyState = msg.party;
   if (msg.t === "party" && catCount(msg.party.slots) > catsBefore) {
     caught = true;
     break;
   }
   if (msg.t === "info" && /Gotcha/.test(msg.text)) {
     caught = true;
+    const extra = await a.wait("party", 1500).then((m) => m, () => null);
+    if (extra?.party) partyState = extra.party;
     break;
   }
   if (msg.t === "appear" && msg.creature?.wild) prey = msg.creature;
@@ -161,6 +167,17 @@ for (let i = 0; i < 12; i++) {
   }
 }
 if (!caught) throw new Error("failed to catch Caterpie");
+
+const catSlot = (partyState.slots || []).findIndex((s) => s?.species === "caterpie");
+if (catSlot < 0) throw new Error("caught Caterpie missing from party slots");
+a.send({ t: "pokebar", slot: catSlot });
+const swapped = await a.wait((m) => m.t === "appear" && m.creature?.kind === "pokemon");
+if (swapped.creature.look !== 10) throw new Error(`swap out look ${swapped.creature.look}, expected Caterpie`);
+if (swapped.creature.masterId !== map1.you.id) throw new Error("swap out master not player");
+a.send({ t: "partyOrder", from: catSlot, to: 0 });
+const ordered = await a.wait("party");
+if (ordered.party.slots[0]?.species !== "caterpie") throw new Error("partyOrder did not move Caterpie to slot 0");
+if (ordered.party.out !== 0) throw new Error("out slot did not follow partyOrder");
 
 a.ws.close();
 await new Promise((r) => setTimeout(r, 400));
@@ -175,8 +192,9 @@ const map2 = await b.wait("map");
 if (map2.you.x !== moved.x || map2.you.y !== moved.y) {
   throw new Error(`persist failed pos ${map2.you.x},${map2.you.y} expected ${moved.x},${moved.y}`);
 }
-if (map2.party.slots[0]?.species !== "charmander") throw new Error("party lost");
+if (!map2.party.slots.some((s) => s?.species === "charmander")) throw new Error("party lost");
 if (!map2.party.slots.some((s) => s?.species === "caterpie")) throw new Error("caught Caterpie not persisted");
+if (map2.party.slots[0]?.species !== "caterpie") throw new Error("partyOrder not persisted");
 const out = map2.creatures.find((c) => c.kind === "pokemon" && c.masterId === map2.you.id);
 if (!out) throw new Error("out pokemon was not restored");
 console.log("SMOKE OK", {

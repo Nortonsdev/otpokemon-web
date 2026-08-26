@@ -47,90 +47,104 @@
               <span id="hud-vocation">Treinador</span>
             </div>
           </div>
+          <div id="hud-taskbar" class="hud-taskbar"></div>
           <div class="hud-top-center">
             <span class="gold-chip" title="Gold">● <b id="hud-gold">0</b></span>
             <button type="button" class="loja" disabled title="Out of scope">Loja</button>
           </div>
-          <div class="hud-top-icons" aria-hidden="true">
-            <span class="top-ico" title="Mapa">▣</span>
-            <span class="top-ico" title="Quest">!</span>
-            <span class="top-ico" title="Amigos">☺</span>
-            <span class="top-ico" title="Opções">⚙</span>
-          </div>
         </header>
 
-        <aside id="hud-loot" class="float-window">
-          <header>Loot da sessão</header>
-          <div class="loot-empty">—</div>
+        <aside id="hud-pokebar" class="float-window" data-win="pokebar">
+          <header class="win-head">
+            <span class="win-title">Lista de Pokemon</span>
+            <span class="win-stages">Stages</span>
+          </header>
+          <div class="win-body">
+            <div id="pokebar-list"></div>
+          </div>
         </aside>
 
-        <aside id="hud-inv" class="float-window">
-          <header>Inventário</header>
-          <div class="equip-grid">
-            <div class="eq-slot" style="grid-area:head" title="Head"></div>
-            <div class="eq-slot" style="grid-area:neck" title="Neck"></div>
-            <div class="eq-slot" style="grid-area:armor" title="Armor"></div>
-            <div class="eq-slot" style="grid-area:pack" title="Backpack"></div>
-            <div class="eq-slot" style="grid-area:lhand" title="Left hand"></div>
-            <div class="eq-slot" style="grid-area:rhand" title="Right hand"></div>
-            <div class="eq-slot" style="grid-area:legs" title="Legs"></div>
-            <div class="eq-slot" style="grid-area:ring" title="Ring"></div>
-            <div class="eq-slot" style="grid-area:feet" title="Feet"></div>
+        <aside id="hud-outstatus" class="float-window" data-win="outstatus">
+          <header class="win-head"><span class="win-title">Pokémon</span></header>
+          <div class="win-body out-body">
+            <img id="out-portrait" class="out-portrait" alt="" />
+            <div class="out-meta">
+              <div id="out-title">Nenhum Pokémon fora</div>
+              <div class="vital-bar hp">
+                <div id="poke-hp-fill" class="vital-fill"></div>
+                <span id="poke-hp-text">0 / 0</span>
+              </div>
+            </div>
           </div>
-          <div class="inv-label">Pokémon</div>
-          <div id="slots" class="party-slots"></div>
-          <div class="inv-label">Bolsa</div>
-          <div id="bolsa" class="bag-grid"></div>
-          <div class="inv-label">Mochila</div>
-          <div id="mochila" class="bag-grid"></div>
-          <div class="cap-row">Capacidade <span id="hud-cap">0.00 oz</span></div>
         </aside>
 
-        <div id="chat" class="float-window">
-          <div class="chat-tabs" id="chat-tabs">
-            <button type="button" data-ch="global">Global</button>
-            <button type="button" data-ch="local" class="active">Local</button>
-            <button type="button" data-ch="sistema">Sistema</button>
-            <button type="button" data-ch="combate">Combate</button>
+        <aside id="hud-loot" class="float-window" data-win="loot">
+          <header class="win-head"><span class="win-title">Loot da sessão</span></header>
+          <div class="win-body loot-empty">—</div>
+        </aside>
+
+        <aside id="hud-battle" class="float-window" data-win="battle">
+          <header class="win-head"><span class="win-title">Batalha</span></header>
+          <div class="win-body">
+            <div id="battle-list"></div>
+            <div id="hud-target-name" class="alvo-name">Sem alvo</div>
           </div>
-          <div id="chat-log"></div>
-          <div class="chat-send">
-            <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10  ·  C captura" />
-            <button type="button" id="chat-send">Enviar</button>
+        </aside>
+
+        <aside id="hud-inv" class="float-window" data-win="inv">
+          <header class="win-head"><span class="win-title">Inventário</span></header>
+          <div class="win-body">
+            <div class="equip-grid">
+              <div class="eq-slot" style="grid-area:head" title="Head"></div>
+              <div class="eq-slot" style="grid-area:neck" title="Neck"></div>
+              <div class="eq-slot" style="grid-area:armor" title="Armor"></div>
+              <div class="eq-slot" style="grid-area:pack" title="Backpack"></div>
+              <div class="eq-slot" style="grid-area:lhand" title="Left hand"></div>
+              <div class="eq-slot" style="grid-area:rhand" title="Right hand"></div>
+              <div class="eq-slot" style="grid-area:legs" title="Legs"></div>
+              <div class="eq-slot" style="grid-area:ring" title="Ring"></div>
+              <div class="eq-slot" style="grid-area:feet" title="Feet"></div>
+            </div>
+            <div class="inv-label">Bolsa</div>
+            <div id="bolsa" class="bag-grid"></div>
+            <div class="inv-label">Mochila</div>
+            <div id="mochila" class="bag-grid"></div>
+            <div class="cap-row">Capacidade <span id="hud-cap">0.00 oz</span></div>
+          </div>
+        </aside>
+
+        <div id="chat" class="float-window" data-win="chat">
+          <header class="win-head"><span class="win-title">Chat</span></header>
+          <div class="win-body">
+            <div class="chat-tabs" id="chat-tabs">
+              <button type="button" data-ch="global">Global</button>
+              <button type="button" data-ch="local" class="active">Local</button>
+              <button type="button" data-ch="sistema">Sistema</button>
+              <button type="button" data-ch="combate">Combate</button>
+            </div>
+            <div id="chat-log"></div>
+            <div class="chat-send">
+              <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10  ·  C captura" />
+              <button type="button" id="chat-send">Enviar</button>
+            </div>
           </div>
         </div>
 
-        <div id="hud-vitals">
-          <div class="vital-col">
-            <div class="vital-bar hp">
-              <div id="player-hp-fill" class="vital-fill"></div>
-              <span id="player-hp-text">150 / 150</span>
+        <div id="hud-vitals" class="float-window" data-win="vitals">
+          <header class="win-head"><span class="win-title">Vitals</span></header>
+          <div class="win-body vitals-body">
+            <div class="vital-col">
+              <div class="vital-bar hp">
+                <div id="player-hp-fill" class="vital-fill"></div>
+                <span id="player-hp-text">150 / 150</span>
+              </div>
+              <div class="xp-row">
+                <span>Lv <b id="hud-xp-lv">1</b></span>
+                <div class="xp-bar"><div id="hud-xp-fill"></div></div>
+                <span id="hud-xp-pct">0.0%</span>
+              </div>
             </div>
-            <div class="vital-bar mp">
-              <div id="poke-hp-fill" class="vital-fill"></div>
-              <span id="poke-hp-text">0 / 0</span>
-            </div>
-            <div class="xp-row">
-              <span>Lv <b id="hud-xp-lv">1</b></span>
-              <div class="xp-bar"><div id="hud-xp-fill"></div></div>
-              <span id="hud-xp-pct">0.0%</span>
-            </div>
-          </div>
-          <div id="hotbar" class="hotbar"></div>
-        </div>
-
-        <div id="hud-combat" class="float-window">
-          <label>Conjunto
-            <select disabled><option>Padrão</option></select>
-          </label>
-          <label>Alvo
-            <select disabled><option>Mais próximo</option></select>
-          </label>
-          <div id="hud-target-name" class="alvo-name">Sem alvo</div>
-          <div class="stances" aria-hidden="true">
-            <span class="stance on" title="Offensive">⚔</span>
-            <span class="stance" title="Balanced">♦</span>
-            <span class="stance" title="Defensive">🛡</span>
+            <div id="hotbar" class="hotbar"></div>
           </div>
         </div>
       </section>

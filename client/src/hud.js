@@ -1,3 +1,5 @@
+import { WindowManager } from "./windows.js";
+
 const LOOK_FILE = {
   1: "bulbasaur",
   4: "charmander",
@@ -10,9 +12,21 @@ function clock() {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+function genderMark(p) {
+  if (!p) return "";
+  const g = p.gender || (String(p.uid || "").charCodeAt(0) % 2 ? "m" : "f");
+  return g === "f" ? "♀" : "♂";
+}
+
+function portraitUrl(p) {
+  const look = LOOK_FILE[p.look] || "caterpie";
+  return `/assets/pokemon/${look}/portrait.png`;
+}
+
 export class Hud {
   constructor(net) {
     this.net = net;
+    this.windows = new WindowManager(net);
     this.party = { slots: [], out: null, count: 0 };
     this.you = null;
     this.bag = [];
@@ -20,11 +34,14 @@ export class Hud {
     this.channel = "local";
     this.lines = [];
     this.target = null;
+    this.creatures = new Map();
+    this.rowDrag = null;
   }
 
   bindGame() {
     if (this.bound) return;
     this.bound = true;
+    this.windows.bind();
     const sendChat = () => {
       const input = document.getElementById("chat-input");
       const text = input.value.trim();
@@ -78,8 +95,8 @@ export class Hud {
   setTarget(creature) {
     this.target = creature;
     const el = document.getElementById("hud-target-name");
-    if (!el) return;
-    el.textContent = creature ? creature.plate || creature.name : "Sem alvo";
+    if (el) el.textContent = creature ? creature.plate || creature.name : "Sem alvo";
+    this.renderBattle();
   }
 
   handle(msg) {
@@ -87,6 +104,9 @@ export class Hud {
       this.you = msg.you;
       this.party = msg.party;
       this.bag = msg.bag || [];
+      this.creatures = new Map((msg.creatures || []).map((c) => [c.id, c]));
+      if (msg.hud) this.windows.merge(msg.hud);
+      if (this.bound) this.windows.applyAll();
       this.render();
     }
     if (msg.t === "party") {
@@ -95,19 +115,37 @@ export class Hud {
       this.render();
     }
     if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
-    if (msg.t === "info") this.log(msg.text, /Hit for|used |fled|Gotcha|broke free/.test(msg.text) ? "combate" : "sistema");
+    if (msg.t === "info") this.log(msg.text, /causou |fled|Gotcha|broke free|Hit for|used /.test(msg.text) ? "combate" : "sistema");
     if (msg.t === "err") this.log(msg.text, "sistema");
     if (msg.t === "moved" && this.you && msg.id === this.you.id) {
       this.you.x = msg.x;
       this.you.y = msg.y;
       this.you.dir = msg.dir;
     }
-    if (msg.t === "fx") this.log(`Hit for ${msg.dmg}.`, "combate");
+    if (msg.t === "moved") {
+      const c = this.creatures.get(msg.id);
+      if (c) {
+        c.x = msg.x;
+        c.y = msg.y;
+      }
+    }
+    if (msg.t === "appear") {
+      this.creatures.set(msg.creature.id, msg.creature);
+      this.renderBattle();
+    }
+    if (msg.t === "disappear") {
+      this.creatures.delete(msg.id);
+      if (this.target?.id === msg.id) this.setTarget(null);
+      else this.renderBattle();
+    }
+    if (msg.t === "fx") {
+      const c = this.creatures.get(msg.to);
+      if (c && msg.hp != null) c.hp = msg.hp;
+      this.renderBattle();
+    }
     if (msg.t === "target") {
       this.setTarget({ id: msg.id, name: msg.name, plate: msg.plate });
     }
-    if (msg.t === "appear" && this.target?.id === msg.creature?.id) this.setTarget(msg.creature);
-    if (msg.t === "disappear" && this.target?.id === msg.id) this.setTarget(null);
   }
 
   render() {
@@ -124,33 +162,108 @@ export class Hud {
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     const pokeText = document.getElementById("poke-hp-text");
     const pokeFill = document.getElementById("poke-hp-fill");
+    const outTitle = document.getElementById("out-title");
+    const outImg = document.getElementById("out-portrait");
     if (!out) {
       pokeText.textContent = "0 / 0";
       pokeFill.style.width = "0%";
+      if (outTitle) outTitle.textContent = "Nenhum Pokémon fora";
+      if (outImg) outImg.removeAttribute("src");
     } else {
       pokeText.textContent = `${out.hp} / ${out.hpMax}`;
-      pokeFill.style.width = `${(out.hp / out.hpMax) * 100}%`;
+      pokeFill.style.width = `${(out.hp / Math.max(1, out.hpMax)) * 100}%`;
+      if (outTitle) outTitle.textContent = `[${out.level}] ${out.name}`;
+      if (outImg) outImg.src = portraitUrl(out);
     }
 
-    const slots = document.getElementById("slots");
-    slots.innerHTML = "";
-    for (let i = 0; i < 6; i++) {
-      const p = this.party.slots?.[i];
-      const el = document.createElement("div");
-      el.className = "slot" + (p ? "" : " empty") + (this.party.out === i ? " out" : "");
-      const look = p ? LOOK_FILE[p.look] : null;
-      const ratio = p ? Math.max(0, Math.min(1, p.hp / Math.max(1, p.hpMax))) : 0;
-      el.innerHTML = p
-        ? `<img class="portrait" src="/assets/pokemon/${look}/portrait.png" alt="${p.name}" />
-           <div class="slot-hp"><div class="slot-hp-fill" style="width:${ratio * 100}%"></div></div>`
-        : `<img class="portrait" src="/assets/hud/slots/pokeball.png" alt="empty" />`;
-      el.title = p ? `${p.name} [${p.level}] ${p.hp}/${p.hpMax}` : "empty";
-      el.onclick = () => this.net.send({ t: "pokebar", slot: i });
-      slots.appendChild(el);
-    }
-
+    this.renderPokebar();
+    this.renderBattle();
     this.renderBags();
     this.renderHotbar(out);
+  }
+
+  renderPokebar() {
+    const list = document.getElementById("pokebar-list");
+    if (!list) return;
+    list.innerHTML = "";
+    for (let i = 0; i < 6; i++) {
+      const p = this.party.slots?.[i];
+      const row = document.createElement("div");
+      const isOut = this.party.out === i;
+      row.className = "poke-row" + (p ? "" : " empty") + (isOut ? " out" : "");
+      row.dataset.slot = String(i);
+      if (p) {
+        const ratio = Math.max(0, Math.min(1, p.hp / Math.max(1, p.hpMax)));
+        const pct = Math.round(ratio * 100);
+        row.innerHTML = `
+          <img class="poke-ico" src="${portraitUrl(p)}" alt="${p.name}" />
+          <span class="poke-gender">${genderMark(p)}</span>
+          <div class="poke-meta">
+            <div class="poke-name">[${p.level}] ${p.name}</div>
+            <div class="poke-hp"><div class="poke-hp-fill" style="width:${pct}%"></div></div>
+          </div>
+          <span class="poke-pct">${pct}%</span>
+        `;
+        row.onclick = (e) => {
+          if (this.rowDrag) return;
+          if (e.target.closest(".win-tools")) return;
+          this.net.send({ t: "pokebar", slot: i });
+        };
+        row.addEventListener("mousedown", (e) => this.onRowDown(i, e));
+      }
+      list.appendChild(row);
+    }
+  }
+
+  onRowDown(from, e) {
+    if (!this.windows.reorder || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const onMove = (ev) => {
+      if (Math.abs(ev.clientX - e.clientX) + Math.abs(ev.clientY - e.clientY) > 4) this.rowDrag = from;
+    };
+    const onUp = (ev) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      const over = ev.target.closest?.(".poke-row");
+      const to = over ? Number(over.dataset.slot) : NaN;
+      if (this.rowDrag != null && Number.isInteger(to) && to !== from) {
+        this.net.send({ t: "partyOrder", from, to });
+      }
+      setTimeout(() => {
+        this.rowDrag = null;
+      }, 0);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  renderBattle() {
+    const list = document.getElementById("battle-list");
+    if (!list) return;
+    list.innerHTML = "";
+    const rows = [...this.creatures.values()].filter((c) => {
+      if (!c) return false;
+      if (c.id === this.you?.id) return false;
+      if (c.masterId && c.masterId === this.you?.id) return false;
+      return c.kind === "wild" || c.wild || c.kind === "player";
+    });
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "battle-empty";
+      empty.textContent = "—";
+      list.appendChild(empty);
+      return;
+    }
+    for (const c of rows) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "battle-row" + (this.target?.id === c.id ? " targeted" : "");
+      const ratio = Math.max(0, Math.min(1, (c.hp ?? 1) / Math.max(1, c.hpMax ?? 1)));
+      el.innerHTML = `<span>${c.plate || c.name}</span><span class="battle-hp"><span style="width:${ratio * 100}%"></span></span>`;
+      el.onclick = () => this.net.send({ t: "attack", id: c.id });
+      list.appendChild(el);
+    }
   }
 
   renderBags() {

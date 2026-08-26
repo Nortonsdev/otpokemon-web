@@ -52,6 +52,9 @@ export class GameScene extends Phaser.Scene {
     this.creatureLayer = null;
     this.live = false;
     this.pendingWorld = null;
+    this.targetId = null;
+    this.targetMark = null;
+    this.glow = null;
   }
 
   preload() {
@@ -81,18 +84,19 @@ export class GameScene extends Phaser.Scene {
     this.wallLayer = this.add.layer();
     this.creatureLayer = this.add.layer();
     this.roofLayer = this.add.layer();
-    this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO");
+    this.keys = this.input.keyboard.addKeys(
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
+    );
     this.input.keyboard.enabled = false;
     this.input.mouse?.disableContextMenu();
     document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
     this.input.on("pointerdown", (p) => this.onPointer(p));
     this.targetId = null;
-    this.targetMark = this.add.rectangle(0, 0, TILE - 2, TILE - 2, 0xff2020, 0.18);
-    this.targetMark.setStrokeStyle(3, 0xff3030, 1);
-    this.targetMark.setOrigin(0, 0);
-    this.targetMark.setVisible(false);
-    this.targetMark.setDepth(1000);
-    this.cameras.main.setRoundPixels(true);
+    this.targetMark = this.add.graphics();
+    this.targetMark.setDepth(4);
+    this.glow = this.add.graphics();
+    this.glow.setDepth(3);
+    this.cameras.main.setRoundPixels(false);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
       const payload = this.pendingWorld;
@@ -101,6 +105,24 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.enterPreview();
     }
+  }
+
+  now() {
+    return this.time?.now ?? 0;
+  }
+
+  displayTile(st) {
+    if (!st) return { x: 0, y: 0 };
+    if (!st.moving || !st.walkMs) return { x: st.x, y: st.y };
+    const t = Math.max(0, Math.min(1, (this.now() - st.walkStart) / st.walkMs));
+    if (t >= 1) {
+      st.moving = false;
+      return { x: st.x, y: st.y };
+    }
+    return {
+      x: st.fromX + (st.x - st.fromX) * t,
+      y: st.fromY + (st.y - st.fromY) * t,
+    };
   }
 
   clearWorld() {
@@ -121,7 +143,8 @@ export class GameScene extends Phaser.Scene {
     this.roofSprites = [];
     this.youId = null;
     this.targetId = null;
-    this.targetMark?.setVisible(false);
+    this.targetMark?.clear();
+    this.glow?.clear();
   }
 
   enterPreview() {
@@ -141,8 +164,8 @@ export class GameScene extends Phaser.Scene {
     this.drawMap();
     this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
-    this.cameras.main.centerOn(8 * TILE + 16, 12 * TILE + 16);
-    this.cameras.main.setRoundPixels(true);
+    this.cameras.main.setRoundPixels(false);
+    this.cameras.main.centerOn(8 * TILE + TILE / 2, 12 * TILE + TILE / 2);
   }
 
   enterWorld(payload) {
@@ -157,10 +180,11 @@ export class GameScene extends Phaser.Scene {
     this.youId = payload.you.id;
     this.drawMap();
     for (const c of payload.creatures) this.spawn(c);
+    this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
-    this.cameras.main.setRoundPixels(true);
-    const you = this.sprites.get(this.youId);
-    if (you) this.cameras.main.startFollow(you, true, 1, 1);
+    this.cameras.main.setRoundPixels(false);
+    this.layoutAll();
+    this.lockCamera();
     this.updateRoofs();
   }
 
@@ -168,9 +192,7 @@ export class GameScene extends Phaser.Scene {
     const { w, h, ground, walls, roofs, items } = this.mapData;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const g = this.add
-          .image(x * TILE, y * TILE, groundTexture(ground[y][x]))
-          .setOrigin(0, 0);
+        const g = this.add.image(x * TILE, y * TILE, groundTexture(ground[y][x])).setOrigin(0, 0);
         g.setDepth(y);
         this.groundLayer.add(g);
         if (walls[y][x]) {
@@ -223,7 +245,15 @@ export class GameScene extends Phaser.Scene {
     plate.setDepth(c.y * 10 + 7);
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
-    this.state.set(c.id, { ...c, moving: false, phase: 0 });
+    this.state.set(c.id, {
+      ...c,
+      moving: false,
+      phase: 0,
+      fromX: c.x,
+      fromY: c.y,
+      walkStart: 0,
+      walkMs: 0,
+    });
     const cx = pos.x + size / 2;
     const barY = plateY + 3;
     const bg = this.add.rectangle(cx, barY, 28, 4, 0x111111).setOrigin(0.5, 0);
@@ -281,17 +311,46 @@ export class GameScene extends Phaser.Scene {
     else bar.fg.setFillStyle(0xcc3d3d);
   }
 
-  place(id, x, y, dir, moving) {
+  layoutCreature(id) {
     const st = this.state.get(id);
     const sprite = this.sprites.get(id);
     if (!st || !sprite) return;
-    const tex = sprite.texture.key;
-    const size = tex === "human" ? 64 : 32;
-    const pos = tileWorld(x, y, size);
+    const d = this.displayTile(st);
+    const size = sprite.texture.key === "human" ? 64 : 32;
+    const pos = tileWorld(d.x, d.y, size);
+    const walking = st.moving;
     sprite.setPosition(pos.x, pos.y);
-    sprite.setFrame(frameIndex(dir, moving, st.phase));
-    sprite.setDepth(y * 10 + 6);
-    this.layoutNameplate(id, pos.x, pos.y, y * 10 + 6);
+    sprite.setFrame(frameIndex(st.dir || 4, walking, st.phase));
+    const depth = Math.round(d.y) * 10 + 6;
+    sprite.setDepth(depth);
+    this.layoutNameplate(id, pos.x, pos.y, depth);
+  }
+
+  layoutAll() {
+    for (const id of this.sprites.keys()) this.layoutCreature(id);
+    this.layoutGlow();
+  }
+
+  lockCamera() {
+    if (!this.live) return;
+    const st = this.state.get(this.youId);
+    if (!st) return;
+    const d = this.displayTile(st);
+    this.cameras.main.centerOn(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2);
+  }
+
+  layoutGlow() {
+    if (!this.glow) return;
+    this.glow.clear();
+    const st = this.state.get(this.youId);
+    if (!this.live || !st) return;
+    const d = this.displayTile(st);
+    const cx = d.x * TILE + TILE / 2;
+    const cy = d.y * TILE + TILE / 2;
+    this.glow.fillStyle(0xfff3c4, 0.16);
+    this.glow.fillCircle(cx, cy, 38);
+    this.glow.fillStyle(0xffe08a, 0.1);
+    this.glow.fillCircle(cx, cy, 22);
   }
 
   handleNet(msg) {
@@ -302,15 +361,12 @@ export class GameScene extends Phaser.Scene {
       const st = this.state.get(msg.id);
       if (!st) return;
       st.dir = msg.dir;
-      this.sprites.get(msg.id)?.setFrame(frameIndex(msg.dir, false, 0));
     }
-    if (msg.t === "moved") {
-      this.animateMove(msg);
-      if (msg.id === this.targetId) this.layoutTarget();
-    }
+    if (msg.t === "moved") this.animateMove(msg);
     if (msg.t === "fx") {
       this.flash(msg.to);
       if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
+      if (msg.dmg != null) this.floatDamage(msg.to, msg.dmg);
     }
     if (msg.t === "target") this.setTarget(msg.id);
     if (msg.t === "disappear" && msg.id === this.targetId) this.setTarget(null);
@@ -325,43 +381,61 @@ export class GameScene extends Phaser.Scene {
 
   layoutTarget() {
     if (!this.targetMark) return;
+    this.targetMark.clear();
     const st = this.targetId ? this.state.get(this.targetId) : null;
-    if (!st) {
-      this.targetMark.setVisible(false);
-      return;
-    }
-    this.targetMark.setPosition(st.x * TILE + 1, st.y * TILE + 1);
-    this.targetMark.setDepth(1000);
-    this.targetMark.setVisible(true);
+    if (!st) return;
+    const d = this.displayTile(st);
+    const cx = d.x * TILE + TILE / 2;
+    const cy = d.y * TILE + TILE / 2;
+    this.targetMark.setDepth(Math.round(d.y) * 10 + 5);
+    this.targetMark.fillStyle(0xff2020, 0.16);
+    this.targetMark.fillCircle(cx, cy, 15);
+    this.targetMark.lineStyle(3, 0xff2a2a, 1);
+    this.targetMark.strokeCircle(cx, cy, 15);
+    this.targetMark.lineStyle(2, 0xff6666, 0.95);
+    this.targetMark.strokeCircle(cx, cy, 8);
   }
 
   animateMove(msg) {
     const st = this.state.get(msg.id);
-    const sprite = this.sprites.get(msg.id);
-    if (!st || !sprite) return;
+    if (!st) return;
+    const disp = this.displayTile(st);
+    st.fromX = disp.x;
+    st.fromY = disp.y;
     st.dir = msg.dir;
     st.x = msg.x;
     st.y = msg.y;
     st.moving = true;
+    st.walkStart = this.now();
+    st.walkMs = Math.max(80, msg.ms || 200);
     st.phase = st.phase ? 0 : 1;
-    const pos = tileWorld(msg.x, msg.y, sprite.texture.key === "human" ? 64 : 32);
-    this.tweens.killTweensOf(sprite);
+    if (msg.id === this.youId) this.updateRoofs();
+  }
+
+  floatDamage(id, dmg) {
+    const st = this.state.get(id);
+    const sprite = this.sprites.get(id);
+    if (!st || !sprite) return;
+    const d = this.displayTile(st);
+    const x = d.x * TILE + TILE / 2;
+    const y = d.y * TILE - 6;
+    const txt = this.add
+      .text(x, y, String(dmg), {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "16px",
+        fontStyle: "bold",
+        color: "#ff4040",
+        stroke: "#000000",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 1);
+    txt.setDepth(2000);
     this.tweens.add({
-      targets: sprite,
-      x: pos.x,
-      y: pos.y,
-      duration: msg.ms || 200,
-      onUpdate: () => {
-        sprite.setFrame(frameIndex(st.dir, true, st.phase));
-        sprite.setDepth(Math.round(st.y) * 10 + 6);
-        this.layoutNameplate(msg.id, sprite.x, sprite.y, sprite.depth);
-      },
-      onComplete: () => {
-        st.moving = false;
-        sprite.setFrame(frameIndex(st.dir, false, 0));
-        this.place(msg.id, msg.x, msg.y, st.dir, false);
-        if (msg.id === this.youId) this.updateRoofs();
-      },
+      targets: txt,
+      y: y - 26,
+      alpha: 0,
+      duration: 700,
+      onComplete: () => txt.destroy(),
     });
   }
 
@@ -398,7 +472,10 @@ export class GameScene extends Phaser.Scene {
     const tx = Math.floor(worldX / TILE);
     const ty = Math.floor(worldY / TILE);
     for (const [, st] of this.state) {
-      if (st.id !== this.youId && st.x === tx && st.y === ty) return st;
+      if (st.id === this.youId) continue;
+      const d = this.displayTile(st);
+      if (Math.floor(d.x + 0.001) === tx && Math.floor(d.y + 0.001) === ty) return st;
+      if (st.x === tx && st.y === ty) return st;
     }
     return null;
   }
@@ -452,6 +529,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   update() {
+    this.layoutAll();
+    this.lockCamera();
+    this.layoutTarget();
     if (!this.live) return;
     if (isTyping()) {
       this.input.keyboard.enabled = false;
@@ -463,6 +543,5 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.net.send({ t: "catch" });
     const move = this.moveKey();
     if (move != null) this.net.send({ t: "move", n: move });
-    this.layoutTarget();
   }
 }

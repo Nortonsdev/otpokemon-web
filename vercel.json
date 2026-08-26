@@ -10,7 +10,6 @@
   ],
   "functions": {
     "api/ws.js": {
-      "maxDuration": 300,
       "includeFiles": "server/**"
     }
   }

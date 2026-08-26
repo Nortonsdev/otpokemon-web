@@ -64,11 +64,11 @@ function ensureGame() {
     height: window.innerHeight,
     backgroundColor: "#111111",
     pixelArt: true,
-    roundPixels: true,
+    roundPixels: false,
     antialias: false,
     scene: [new GameScene(net, hud)],
     scale: { mode: Phaser.Scale.RESIZE },
-    render: { pixelArt: true, roundPixels: true, antialias: false },
+    render: { pixelArt: true, roundPixels: false, antialias: false },
   });
   return game;
 }
