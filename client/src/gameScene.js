@@ -68,8 +68,6 @@ export class GameScene extends Phaser.Scene {
     this.groundLayer = null;
     this.itemLayer = null;
     this.wallLayer = null;
-    this.roofLayer = null;
-    this.creatureLayer = null;
     this.live = false;
     this.pendingWorld = null;
     this.targetId = null;
@@ -104,8 +102,6 @@ export class GameScene extends Phaser.Scene {
     this.groundLayer = this.add.layer();
     this.itemLayer = this.add.layer();
     this.wallLayer = this.add.layer();
-    this.creatureLayer = this.add.layer();
-    this.roofLayer = this.add.layer();
     this.keys = this.input.keyboard.addKeys(
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
@@ -128,7 +124,7 @@ export class GameScene extends Phaser.Scene {
     this.targetMark = this.add.graphics();
     this.targetMark.setDepth(4);
     this.glow = this.add.graphics();
-    this.glow.setDepth(3);
+    this.glow.setDepth(5);
     this.cameras.main.setRoundPixels(false);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
@@ -172,7 +168,7 @@ export class GameScene extends Phaser.Scene {
     this.groundLayer.removeAll(true);
     this.itemLayer.removeAll(true);
     this.wallLayer.removeAll(true);
-    this.roofLayer.removeAll(true);
+    this.roofSprites.forEach((r) => r.destroy());
     this.roofSprites = [];
     this.youId = null;
     this.targetId = null;
@@ -238,7 +234,6 @@ export class GameScene extends Phaser.Scene {
           roof.setDepth(y * 10 + 8);
           roof.tileX = x;
           roof.tileY = y;
-          this.roofLayer.add(roof);
           this.roofSprites.push(roof);
         }
       }
@@ -265,8 +260,7 @@ export class GameScene extends Phaser.Scene {
     const pos = tileWorld(c.x, c.y, size);
     const sprite = this.add.sprite(pos.x, pos.y, tex, frameIndex(c.dir, false, 0));
     sprite.setOrigin(0, 0);
-    sprite.setDepth(c.y * 10 + 6);
-    this.creatureLayer.add(sprite);
+    sprite.setDepth(c.y * 10 + 9);
     const plateY = tex === "human" ? pos.y + 8 : pos.y - 2;
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, {
@@ -278,7 +272,7 @@ export class GameScene extends Phaser.Scene {
         strokeThickness: 3,
       })
       .setOrigin(0.5, 1);
-    plate.setDepth(c.y * 10 + 7);
+    plate.setDepth(c.y * 10 + 10);
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
     this.state.set(c.id, {
@@ -294,9 +288,9 @@ export class GameScene extends Phaser.Scene {
     const barY = plateY + 3;
     const bg = this.add.rectangle(cx, barY, 28, 4, 0x111111).setOrigin(0.5, 0);
     bg.setStrokeStyle(1, 0x000000, 0.9);
-    bg.setDepth(c.y * 10 + 8);
+    bg.setDepth(c.y * 10 + 11);
     const fg = this.add.rectangle(cx - 13, barY + 1, 26, 2, 0x3dcc4a).setOrigin(0, 0);
-    fg.setDepth(c.y * 10 + 9);
+    fg.setDepth(c.y * 10 + 12);
     this.hpBars.set(c.id, { bg, fg });
     this.setHpBar(c.id, c.hp, c.hpMax);
     this.refreshPlate(c.id);
@@ -386,7 +380,7 @@ export class GameScene extends Phaser.Scene {
     const size = creatureSize(sprite.texture.key);
     const pos = tileWorld(d.x, d.y, size);
     const walking = st.moving && !st.dead;
-    const depth = Math.round(d.y) * 10 + 6;
+    const depth = Math.round(d.y) * 10 + 9;
     const ability = st.mount?.ability;
     if (st.dead) {
       sprite.setOrigin(0.5, 0.5);
@@ -453,6 +447,7 @@ export class GameScene extends Phaser.Scene {
     const d = this.displayTile(st);
     const cx = d.x * TILE + TILE / 2;
     const cy = d.y * TILE + TILE / 2;
+    this.glow.setDepth(Math.round(d.y) * 10 + 5);
     this.glow.fillStyle(0xfff3c4, 0.16);
     this.glow.fillCircle(cx, cy, 38);
     this.glow.fillStyle(0xffe08a, 0.1);
