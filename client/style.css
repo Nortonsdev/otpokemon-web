@@ -16,6 +16,13 @@
   --frame-button: url(/assets/ui/frames/frame-button.png);
   --frame-slot: url(/assets/ui/frames/frame-slot.png);
   --frame-slot-active: url(/assets/ui/frames/frame-slot-active.png);
+  --myst-frame: url(/assets/ui/myst/2pixel_up_frame_borderimage.png);
+  --myst-pokebar-window: url(/assets/ui/myst/pokebar_window.png);
+  --myst-pokebar-slot: url(/assets/ui/myst/pokebar_default.png);
+  --myst-pokebar-slot-use: url(/assets/ui/myst/pokebar_use.png);
+  --myst-pokeinfo: url(/assets/ui/myst/pokeinfowindow.png);
+  --myst-action-slot: url(/assets/ui/actionbar/actionbarslot.png);
+  --myst-hp: #02ec0d;
 }
 
 * { box-sizing: border-box; }
@@ -104,26 +111,91 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
 .task-btn.closed { color: #c8a848; }
 .task-btn.open { color: var(--ot-green); }
 
-/* ── OTClient window chrome ── */
+/* ── Myst OTClient window chrome (9-slice) ── */
 .ot-window {
-  pointer-events: auto; position: absolute;
-  background: var(--ot-bg);
+  pointer-events: auto;
+  position: absolute;
   color: var(--ot-text);
-  border: 1px solid var(--ot-border);
-  border-radius: 5px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(3px);
 }
-.ot-window > .win-head {
+.myst-frame {
+  border: 2px solid transparent;
+  border-image: var(--myst-frame) 2 fill stretch;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+.myst-frame > .win-head {
   padding: 3px 8px 2px;
   color: var(--ot-muted);
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  display: flex; align-items: center; gap: 4px;
-  cursor: default; position: relative; z-index: 5;
-  border-bottom: 1px solid var(--ot-border-dim);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: default;
+  position: relative;
+  z-index: 5;
+  border-bottom: 1px solid rgba(106, 140, 196, 0.22);
   min-height: 20px;
+  background: transparent;
+}
+.myst-pokebar {
+  width: 198px;
+  height: 319px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  background: var(--myst-pokebar-window) no-repeat top left;
+  background-size: 198px 319px;
+}
+.myst-pokebar > .win-head {
+  height: 30px;
+  padding: 5px 8px 0;
+  border: 0;
+  background: transparent;
+}
+.myst-pokebar .win-title,
+.myst-pokebar .win-stages {
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  overflow: hidden;
+}
+.myst-pokebar .win-body,
+.pokebar-body {
+  position: relative;
+  height: 289px;
+  padding: 0;
+  overflow: visible;
+}
+.pokebar-list {
+  position: absolute;
+  inset: 0;
+}
+.myst-pokeinfo {
+  width: 230px;
+  min-height: 144px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  background: var(--myst-pokeinfo) no-repeat top left;
+  background-size: 100% 100%;
+}
+.myst-pokeinfo > .win-head {
+  height: 24px;
+  padding: 4px 8px 0;
+  border: 0;
+  background: transparent;
+}
+.myst-pokeinfo .win-title {
+  opacity: 0;
+  pointer-events: none;
 }
 .win-title { flex: 1; text-transform: capitalize; }
 .win-stages { font-size: 9px; color: #687896; font-weight: 500; }
@@ -152,43 +224,90 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   background: rgba(16, 22, 38, 0.95); color: var(--ot-text); cursor: pointer;
 }
 
-#hud-vip { top: 196px; left: 6px; width: 118px; }
+#hud-vip { top: 168px; left: 6px; width: 118px; }
 .vip-list { list-style: none; margin: 0; padding: 4px 8px 8px; font-size: 11px; }
 .vip-list li { padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vip-on { color: var(--ot-green); }
 .vip-off { color: #c86060; }
 
-#hud-pokebar { top: 268px; left: 6px; width: 204px; }
-#pokebar-list { padding: 4px 6px 8px; display: flex; flex-direction: column; gap: 4px; }
-.poke-row {
-  display: flex; align-items: center; gap: 5px; padding: 3px 6px 3px 4px;
-  background: rgba(8, 14, 28, 0.75); cursor: pointer; min-height: 36px;
-  border-radius: 18px; border: 1px solid var(--ot-border-dim);
+#hud-pokebar { top: 198px; left: 6px; width: 198px; height: 319px; }
+.poke-slot {
+  position: absolute;
+  left: 0;
+  width: 198px;
+  height: 47px;
+  cursor: pointer;
 }
-.poke-row.out {
-  background: rgba(30, 70, 40, 0.55);
-  border-color: rgba(60, 180, 74, 0.55);
-  box-shadow: inset 0 0 0 1px rgba(60, 180, 74, 0.25);
+.poke-slot.empty { cursor: default; opacity: 0.55; }
+.poke-slot-bg {
+  position: absolute;
+  left: 6px;
+  top: 0;
+  width: 187px;
+  height: 47px;
+  background: var(--myst-pokebar-slot) no-repeat;
+  background-size: 187px 47px;
+  pointer-events: none;
 }
-.poke-row.empty {
-  opacity: 0.4; cursor: default; min-height: 36px;
-  background: rgba(8, 14, 28, 0.45);
+.poke-slot.out .poke-slot-bg {
+  background-image: var(--myst-pokebar-slot-use);
 }
 .poke-ico {
-  width: 30px; height: 30px; border-radius: 50%; object-fit: cover;
-  image-rendering: pixelated; background: #0a0e18;
-  border: 1px solid var(--ot-border-dim); flex: none;
+  position: absolute;
+  left: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  background: #0a0e18;
+  border: 0;
+  flex: none;
+  z-index: 2;
 }
-.poke-gender { color: #7aa2f7; font-size: 11px; width: 10px; flex: none; }
-.poke-meta { flex: 1; min-width: 0; }
+.poke-gender {
+  position: absolute;
+  left: 40px;
+  top: 2px;
+  color: #7aa2f7;
+  font-size: 10px;
+  z-index: 2;
+}
 .poke-name {
-  color: #e8ecf8; font-size: 11px; font-weight: 500;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2;
+  position: absolute;
+  left: 66px;
+  top: 2px;
+  right: 8px;
+  color: #e8ecf8;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  z-index: 2;
 }
-.poke-hp { height: 5px; background: rgba(0, 0, 0, 0.45); margin-top: 3px; border-radius: 3px; overflow: hidden; }
-.poke-hp-fill { height: 100%; background: var(--ot-hp); border-radius: 3px; }
-.poke-pct { font-size: 10px; color: var(--ot-text); width: 32px; text-align: right; flex: none; }
-body.pokebar-reorder .poke-row { cursor: grab; }
+.poke-hp {
+  position: absolute;
+  left: 66px;
+  width: 87px;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  z-index: 2;
+}
+.poke-hp-fill {
+  height: 100%;
+  background: var(--myst-hp);
+}
+.poke-pct {
+  position: absolute;
+  right: 8px;
+  font-size: 9px;
+  color: var(--ot-text);
+  z-index: 2;
+}
+body.pokebar-reorder .poke-slot { cursor: grab; }
 
 #hud-battle { left: 6px; bottom: 118px; width: 204px; }
 .battle-filters { display: flex; gap: 3px; margin-right: 4px; }
@@ -210,13 +329,13 @@ body.pokebar-reorder .poke-row { cursor: grab; }
 .battle-hp > span { display: block; height: 100%; background: var(--ot-hp); border-radius: 2px; }
 
 /* ── RIGHT COLUMN ── */
-#hud-pokeinfo { top: 28px; right: 6px; width: 210px; }
-.pokeinfo-body { display: flex; gap: 6px; padding: 6px 8px 8px; align-items: flex-start; }
-.pokeinfo-portrait-wrap { position: relative; flex: none; }
+#hud-pokeinfo { top: 28px; right: 6px; width: 230px; }
+.pokeinfo-body { display: flex; gap: 6px; padding: 8px 10px 10px; align-items: flex-start; }
+.pokeinfo-portrait-wrap { position: relative; flex: none; margin-top: 2px; }
 .pokeinfo-portrait {
-  width: 58px; height: 58px; border-radius: 50%; object-fit: cover;
+  width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
   image-rendering: pixelated; background: #0a0e18;
-  border: 2px solid var(--ot-border); display: block;
+  border: 0; display: block;
 }
 .pokeinfo-lv-badge {
   position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
@@ -236,7 +355,7 @@ body.pokebar-reorder .poke-row { cursor: grab; }
 .stat-lbl { color: var(--ot-muted); font-weight: 600; letter-spacing: 0.02em; }
 .stat-bar { height: 7px; background: rgba(0, 0, 0, 0.55); border-radius: 2px; overflow: hidden; }
 .stat-fill { height: 100%; width: 0; border-radius: 2px; }
-.stat-row.hp .stat-fill { background: var(--ot-hp); }
+.stat-row.hp .stat-fill { background: var(--myst-hp); }
 .stat-row.exp .stat-fill { background: var(--ot-exp); }
 .stat-row.fish .stat-fill { background: var(--ot-fish); }
 .stat-row.stm .stat-fill { background: var(--ot-stm); }
@@ -301,15 +420,18 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 .hot-row { display: flex; gap: 5px; pointer-events: none; }
 .hot-slot {
   pointer-events: auto; position: relative;
-  width: 34px; height: 34px; margin: 0; padding: 0;
-  border-radius: 50%; background: rgba(10, 16, 30, 0.88);
-  border: 1px solid var(--ot-border); display: grid; place-items: center;
+  width: 36px; height: 36px; margin: 0; padding: 0;
+  border-radius: 50%;
+  border: 0;
+  background: var(--myst-action-slot) no-repeat center;
+  background-size: 36px 36px;
+  display: grid; place-items: center;
   font-size: 8px; color: var(--ot-muted); cursor: default;
 }
 .hot-slot img { width: 22px; height: 22px; image-rendering: pixelated; border-radius: 50%; }
-.hot-slot.on { border-color: var(--ot-accent); color: var(--ot-text); cursor: pointer; }
-.hot-slot.on:hover { filter: brightness(1.15); background: rgba(16, 26, 48, 0.95); }
-.hot-slot.off { opacity: 0.42; }
+.hot-slot.on { filter: brightness(1.12); cursor: pointer; }
+.hot-slot.on:hover { filter: brightness(1.25); }
+.hot-slot.off { opacity: 0.42; filter: grayscale(0.35); }
 .hot-key {
   position: absolute; top: 1px; left: 3px; font-size: 7px; color: #8898b8;
   line-height: 1; pointer-events: none;
@@ -373,6 +495,6 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 body.in-game #world-scrim { display: none; }
 
 @media (max-width: 900px) {
-  #hud-pokeinfo { width: 190px; }
+  #hud-pokeinfo { width: 220px; }
   .chat-dock { width: calc(100vw - 12px); }
 }

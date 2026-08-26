@@ -13,7 +13,7 @@ export const WINDOW_DEFS = [
 const DEFAULTS = {
   minimap: { x: 6, y: 28, open: true, locked: true, min: false },
   vip: { x: 6, y: 196, open: true, locked: true, min: false },
-  pokebar: { x: 6, y: 268, open: true, locked: true, min: false },
+  pokebar: { x: 6, y: 198, open: true, locked: true, min: false },
   battle: { x: 6, y: 0, open: true, locked: true, min: false, bottom: 118 },
   status: { x: 0, y: 28, open: true, locked: true, min: false, right: 6 },
   inv: { x: 0, y: 168, open: true, locked: true, min: false, right: 6 },

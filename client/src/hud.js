@@ -24,9 +24,9 @@ function genderMark(p) {
   return g === "f" ? "♀" : "♂";
 }
 
-function portraitUrl(p) {
-  return `/assets/pokemon/${p.species || "caterpie"}/portrait.png`;
-}
+const PORTRAIT_TOPS = [36, 83, 130, 177, 224, 271];
+const HP_TOPS = [51, 98, 145, 192, 239, 286];
+const SLOT_TOPS = [33, 80, 127, 174, 221, 268];
 
 export class Hud {
   constructor(net) {
@@ -312,22 +312,49 @@ export class Hud {
     list.innerHTML = "";
     for (let i = 0; i < 6; i++) {
       const p = this.party.slots?.[i];
-      const row = document.createElement("div");
       const isOut = this.party.out === i || this.party.mount?.slot === i;
-      row.className = "poke-row" + (p ? "" : " empty") + (isOut ? " out" : "");
+      const row = document.createElement("div");
+      row.className = "poke-slot" + (p ? "" : " empty") + (isOut ? " out" : "");
       row.dataset.slot = String(i);
+      row.style.top = `${SLOT_TOPS[i]}px`;
+
+      const bg = document.createElement("div");
+      bg.className = "poke-slot-bg";
+      row.appendChild(bg);
+
       if (p) {
         const ratio = Math.max(0, Math.min(1, p.hp / Math.max(1, p.hpMax)));
         const pct = Math.round(ratio * 100);
-        row.innerHTML = `
-          <img class="poke-ico" src="${portraitUrl(p)}" alt="${p.name}" />
-          <span class="poke-gender">${genderMark(p)}</span>
-          <div class="poke-meta">
-            <div class="poke-name">[${p.level}] ${p.name}</div>
-            <div class="poke-hp"><div class="poke-hp-fill" style="width:${pct}%"></div></div>
-          </div>
-          <span class="poke-pct">${pct}%</span>
-        `;
+
+        const ico = document.createElement("img");
+        ico.className = "poke-ico";
+        ico.src = portraitUrl(p);
+        ico.alt = p.name;
+        ico.style.top = `${PORTRAIT_TOPS[i] - SLOT_TOPS[i]}px`;
+        row.appendChild(ico);
+
+        const gender = document.createElement("span");
+        gender.className = "poke-gender";
+        gender.textContent = genderMark(p);
+        row.appendChild(gender);
+
+        const name = document.createElement("div");
+        name.className = "poke-name";
+        name.textContent = `[${p.level}] ${p.name}`;
+        row.appendChild(name);
+
+        const hp = document.createElement("div");
+        hp.className = "poke-hp";
+        hp.style.top = `${HP_TOPS[i] - SLOT_TOPS[i]}px`;
+        hp.innerHTML = `<div class="poke-hp-fill" style="width:${pct}%"></div>`;
+        row.appendChild(hp);
+
+        const pctEl = document.createElement("span");
+        pctEl.className = "poke-pct";
+        pctEl.style.top = `${HP_TOPS[i] - SLOT_TOPS[i] - 1}px`;
+        pctEl.textContent = `${pct}%`;
+        row.appendChild(pctEl);
+
         row.onclick = (e) => {
           if (this.rowDrag) return;
           if (e.target.closest(".win-tools")) return;
@@ -349,7 +376,7 @@ export class Hud {
     const onUp = (ev) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
-      const over = ev.target.closest?.(".poke-row");
+      const over = ev.target.closest?.(".poke-slot");
       const to = over ? Number(over.dataset.slot) : NaN;
       if (this.rowDrag != null && Number.isInteger(to) && to !== from) {
         this.net.send({ t: "partyOrder", from, to });
