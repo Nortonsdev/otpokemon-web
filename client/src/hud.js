@@ -63,8 +63,7 @@ export class Hud {
       }
       this.flushLog();
     });
-    this.renderBags();
-    this.renderHotbar();
+    this.render();
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") this.selectItem(null);
     });

@@ -289,7 +289,8 @@ body.pokebar-reorder .poke-row { cursor: grab; }
 .battle-hp { height: 4px; background: #1a1a1a; }
 .battle-hp > span { display: block; height: 100%; background: #3fac35; }
 
-#hud-inv { top: 50px; right: 10px; width: 214px; padding-bottom: 10px; }
+#hud-inv { top: 50px; right: 10px; width: 214px; padding-bottom: 10px; max-height: calc(100vh - 60px); overflow: hidden; }
+#hud-inv .win-body { max-height: calc(100vh - 100px); overflow-y: auto; }
 .equip-grid {
   display: grid;
   grid-template-columns: 42px 42px 42px;

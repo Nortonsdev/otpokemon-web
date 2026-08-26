@@ -97,6 +97,7 @@ net.on("map", (m) => {
   session.inWorld = true;
   if (m.you?.name) session.charName = m.you.name;
   show("screen-game");
+  hud.handle(m);
   hud.bindGame();
   const g = ensureGame();
   const scene = g.scene.getScene("game");
