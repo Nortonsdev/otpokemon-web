@@ -304,10 +304,20 @@ body.pokebar-reorder .poke-row { cursor: grab; }
   padding: 4px 10px 8px;
 }
 .eq-slot, .bag-cell {
+  position: relative;
   width: 42px; height: 42px;
   background: #111318;
   border: 8px solid transparent;
   border-image: var(--frame-slot) 10 stretch;
+}
+.bag-cell.has-item { cursor: context-menu; }
+.bag-cell.use-with, .hot-slot.use-with {
+  border-image: var(--frame-slot-active) 10 stretch;
+  outline: 1px solid #e0af68;
+}
+body.use-with,
+body.use-with * {
+  cursor: url("/assets/hud/slots/pokeball.png") 12 12, crosshair !important;
 }
 .inv-label {
   padding: 2px 14px 2px;

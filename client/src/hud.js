@@ -36,6 +36,7 @@ export class Hud {
     this.target = null;
     this.creatures = new Map();
     this.rowDrag = null;
+    this.selectedItem = null;
   }
 
   bindGame() {
@@ -47,8 +48,7 @@ export class Hud {
       const text = input.value.trim();
       input.value = "";
       if (!text) return;
-      if (text.toLowerCase() === "catch") this.net.send({ t: "catch" });
-      else this.net.send({ t: "say", text });
+      this.net.send({ t: "say", text });
     };
     document.getElementById("chat-input").addEventListener("keydown", (e) => {
       if (e.key === "Enter") sendChat();
@@ -65,6 +65,21 @@ export class Hud {
     });
     this.renderBags();
     this.renderHotbar();
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.selectItem(null);
+    });
+  }
+
+  selectItem(item) {
+    if (item === "pokeball") {
+      const balls = this.bag.find((i) => i.item === "pokeball");
+      if (!balls?.count) item = null;
+    }
+    this.selectedItem = item || null;
+    document.body.classList.toggle("use-with", !!this.selectedItem);
+    this.renderBags();
+    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
+    this.renderHotbar(out);
   }
 
   log(text, ch = "sistema") {
@@ -115,7 +130,7 @@ export class Hud {
       this.render();
     }
     if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
-    if (msg.t === "info") this.log(msg.text, /causou |fled|Gotcha|broke free|Hit for|used /.test(msg.text) ? "combate" : "sistema");
+    if (msg.t === "info") this.log(msg.text, /causou |Pegou|escapou|vivo|derrotado/.test(msg.text) ? "combate" : "sistema");
     if (msg.t === "err") this.log(msg.text, "sistema");
     if (msg.t === "moved" && this.you && msg.id === this.you.id) {
       this.you.x = msg.x;
@@ -138,9 +153,21 @@ export class Hud {
       if (this.target?.id === msg.id) this.setTarget(null);
       else this.renderBattle();
     }
+    if (msg.t === "down") {
+      const c = this.creatures.get(msg.id);
+      if (c) {
+        c.dead = true;
+        c.hp = 0;
+        c.plate = `${c.name} [${c.level || 5}]  0/${c.hpMax}`;
+      }
+      this.renderBattle();
+    }
     if (msg.t === "fx") {
       const c = this.creatures.get(msg.to);
-      if (c && msg.hp != null) c.hp = msg.hp;
+      if (c && msg.hp != null) {
+        c.hp = msg.hp;
+        if (c.name) c.plate = `${c.name} [${c.level || 5}]  ${c.hp}/${c.hpMax}`;
+      }
       this.renderBattle();
     }
     if (msg.t === "target") {
@@ -261,7 +288,7 @@ export class Hud {
       el.className = "battle-row" + (this.target?.id === c.id ? " targeted" : "");
       const ratio = Math.max(0, Math.min(1, (c.hp ?? 1) / Math.max(1, c.hpMax ?? 1)));
       el.innerHTML = `<span>${c.plate || c.name}</span><span class="battle-hp"><span style="width:${ratio * 100}%"></span></span>`;
-      el.onclick = () => this.net.send({ t: "attack", id: c.id });
+      el.onclick = () => this.net.send({ t: "target", id: c.id });
       list.appendChild(el);
     }
   }
@@ -276,8 +303,15 @@ export class Hud {
         const cell = document.createElement("div");
         cell.className = "bag-cell";
         if (i === 0 && first) {
+          cell.classList.add("has-item");
+          if (this.selectedItem === "pokeball") cell.classList.add("use-with");
           cell.innerHTML = `<img class="portrait" src="/assets/hud/slots/pokeball.png" alt="ball" style="width:24px;height:24px;image-rendering:pixelated" /><span class="bag-count">${first}</span>`;
-          cell.title = `Poké Ball ×${first}`;
+          cell.title = `Pokébola ×${first} — botão direito para usar`;
+          cell.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.selectItem(this.selectedItem === "pokeball" ? null : "pokeball");
+          };
         }
         grid.appendChild(cell);
       }
@@ -301,6 +335,16 @@ export class Hud {
       if (i <= 10) {
         btn.innerHTML = `<img src="/assets/hud/moves/${n}_${on ? "on" : "off"}.png" alt="M${n}" /><span>M${n}</span>`;
         if (on) btn.onclick = () => this.net.send({ t: "move", n });
+      } else if (i === 11) {
+        const balls = this.bag.find((b) => b.item === "pokeball");
+        const count = balls?.count || 0;
+        btn.className = "hot-slot on" + (this.selectedItem === "pokeball" ? " use-with" : "");
+        btn.title = count ? `Pokébola ×${count} — botão direito para usar` : "Pokébola";
+        btn.innerHTML = `<img src="/assets/hud/slots/pokeball.png" alt="ball" /><span>${count}</span>`;
+        btn.oncontextmenu = (e) => {
+          e.preventDefault();
+          this.selectItem(this.selectedItem === "pokeball" ? null : "pokeball");
+        };
       } else {
         btn.textContent = "+";
       }

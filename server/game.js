@@ -367,7 +367,11 @@ export class World {
       level: c.level || (c.kind === "player" ? 1 : 5),
       masterId: c.masterId || null,
       wild: !!c.wild,
-      plate: c.kind === "player" ? c.name : `${c.name} [${c.level || 5}]`,
+      plate:
+        c.kind === "player"
+          ? c.name
+          : `${c.name} [${c.level || 5}]  ${c.hp}/${c.hpMax}`,
+      dead: !!c.dead,
     };
   }
 
@@ -412,6 +416,7 @@ export class World {
     dir = Number(dir);
     if (!Number.isInteger(dir) || dir < 0 || dir > 7) return;
     if (fromClient && creature.kind === "player") creature.walkTo = null;
+    if (creature.dead) return;
     const t = this.now();
     if (t < creature.busyUntil) return;
     creature.dir = dir;
@@ -450,18 +455,25 @@ export class World {
   look(player, x, y) {
     x = Number(x);
     y = Number(y);
-    const who = this.occupant(x, y);
+    const who = this.occupant(x, y) || this.corpseAt(x, y);
     let text;
     if (who) {
       if (who.kind === "player") text = `You see ${who.name}.`;
+      else if (who.dead) text = `Você vê o corpo de um ${who.name}.`;
       else text = `You see ${who.name} [${who.level || 5}]. Health: ${who.hp} / ${who.hpMax}.`;
     } else text = `You see ${tileName(x, y)}.`;
     this.sys(player, text);
   }
 
   use(player, msg) {
-    if (msg && msg.item === "pokeball") return this.catchBall(player);
-    this.sys(player, "Nothing happens.");
+    if (msg && msg.item === "pokeball") {
+      if (msg.id != null) {
+        const id = Number(msg.id);
+        if (this.creatures.has(id)) player.targetId = id;
+      }
+      return this.catchBall(player);
+    }
+    this.sys(player, "Nada acontece.");
   }
 
   say(player, text) {
@@ -499,7 +511,7 @@ export class World {
     player.targetId = id;
     const client = this.clientOf(player);
     if (client) this.send(client.ws, { t: "target", id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
-    if (!c.wild) return;
+    if (!c.wild || c.dead) return;
     this.useMove(player, 1);
   }
 
@@ -662,7 +674,14 @@ export class World {
       this.sys(player, "Você não tem um alvo.");
       return;
     }
-    const dmg = move.power + randomInt(1, 5);
+    if (target.dead) {
+      this.sys(player, "Esse Pokémon já foi derrotado.");
+      return;
+    }
+    const t = this.now();
+    if (t < poke.busyUntil) return;
+    poke.busyUntil = t + STEP_MS;
+    const dmg = Math.max(2, Math.floor(move.power / 5) + randomInt(1, 3));
     target.hp = Math.max(0, (target.hp || 1) - dmg);
     this.broadcastArea({
       t: "fx",
@@ -684,13 +703,32 @@ export class World {
       this.defeat(target);
       return;
     }
-    if (target.wild) {
-      const specT = SPECIES[target.species];
-      const fleeAt = specT?.runOnHealth || 0;
-      if (fleeAt > 0 && (target.hp * 100) / target.hpMax <= fleeAt) {
-        this.sys(player, `${target.name} fled!`);
-        this.flee(target);
-      }
+    if (target.wild) this.wildRetaliate(target, poke);
+  }
+
+  wildRetaliate(wild, poke) {
+    if (!wild?.wild || wild.dead || !poke || poke.hp <= 0) return;
+    const dmg = Math.max(1, randomInt(1, 3));
+    poke.hp = Math.max(0, poke.hp - dmg);
+    this.broadcastArea({
+      t: "fx",
+      from: wild.id,
+      to: poke.id,
+      move: "Tackle",
+      dmg,
+      hp: poke.hp,
+      hpMax: poke.hpMax,
+      retaliate: true,
+    });
+    const master = this.creatures.get(poke.masterId);
+    if (!master) return;
+    this.sys(master, `Um ${wild.name} causou ${dmg} de dano em seu ${poke.name}.`);
+    const mon = master.party.find((p) => p && p.uid === poke.uid);
+    if (mon) mon.hp = poke.hp;
+    this.syncParty(master);
+    if (poke.hp <= 0) {
+      this.sys(master, `${poke.name} foi nocauteado!`);
+      this.goback(master, false);
     }
   }
 
@@ -706,20 +744,32 @@ export class World {
   }
 
   defeat(creature) {
-    if (creature.kind === "wild") {
-      this.vacate(creature);
-      this.creatures.delete(creature.id);
-      this.broadcastArea({ t: "disappear", id: creature.id });
-      this.wildRespawnAt = this.now() + 8000;
+    if (!creature.wild) return;
+    creature.dead = true;
+    creature.hp = 0;
+    creature.busyUntil = this.now() + 1e12;
+    this.vacate(creature);
+    this.broadcastArea({ t: "down", id: creature.id, x: creature.x, y: creature.y });
+  }
+
+  removeCorpse(creature) {
+    if (!creature) return;
+    this.vacate(creature);
+    this.creatures.delete(creature.id);
+    this.broadcastArea({ t: "disappear", id: creature.id });
+    for (const c of this.creatures.values()) {
+      if (c.kind === "player" && c.targetId === creature.id) c.targetId = null;
     }
+    this.ensureWild();
   }
 
   catchBall(player) {
     const balls = player.bag.find((i) => i.item === "pokeball");
-    if (!balls || balls.count <= 0) return this.sys(player, "You have no Poké Balls.");
+    if (!balls || balls.count <= 0) return this.sys(player, "Você não tem Pokébolas.");
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
     if (!target || !target.wild) return this.sys(player, "Você não tem um alvo.");
-    if (player.party.filter(Boolean).length >= PARTY_CAP) return this.sys(player, "Party is full.");
+    if (!target.dead) return this.sys(player, "O Pokémon ainda está vivo.");
+    if (player.party.filter(Boolean).length >= PARTY_CAP) return this.sys(player, "A party está cheia.");
     balls.count -= 1;
     const spec = SPECIES[target.species];
     const rate = spec.catchRate * BALL.rate;
@@ -729,17 +779,24 @@ export class World {
       const mon = this.makeMon(target.species, target.level || 2, {
         ivs: target.ivs ? { ...target.ivs } : undefined,
         evs: target.evs ? { ...target.evs } : this.zeroEvs(),
-        hp: Math.max(1, target.hp),
+        hp: 1,
       });
-      player.party.push(mon);
-      this.vacate(target);
-      this.creatures.delete(target.id);
-      this.broadcastArea({ t: "disappear", id: target.id });
+      let placed = false;
+      for (let i = 0; i < PARTY_CAP; i++) {
+        if (!player.party[i]) {
+          player.party[i] = mon;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) player.party.push(mon);
+      this.sys(player, `Pegou! ${mon.name} foi capturado.`);
+      this.removeCorpse(target);
       player.targetId = null;
-      this.sys(player, `Gotcha! ${mon.name} was caught.`);
-      this.wildRespawnAt = this.now() + 8000;
     } else {
-      this.sys(player, `${target.name} broke free!`);
+      this.sys(player, `${target.name} escapou!`);
+      this.removeCorpse(target);
+      player.targetId = null;
     }
     this.syncParty(player);
     this.snapshotPlayer(player);
@@ -751,7 +808,7 @@ export class World {
     let follow = master;
     if (master.targetId) {
       const t = this.creatures.get(master.targetId);
-      if (t && t.id !== poke.id) follow = t;
+      if (t && t.id !== poke.id && !t.dead) follow = t;
     }
     const dest = behind(follow.x, follow.y, follow.dir);
     if (poke.x === dest.x && poke.y === dest.y) {
@@ -779,8 +836,15 @@ export class World {
     return opts.length ? opts[0].dir : null;
   }
 
+  corpseAt(x, y) {
+    for (const c of this.creatures.values()) {
+      if (c.dead && c.x === x && c.y === y) return c;
+    }
+    return null;
+  }
+
   ensureWild() {
-    const existing = [...this.creatures.values()].filter((c) => c.wild).length;
+    const existing = [...this.creatures.values()].filter((c) => c.wild && !c.dead).length;
     const want = 2;
     for (let i = existing; i < want; i++) this.spawnWild();
   }
@@ -818,7 +882,7 @@ export class World {
 
   tickWildWander() {
     for (const c of this.creatures.values()) {
-      if (!c.wild || this.now() < c.busyUntil) continue;
+      if (!c.wild || c.dead || this.now() < c.busyUntil) continue;
       if (randomInt(0, 5) !== 0) continue;
       this.walk(c, randomInt(0, 8), false);
     }

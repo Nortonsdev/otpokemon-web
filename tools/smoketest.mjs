@@ -81,7 +81,9 @@ if (map1.party.out !== 0) {
   throw new Error("out slot set but poke missing from map");
 } else {
   const existing = map1.creatures.find((c) => c.id === outId);
-  if (existing?.plate && existing.plate !== "Charmander [5]") throw new Error(`out plate ${existing.plate}`);
+  if (existing?.plate && !String(existing.plate).startsWith("Charmander [5]")) {
+    throw new Error(`out plate ${existing.plate}`);
+  }
   if (existing && (existing.hpMax < 19 || existing.hpMax > 22)) {
     throw new Error(`out Charmander hpMax ${existing.hpMax}`);
   }
@@ -92,7 +94,7 @@ if (!wild) throw new Error("no wild Caterpie on map");
 if (wild.hpMax < 13 || wild.hpMax > 15) {
   throw new Error(`wild hpMax ${wild.hpMax} (Ruby lv2 Caterpie should be 13–15)`);
 }
-if (wild.plate !== "Caterpie [2]") throw new Error(`wild plate ${wild.plate}`);
+if (!String(wild.plate || "").startsWith("Caterpie [2]")) throw new Error(`wild plate ${wild.plate}`);
 
 a.send({ t: "pokebar", slot: 0 });
 await a.wait((m) => m.t === "disappear" && m.id === outId);
@@ -107,28 +109,32 @@ if (punch) throw new Error("attacked without an out Pokémon");
 a.send({ t: "pokebar", slot: 0 });
 const reout = await a.wait((m) => m.t === "appear" && m.creature?.kind === "pokemon");
 outId = reout.creature.id;
-if (reout.creature.plate !== "Charmander [5]") throw new Error(`out plate ${reout.creature.plate}`);
+if (!String(reout.creature.plate || "").startsWith("Charmander [5]")) {
+  throw new Error(`out plate ${reout.creature.plate}`);
+}
 if (reout.creature.hpMax < 19 || reout.creature.hpMax > 22) {
   throw new Error(`out Charmander hpMax ${reout.creature.hpMax}`);
 }
 
 a.send({ t: "attack", id: wild.id });
-const hit = await a.wait((m) => m.t === "fx" || (m.t === "info" && /causou |used /.test(m.text || "")));
+let hit = null;
+for (let i = 0; i < 10 && !hit; i++) {
+  if (i) a.send({ t: "attack", id: wild.id });
+  hit = await a
+    .wait((m) => (m.t === "fx" && m.to === wild.id) || (m.t === "info" && /causou /.test(m.text || "")), 500)
+    .then((m) => m, () => null);
+  if (!hit) await new Promise((r) => setTimeout(r, 220));
+}
 if (!hit) throw new Error("right-click attack did not fire M1");
 if (hit.t === "fx" && hit.from === map1.you.id) throw new Error("damage must come from the out Pokémon");
 if (hit.t === "fx" && hit.from !== outId) throw new Error("M1 fromId is not the out Pokémon");
+if (hit.t === "fx" && hit.hp === 0) throw new Error("first M1 one-shot the Caterpie");
+if (hit.t === "down") throw new Error("first M1 one-shot the Caterpie");
 
 let prey = wild;
-const fled = await a
-  .wait((m) => m.t === "disappear" && m.id === wild.id, 400)
-  .then(() => true, () => false);
-if (fled) {
-  const spawn = await a.wait((m) => m.t === "appear" && m.creature?.wild, 12000);
-  prey = spawn.creature;
-  if (prey.hpMax < 13 || prey.hpMax > 15) {
-    throw new Error(`respawned wild hpMax ${prey.hpMax}`);
-  }
-}
+a.send({ t: "use", item: "pokeball", id: prey.id });
+const liveReject = await a.wait((m) => m.t === "info" && /vivo/.test(m.text || ""), 2500);
+if (!liveReject) throw new Error("expected live Pokémon to reject the ball");
 
 let moved = null;
 for (const dir of [2, 4, 6, 0, 3, 1, 5, 7]) {
@@ -141,32 +147,62 @@ for (const dir of [2, 4, 6, 0, 3, 1, 5, 7]) {
 }
 if (!moved) throw new Error("player did not change sqm");
 
+async function knockDown(id) {
+  for (let i = 0; i < 16; i++) {
+    a.send({ t: "attack", id });
+    const m = await a
+      .wait(
+        (x) =>
+          (x.t === "fx" && x.to === id) ||
+          (x.t === "down" && x.id === id) ||
+          (x.t === "info" && /já foi derrotado/.test(x.text || "")),
+        800
+      )
+      .then((x) => x, () => null);
+    if (!m) {
+      await new Promise((r) => setTimeout(r, 220));
+      continue;
+    }
+    if (m.t === "down") return;
+    if (m.t === "info" && /já foi derrotado/.test(m.text || "")) return;
+    if (m.t === "fx" && m.hp === 0) {
+      await a.wait((x) => x.t === "down" && x.id === id, 1200);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 220));
+  }
+  throw new Error("could not KO Caterpie (expected 4–6 M1s, not a one-shot)");
+}
+
+await knockDown(prey.id);
+
 const catCount = (slots) => (slots || []).filter((s) => s?.species === "caterpie").length;
 const catsBefore = catCount(map1.party.slots);
-a.send({ t: "target", id: prey.id });
 let caught = false;
 let partyState = map1.party;
-for (let i = 0; i < 12; i++) {
-  a.send({ t: "catch" });
-  const msg = await a.wait((m) => m.t === "info" || m.t === "party" || m.t === "disappear" || m.t === "appear");
-  if (msg.t === "party") partyState = msg.party;
-  if (msg.t === "party" && catCount(msg.party.slots) > catsBefore) {
+for (let i = 0; i < 10 && !caught; i++) {
+  a.send({ t: "use", item: "pokeball", id: prey.id });
+  const msg = await a.wait(
+    (m) => m.t === "info" && /Pegou|escapou|vivo|cheia|Pokébolas|alvo/.test(m.text || ""),
+    3000
+  );
+  if (/vivo/.test(msg.text || "")) throw new Error("ball accepted a living Pokémon");
+  if (/Pegou/.test(msg.text || "")) {
     caught = true;
+    const extra = await a.wait((m) => m.t === "party" && catCount(m.party.slots) > catsBefore, 2000);
+    partyState = extra.party;
     break;
   }
-  if (msg.t === "info" && /Gotcha/.test(msg.text)) {
-    caught = true;
-    const extra = await a.wait("party", 1500).then((m) => m, () => null);
-    if (extra?.party) partyState = extra.party;
-    break;
-  }
-  if (msg.t === "appear" && msg.creature?.wild) prey = msg.creature;
-  if (msg.t === "info" && /fled/.test(msg.text)) {
-    const spawn = await a.wait((m) => m.t === "appear" && m.creature?.wild, 12000);
+  if (/escapou/.test(msg.text || "")) {
+    await a.wait((m) => m.t === "disappear" && m.id === prey.id, 2000);
+    const spawn = await a.wait((m) => m.t === "appear" && m.creature?.wild && !m.creature.dead, 12000);
     prey = spawn.creature;
+    await knockDown(prey.id);
+    continue;
   }
+  throw new Error(`unexpected catch result: ${msg.text}`);
 }
-if (!caught) throw new Error("failed to catch Caterpie");
+if (!caught) throw new Error("failed to catch Caterpie with use-with on corpse");
 
 const catSlot = (partyState.slots || []).findIndex((s) => s?.species === "caterpie");
 if (catSlot < 0) throw new Error("caught Caterpie missing from party slots");
@@ -174,9 +210,13 @@ a.send({ t: "pokebar", slot: catSlot });
 const swapped = await a.wait((m) => m.t === "appear" && m.creature?.kind === "pokemon");
 if (swapped.creature.look !== 10) throw new Error(`swap out look ${swapped.creature.look}, expected Caterpie`);
 if (swapped.creature.masterId !== map1.you.id) throw new Error("swap out master not player");
-a.send({ t: "partyOrder", from: catSlot, to: 0 });
-const ordered = await a.wait((m) => m.t === "party" && m.party?.slots?.[0]?.species === "caterpie");
-if (ordered.party.out !== 0) throw new Error("out slot did not follow partyOrder");
+if (catSlot !== 0) {
+  a.send({ t: "partyOrder", from: catSlot, to: 0 });
+  const ordered = await a.wait((m) => m.t === "party" && m.party?.slots?.[0]?.species === "caterpie");
+  if (ordered.party.out !== 0) throw new Error("out slot did not follow partyOrder");
+} else if (partyState.out !== 0) {
+  throw new Error("out slot did not follow pokebar swap");
+}
 
 const hudLayout = {
   pokebar: { x: 44, y: 88, open: true, locked: false, min: false },

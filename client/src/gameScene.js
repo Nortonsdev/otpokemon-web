@@ -85,7 +85,7 @@ export class GameScene extends Phaser.Scene {
     this.creatureLayer = this.add.layer();
     this.roofLayer = this.add.layer();
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
     this.input.keyboard.enabled = false;
     this.input.mouse?.disableContextMenu();
@@ -263,6 +263,8 @@ export class GameScene extends Phaser.Scene {
     fg.setDepth(c.y * 10 + 9);
     this.hpBars.set(c.id, { bg, fg });
     this.setHpBar(c.id, c.hp, c.hpMax);
+    this.refreshPlate(c.id);
+    if (c.dead) this.applyCorpseLook(c.id);
   }
 
   despawn(id) {
@@ -311,6 +313,29 @@ export class GameScene extends Phaser.Scene {
     else bar.fg.setFillStyle(0xcc3d3d);
   }
 
+  refreshPlate(id) {
+    const st = this.state.get(id);
+    const plate = this.plates.get(id);
+    if (!st || !plate) return;
+    if (st.kind === "player") plate.setText(st.name);
+    else plate.setText(`${st.name} [${st.level || 5}]  ${st.hp ?? 0}/${st.hpMax ?? 0}`);
+  }
+
+  applyCorpseLook(id) {
+    const st = this.state.get(id);
+    const sprite = this.sprites.get(id);
+    if (!st || !sprite || sprite.texture.key === "human") return;
+    st.dead = true;
+    st.moving = false;
+    st.hp = 0;
+    sprite.setOrigin(0.5, 0.5);
+    sprite.setAngle(90);
+    sprite.setTint(0x8a8a8a);
+    sprite.setFrame(frameIndex(4, false, 0));
+    this.setHpBar(id, 0, st.hpMax);
+    this.refreshPlate(id);
+  }
+
   layoutCreature(id) {
     const st = this.state.get(id);
     const sprite = this.sprites.get(id);
@@ -318,10 +343,21 @@ export class GameScene extends Phaser.Scene {
     const d = this.displayTile(st);
     const size = sprite.texture.key === "human" ? 64 : 32;
     const pos = tileWorld(d.x, d.y, size);
-    const walking = st.moving;
-    sprite.setPosition(pos.x, pos.y);
-    sprite.setFrame(frameIndex(st.dir || 4, walking, st.phase));
+    const walking = st.moving && !st.dead;
     const depth = Math.round(d.y) * 10 + 6;
+    if (st.dead && size === 32) {
+      sprite.setOrigin(0.5, 0.5);
+      sprite.setAngle(90);
+      sprite.setTint(0x8a8a8a);
+      sprite.setPosition(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2);
+      sprite.setFrame(frameIndex(4, false, 0));
+    } else {
+      sprite.setOrigin(0, 0);
+      sprite.setAngle(0);
+      sprite.clearTint();
+      sprite.setPosition(pos.x, pos.y);
+      sprite.setFrame(frameIndex(st.dir || 4, walking, st.phase));
+    }
     sprite.setDepth(depth);
     this.layoutNameplate(id, pos.x, pos.y, depth);
   }
@@ -366,7 +402,19 @@ export class GameScene extends Phaser.Scene {
     if (msg.t === "fx") {
       this.flash(msg.to);
       if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
+      this.refreshPlate(msg.to);
       if (msg.dmg != null) this.floatDamage(msg.to, msg.dmg);
+    }
+    if (msg.t === "down") {
+      const st = this.state.get(msg.id);
+      if (st) {
+        st.dead = true;
+        st.hp = 0;
+        st.moving = false;
+        if (msg.x != null) st.x = msg.x;
+        if (msg.y != null) st.y = msg.y;
+      }
+      this.applyCorpseLook(msg.id);
     }
     if (msg.t === "target") this.setTarget(msg.id);
     if (msg.t === "disappear" && msg.id === this.targetId) this.setTarget(null);
@@ -485,13 +533,26 @@ export class GameScene extends Phaser.Scene {
     const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
     const tx = Math.floor(world.x / TILE);
     const ty = Math.floor(world.y / TILE);
-    if (pointer.rightButtonDown()) {
-      const who = this.creatureAt(world.x, world.y);
-      if (who) this.net.send({ t: "attack", id: who.id });
+    const who = this.creatureAt(world.x, world.y);
+    const right = pointer.button === 2 || pointer.rightButtonDown();
+    const left = pointer.button === 0 || (!right && pointer.leftButtonDown());
+    if (right) {
+      if (who && !who.dead) this.net.send({ t: "attack", id: who.id });
+      else if (who) this.net.send({ t: "target", id: who.id });
       else this.net.send({ t: "look", x: tx, y: ty });
       return;
     }
-    if (pointer.leftButtonDown()) {
+    if (left) {
+      const item = this.hud?.selectedItem;
+      if (item === "pokeball") {
+        if (who) {
+          this.net.send({ t: "use", item: "pokeball", id: who.id });
+          if (who.dead) this.hud.selectItem(null);
+        } else {
+          this.hud.selectItem(null);
+        }
+        return;
+      }
       this.net.send({ t: "walkTo", x: tx, y: ty });
     }
   }
@@ -540,7 +601,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard.enabled = true;
     const dir = this.currentDir();
     if (dir != null) this.net.send({ t: "walk", dir });
-    if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.net.send({ t: "catch" });
+    if (this.keys.ESC && Phaser.Input.Keyboard.JustDown(this.keys.ESC)) this.hud?.selectItem(null);
     const move = this.moveKey();
     if (move != null) this.net.send({ t: "move", n: move });
   }
