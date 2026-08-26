@@ -312,7 +312,10 @@ def compose_frame(group: FrameGroup, mm: mmap.mmap, direction: int, phase: int) 
                 idx = group_sprite_index(group, direction, 0, 0, layer, phase, w, h)
                 sid = group.sprite_ids[idx] if 0 <= idx < len(group.sprite_ids) else 0
                 tile = decode_sprite(mm, sid)
-                frame.paste(tile, (w * 32, h * 32), tile)
+                # OTClient: feet on tile, compose from bottom-right quadrant.
+                px = (group.width - 1 - w) * 32
+                py = (group.height - 1 - h) * 32
+                frame.paste(tile, (px, py), tile)
     return frame
 
 
