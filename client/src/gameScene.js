@@ -91,7 +91,14 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard.enabled = false;
     this.input.keyboard.clearCaptures?.();
     this.input.mouse?.disableContextMenu();
-    document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
+    const onRight = (e) => {
+      if (!this.live) return;
+      if (e.target?.closest?.(".float-window, .panel, input, button, select, textarea")) return;
+      e.preventDefault();
+      this.handleWorldClick(e.clientX, e.clientY, "right");
+    };
+    document.getElementById("game")?.addEventListener("contextmenu", onRight);
+    document.addEventListener("contextmenu", onRight, true);
     this.input.on("pointerdown", (p) => {
       document.getElementById("chat-input")?.blur();
       this.onPointer(p);
@@ -475,13 +482,13 @@ export class GameScene extends Phaser.Scene {
     const d = this.displayTile(st);
     const cx = d.x * TILE + TILE / 2;
     const cy = d.y * TILE + TILE / 2;
-    this.targetMark.setDepth(Math.round(d.y) * 10 + 5);
-    this.targetMark.fillStyle(0xff2020, 0.16);
-    this.targetMark.fillCircle(cx, cy, 15);
-    this.targetMark.lineStyle(3, 0xff2a2a, 1);
-    this.targetMark.strokeCircle(cx, cy, 15);
-    this.targetMark.lineStyle(2, 0xff6666, 0.95);
-    this.targetMark.strokeCircle(cx, cy, 8);
+    this.targetMark.setDepth(Math.round(d.y) * 10 + 12);
+    this.targetMark.fillStyle(0xff2020, 0.22);
+    this.targetMark.fillCircle(cx, cy, 18);
+    this.targetMark.lineStyle(4, 0xff2a2a, 1);
+    this.targetMark.strokeCircle(cx, cy, 18);
+    this.targetMark.lineStyle(2, 0xfff0f0, 0.95);
+    this.targetMark.strokeCircle(cx, cy, 10);
   }
 
   animateMove(msg) {
@@ -569,8 +576,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   creatureAt(worldX, worldY) {
+    const tx = Math.floor(worldX / TILE);
+    const ty = Math.floor(worldY / TILE);
     let best = null;
     let bestDepth = -Infinity;
+    for (const [, st] of this.state) {
+      if (st.id === this.youId) continue;
+      const d = this.displayTile(st);
+      const onTile =
+        (Math.floor(d.x + 0.001) === tx && Math.floor(d.y + 0.001) === ty) ||
+        (st.x === tx && st.y === ty);
+      if (!onTile) continue;
+      const depth = Math.round(d.y) * 10;
+      if (depth >= bestDepth) {
+        best = st;
+        bestDepth = depth;
+      }
+    }
+    if (best) return best;
     for (const [id, sprite] of this.sprites) {
       if (id === this.youId) continue;
       const b = sprite.getBounds();
@@ -581,45 +604,52 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
-    if (best) return best;
-    const tx = Math.floor(worldX / TILE);
-    const ty = Math.floor(worldY / TILE);
-    for (const [, st] of this.state) {
-      if (st.id === this.youId) continue;
-      const d = this.displayTile(st);
-      if (Math.floor(d.x + 0.001) === tx && Math.floor(d.y + 0.001) === ty) return st;
-      if (st.x === tx && st.y === ty) return st;
-    }
-    return null;
+    return best;
   }
 
-  onPointer(pointer) {
+  handleWorldClick(clientX, clientY, button) {
     if (!this.live) return;
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-    const tx = Math.floor(world.x / TILE);
-    const ty = Math.floor(world.y / TILE);
-    const who = this.creatureAt(world.x, world.y);
-    const right = pointer.button === 2 || pointer.rightButtonDown();
-    const left = pointer.button === 0 || (!right && pointer.leftButtonDown());
+    const canvas = this.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const px = ((clientX - rect.left) / rect.width) * this.scale.width;
+    const py = ((clientY - rect.top) / rect.height) * this.scale.height;
+    const world = this.cameras.main.getWorldPoint(px, py);
+    this.applyClick(world.x, world.y, button === "right");
+  }
+
+  applyClick(worldX, worldY, right) {
+    if (right) {
+      const now = Date.now();
+      if (now - (this.lastRightAt || 0) < 80) return;
+      this.lastRightAt = now;
+    }
+    const tx = Math.floor(worldX / TILE);
+    const ty = Math.floor(worldY / TILE);
+    const who = this.creatureAt(worldX, worldY);
     if (right) {
       if (who && !who.dead) this.net.send({ t: "attack", id: who.id });
       else if (who) this.net.send({ t: "target", id: who.id });
       else this.net.send({ t: "look", x: tx, y: ty });
       return;
     }
-    if (left) {
-      const item = this.hud?.selectedItem;
-      if (item === "pokeball") {
-        if (who) {
-          this.net.send({ t: "use", item: "pokeball", id: who.id });
-          if (who.dead) this.hud.selectItem(null);
-        } else {
-          this.hud.selectItem(null);
-        }
-        return;
+    const item = this.hud?.selectedItem;
+    if (item === "pokeball") {
+      if (who) {
+        this.net.send({ t: "use", item: "pokeball", id: who.id });
+        if (who.dead) this.hud.selectItem(null);
+      } else {
+        this.hud.selectItem(null);
       }
-      this.net.send({ t: "walkTo", x: tx, y: ty });
+      return;
     }
+    this.net.send({ t: "walkTo", x: tx, y: ty });
+  }
+
+  onPointer(pointer) {
+    if (!this.live) return;
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const right = pointer.button === 2 || pointer.rightButtonDown();
+    this.applyClick(world.x, world.y, right);
   }
 
   currentDir() {
