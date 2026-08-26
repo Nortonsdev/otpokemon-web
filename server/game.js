@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import {
+  ATK_MS,
   BALL,
   DELTA,
   DIR,
@@ -26,6 +27,7 @@ export class World {
     this.creatures = new Map();
     this.occupancy = new Map();
     this.wildRespawnAt = 0;
+    this.ensureDemoAccount();
     this.ensureWild();
     this.dirty = false;
   }
@@ -112,6 +114,7 @@ export class World {
       if (t === "target") return this.setTarget(player, msg.id);
       if (t === "attack") return this.attack(player, msg.id);
       if (t === "move") return this.useMove(player, Number(msg.n));
+      if (t === "order") return this.order(player, msg);
     } catch (err) {
       console.error(err);
       this.err(client, "Server error.");
@@ -172,10 +175,11 @@ export class World {
       dir: DIR.S,
       hp: PLAYER_HP,
       hpMax: PLAYER_HP,
-      bag: [{ item: "pokeball", count: 10 }],
+      bag: [{ item: "pokeball", count: 20 }],
       party: [this.makeMon(specKey, 5)],
       out: null,
       target: null,
+      mount: null,
     };
     record.x = 8;
     record.y = 12;
@@ -191,8 +195,6 @@ export class World {
 
   makeMon(species, level = 5, opts = {}) {
     const spec = SPECIES[species];
-    const ivs = opts.ivs || this.rollIvs();
-    const evs = opts.evs || this.zeroEvs();
     const mon = {
       uid: opts.uid || randomUUID(),
       species,
@@ -202,8 +204,6 @@ export class World {
       level,
       baseHp: spec.baseStats.hp,
       baseStats: { ...spec.baseStats },
-      ivs,
-      evs,
       ball: opts.ball || "charged",
     };
     applyRubyHealth(mon);
@@ -211,25 +211,60 @@ export class World {
     return mon;
   }
 
-  rollIvs() {
-    const n = () => randomInt(1, 32);
-    return { hp: n(), atk: n(), def: n(), spa: n(), spd: n(), spe: n() };
-  }
-
-  zeroEvs() {
-    return { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-  }
-
   ensureMon(mon) {
     if (!mon) return mon;
     const spec = SPECIES[mon.species];
     if (!spec) return mon;
-    if (!mon.baseStats) mon.baseStats = { ...spec.baseStats };
-    if (!mon.baseHp) mon.baseHp = spec.baseStats.hp;
-    if (!mon.ivs) mon.ivs = this.rollIvs();
-    if (!mon.evs) mon.evs = this.zeroEvs();
+    mon.look = spec.look;
+    mon.name = spec.name;
+    mon.baseStats = { ...spec.baseStats };
+    mon.baseHp = spec.baseStats.hp;
+    delete mon.ivs;
+    delete mon.evs;
     applyRubyHealth(mon);
     return mon;
+  }
+
+  ensureDemoAccount() {
+    if (!this.save.accounts.demo) this.save.accounts.demo = { password: "demo", chars: [] };
+    const acc = this.save.accounts.demo;
+    acc.password = "demo";
+    let name = acc.chars.find((n) => this.save.characters[n]?.account === "demo") || acc.chars[0] || "Demo";
+    if (!acc.chars.includes(name)) acc.chars.unshift(name);
+    let rec = this.save.characters[name];
+    if (!rec || rec.account !== "demo") {
+      rec = {
+        name,
+        account: "demo",
+        x: 8,
+        y: 12,
+        z: MAP.z,
+        dir: DIR.S,
+        hp: PLAYER_HP,
+        hpMax: PLAYER_HP,
+        bag: [{ item: "pokeball", count: 20 }],
+        party: [],
+        out: 0,
+        target: null,
+      };
+    }
+    rec.bag = [{ item: "pokeball", count: 20 }];
+    const party = (rec.party || []).filter(Boolean).map((p) => this.ensureMon(p));
+    if (!party.some((p) => p.species === "charizard")) party.unshift(this.makeMon("charizard", 36));
+    if (!party.some((p) => p.species === "rapidash")) {
+      const at = party[0]?.species === "charizard" ? 1 : 0;
+      party.splice(at, 0, this.makeMon("rapidash", 40));
+    }
+    rec.party = party.slice(0, PARTY_CAP);
+    rec.out = rec.party.findIndex((p) => p?.species === "charizard");
+    if (rec.out < 0) rec.out = 0;
+    rec.mount = null;
+    if (!walkable(rec.x, rec.y)) {
+      rec.x = 8;
+      rec.y = 12;
+    }
+    this.save.characters[name] = rec;
+    this.persist();
   }
 
   enter(client, { name }) {
@@ -252,6 +287,7 @@ export class World {
       busyUntil: 0,
       targetId: null,
       walkTo: null,
+      mount: null,
       charName,
       bag: rec.bag,
       party: (rec.party || []).map((p) => this.ensureMon(p)),
@@ -362,16 +398,17 @@ export class World {
       z: c.z,
       dir: c.dir,
       look: c.look,
+      species: c.species || null,
       hp: c.hp,
       hpMax: c.hpMax,
       level: c.level || (c.kind === "player" ? 1 : 5),
       masterId: c.masterId || null,
       wild: !!c.wild,
-      plate:
-        c.kind === "player"
-          ? c.name
-          : `${c.name} [${c.level || 5}]  ${c.hp}/${c.hpMax}`,
+      plate: c.kind === "player" ? c.name : `${c.name} [${c.level || 5}]`,
       dead: !!c.dead,
+      mount: c.mount
+        ? { ability: c.mount.ability, species: c.mount.species, look: c.mount.look }
+        : null,
     };
   }
 
@@ -400,6 +437,14 @@ export class World {
       slots,
       out: player.outSlot,
       count: player.party.filter(Boolean).length,
+      mount: player.mount
+        ? {
+            ability: player.mount.ability,
+            species: player.mount.species,
+            look: player.mount.look,
+            slot: player.mount.slot,
+          }
+        : null,
     };
   }
 
@@ -423,7 +468,7 @@ export class World {
     const d = DELTA[dir];
     const nx = creature.x + d.x;
     const ny = creature.y + d.y;
-    if (!walkable(nx, ny) || this.occupant(nx, ny)) {
+    if (!walkable(nx, ny, { surf: creature.mount?.ability === "surf" }) || this.occupant(nx, ny)) {
       this.broadcastArea({ t: "turn", id: creature.id, dir });
       if (creature.kind === "player") this.snapshotPlayer(creature);
       return;
@@ -549,6 +594,11 @@ export class World {
   pokebar(player, slot) {
     slot = Number(slot);
     if (!Number.isInteger(slot) || slot < 0 || slot >= PARTY_CAP) return;
+    if (player.mount) {
+      const mounted = player.mount.slot;
+      this.dismount(player);
+      if (slot === mounted) return;
+    }
     const mon = player.party[slot];
     if (!mon) return;
     if (player.outSlot === slot) {
@@ -579,6 +629,11 @@ export class World {
     else if (player.outSlot != null) {
       if (from < player.outSlot && to >= player.outSlot) player.outSlot -= 1;
       else if (from > player.outSlot && to <= player.outSlot) player.outSlot += 1;
+    }
+    if (player.mount?.slot === from) player.mount.slot = to;
+    else if (player.mount?.slot != null) {
+      if (from < player.mount.slot && to >= player.mount.slot) player.mount.slot -= 1;
+      else if (from > player.mount.slot && to <= player.mount.slot) player.mount.slot += 1;
     }
     this.syncParty(player);
     this.snapshotPlayer(player);
@@ -644,6 +699,71 @@ export class World {
     this.snapshotPlayer(player);
   }
 
+  order(player, msg) {
+    const ability = String(msg.ability || "").toLowerCase();
+    if (!["fly", "hide", "ride", "surf"].includes(ability)) return;
+    if (player.mount?.ability === ability) {
+      this.dismount(player);
+      return;
+    }
+    const slot = this.findAbilitySlot(player, ability);
+    if (slot == null) {
+      this.sys(player, "Nenhum Pokémon com essa habilidade.");
+      return;
+    }
+    this.mount(player, slot, ability);
+  }
+
+  findAbilitySlot(player, ability) {
+    if (player.mount && SPECIES[player.mount.species]?.abilities?.includes(ability)) {
+      return player.mount.slot;
+    }
+    if (player.outSlot != null) {
+      const mon = player.party[player.outSlot];
+      if (mon && SPECIES[mon.species]?.abilities?.includes(ability)) return player.outSlot;
+    }
+    return null;
+  }
+
+  mount(player, slot, ability) {
+    const mon = player.party[slot];
+    const spec = mon ? SPECIES[mon.species] : null;
+    if (!mon || !spec?.abilities?.includes(ability)) {
+      this.sys(player, "Nenhum Pokémon com essa habilidade.");
+      return;
+    }
+    if (player.outId) this.goback(player, false);
+    if (player.mount) {
+      player.mount = null;
+      player.look = 128;
+    }
+    player.mount = {
+      ability,
+      species: mon.species,
+      look: spec.look,
+      uid: mon.uid,
+      slot,
+    };
+    player.look = spec.look;
+    this.broadcastArea({ t: "outfit", creature: this.publicCreature(player) });
+    this.syncParty(player);
+    this.snapshotPlayer(player);
+    const label = ability === "fly" ? "Fly" : ability === "ride" ? "Ride" : ability === "hide" ? "Hide" : "Surf";
+    this.sys(player, `${label}!`);
+  }
+
+  dismount(player) {
+    const mount = player.mount;
+    player.mount = null;
+    player.look = 128;
+    this.broadcastArea({ t: "outfit", creature: this.publicCreature(player) });
+    this.syncParty(player);
+    this.snapshotPlayer(player);
+    if (mount && Number.isInteger(mount.slot) && player.party[mount.slot]) {
+      this.releaseSlot(player, mount.slot, false);
+    }
+  }
+
   summonTile(player) {
     const b = behind(player.x, player.y, player.dir);
     if (walkable(b.x, b.y) && !this.occupant(b.x, b.y)) return b;
@@ -679,8 +799,9 @@ export class World {
       return;
     }
     const t = this.now();
-    if (t < (poke.atkBusyUntil || 0)) return;
-    poke.atkBusyUntil = t + STEP_MS;
+    if (t < (player.atkBusyUntil || 0) || t < (poke.atkBusyUntil || 0)) return;
+    player.atkBusyUntil = t + ATK_MS;
+    poke.atkBusyUntil = t + ATK_MS;
     const dmg = Math.max(2, Math.floor(move.power / 5) + randomInt(1, 3));
     target.hp = Math.max(0, (target.hp || 1) - dmg);
     this.broadcastArea({
@@ -776,11 +897,7 @@ export class World {
     const roll = randomInt(1, 101);
     this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id });
     if (roll <= rate) {
-      const mon = this.makeMon(target.species, target.level || 2, {
-        ivs: target.ivs ? { ...target.ivs } : undefined,
-        evs: target.evs ? { ...target.evs } : this.zeroEvs(),
-        hp: 1,
-      });
+      const mon = this.makeMon(target.species, target.level || 2);
       let placed = false;
       for (let i = 0; i < PARTY_CAP; i++) {
         if (!player.party[i]) {
@@ -790,7 +907,7 @@ export class World {
         }
       }
       if (!placed) player.party.push(mon);
-      this.sys(player, `Pegou! ${mon.name} foi capturado.`);
+      this.sys(player, "Catch successful");
       this.removeCorpse(target);
       player.targetId = null;
     } else {
@@ -825,7 +942,7 @@ export class World {
     for (let dir = 0; dir < 8; dir++) {
       const nx = x + DELTA[dir].x;
       const ny = y + DELTA[dir].y;
-      if (!walkable(nx, ny)) continue;
+      if (!walkable(nx, ny, { surf: false })) continue;
       const occ = this.occupant(nx, ny);
       if (occ && occ.id !== selfId) continue;
       const dist = Math.max(Math.abs(tx - nx), Math.abs(ty - ny));

@@ -1,10 +1,8 @@
 import WebSocket from "ws";
 import { getMaxHealth } from "../server/species.js";
 
-if (getMaxHealth({ hp: 39 }, 1, 0, 5) !== 19) throw new Error("Charmander IV1 max HP");
-if (getMaxHealth({ hp: 39 }, 31, 0, 5) !== 22) throw new Error("Charmander IV31 max HP");
-if (getMaxHealth({ hp: 45 }, 1, 0, 2) !== 13) throw new Error("Caterpie IV1 max HP");
-if (getMaxHealth({ hp: 45 }, 31, 0, 2) !== 15) throw new Error("Caterpie IV31 max HP");
+if (getMaxHealth({ hp: 39 }, 5) !== 18) throw new Error("Charmander lv5 max HP");
+if (getMaxHealth({ hp: 45 }, 2) !== 13) throw new Error("Caterpie lv2 max HP");
 
 const url = process.env.WS_URL || "ws://127.0.0.1:3001/ws";
 
@@ -66,8 +64,8 @@ const start = { x: map1.you.x, y: map1.you.y };
 if (map1.you.kind !== "player") throw new Error("player must be human, not pokemon");
 if (map1.party.slots[0]?.species !== "charmander") throw new Error("starter missing");
 const starterHp = map1.party.slots[0].hpMax;
-if (starterHp < 19 || starterHp > 22) {
-  throw new Error(`starter hpMax ${starterHp} (Ruby lv5 Charmander should be 19–22)`);
+if (starterHp !== 18) {
+  throw new Error(`starter hpMax ${starterHp} (Charmander lv5 without IVs should be 18)`);
 }
 
 let outId = map1.creatures.find((c) => c.kind === "pokemon" && c.masterId === map1.you.id)?.id || null;
@@ -84,15 +82,15 @@ if (map1.party.out !== 0) {
   if (existing?.plate && !String(existing.plate).startsWith("Charmander [5]")) {
     throw new Error(`out plate ${existing.plate}`);
   }
-  if (existing && (existing.hpMax < 19 || existing.hpMax > 22)) {
+  if (existing && existing.hpMax !== 18) {
     throw new Error(`out Charmander hpMax ${existing.hpMax}`);
   }
 }
 
 const wild = map1.creatures.find((c) => c.wild);
 if (!wild) throw new Error("no wild Caterpie on map");
-if (wild.hpMax < 13 || wild.hpMax > 15) {
-  throw new Error(`wild hpMax ${wild.hpMax} (Ruby lv2 Caterpie should be 13–15)`);
+if (wild.hpMax !== 13) {
+  throw new Error(`wild hpMax ${wild.hpMax} (Caterpie lv2 without IVs should be 13)`);
 }
 if (!String(wild.plate || "").startsWith("Caterpie [2]")) throw new Error(`wild plate ${wild.plate}`);
 
@@ -112,7 +110,7 @@ outId = reout.creature.id;
 if (!String(reout.creature.plate || "").startsWith("Charmander [5]")) {
   throw new Error(`out plate ${reout.creature.plate}`);
 }
-if (reout.creature.hpMax < 19 || reout.creature.hpMax > 22) {
+if (reout.creature.hpMax !== 18) {
   throw new Error(`out Charmander hpMax ${reout.creature.hpMax}`);
 }
 
@@ -156,11 +154,11 @@ async function knockDown(id) {
           (x.t === "fx" && x.to === id) ||
           (x.t === "down" && x.id === id) ||
           (x.t === "info" && /já foi derrotado/.test(x.text || "")),
-        800
+        1200
       )
       .then((x) => x, () => null);
     if (!m) {
-      await new Promise((r) => setTimeout(r, 220));
+      await new Promise((r) => setTimeout(r, 1100));
       continue;
     }
     if (m.t === "down") return;
@@ -169,7 +167,7 @@ async function knockDown(id) {
       await a.wait((x) => x.t === "down" && x.id === id, 1200);
       return;
     }
-    await new Promise((r) => setTimeout(r, 220));
+    await new Promise((r) => setTimeout(r, 1050));
   }
   throw new Error("could not KO Caterpie (expected 4–6 M1s, not a one-shot)");
 }
@@ -183,14 +181,16 @@ let partyState = map1.party;
 for (let i = 0; i < 10 && !caught; i++) {
   a.send({ t: "use", item: "pokeball", id: prey.id });
   const msg = await a.wait(
-    (m) => m.t === "info" && /Pegou|escapou|vivo|cheia|Pokébolas|alvo/.test(m.text || ""),
+    (m) => m.t === "info" && /Catch successful|escapou|vivo|cheia|Pokébolas|alvo/.test(m.text || ""),
     3000
   );
   if (/vivo/.test(msg.text || "")) throw new Error("ball accepted a living Pokémon");
-  if (/Pegou/.test(msg.text || "")) {
+  if (/Catch successful/.test(msg.text || "")) {
     caught = true;
     const extra = await a.wait((m) => m.t === "party" && catCount(m.party.slots) > catsBefore, 2000);
     partyState = extra.party;
+    const got = extra.party.slots.find((s) => s?.species === "caterpie");
+    if (got && got.hp !== got.hpMax) throw new Error(`caught Caterpie HP ${got.hp}/${got.hpMax}, expected full`);
     break;
   }
   if (/escapou/.test(msg.text || "")) {
@@ -245,11 +245,48 @@ if (map2.hud?.pokebar?.x !== 44 || map2.hud?.pokebar?.locked !== false) {
 }
 const out = map2.creatures.find((c) => c.kind === "pokemon" && c.masterId === map2.you.id);
 if (!out) throw new Error("out pokemon was not restored");
+b.ws.close();
+
+const d = connect();
+await d.open;
+await d.wait("hello");
+d.send({ t: "login", user: "demo", pass: "demo" });
+const demoWelcome = await d.wait("welcome");
+const demoChar = demoWelcome.chars?.[0];
+if (!demoChar) throw new Error("demo account has no character");
+d.send({ t: "enter", name: demoChar });
+const demoMap = await d.wait("map");
+if (!demoMap.party.slots.some((s) => s?.species === "charizard")) throw new Error("demo missing Charizard");
+if (!demoMap.party.slots.some((s) => s?.species === "rapidash")) throw new Error("demo missing Rapidash");
+const flySlot = demoMap.party.slots.findIndex((s) => s?.species === "charizard");
+if (demoMap.party.out !== flySlot) {
+  d.send({ t: "pokebar", slot: flySlot });
+  await d.wait((m) => m.t === "appear" && m.creature?.species === "charizard");
+}
+d.send({ t: "order", ability: "fly" });
+const flew = await d.wait((m) => m.t === "outfit" && m.creature?.mount?.ability === "fly");
+if (flew.creature.kind !== "player") throw new Error("fly must outfit the player");
+if (flew.creature.mount.species !== "charizard") throw new Error("fly mount is not Charizard");
+d.send({ t: "order", ability: "fly" });
+await d.wait((m) => m.t === "outfit" && !m.creature?.mount);
+await d.wait((m) => m.t === "appear" && m.creature?.species === "charizard");
+const rideSlot = demoMap.party.slots.findIndex((s) => s?.species === "rapidash");
+d.send({ t: "pokebar", slot: rideSlot });
+await d.wait((m) => m.t === "appear" && m.creature?.species === "rapidash");
+d.send({ t: "order", ability: "ride" });
+const rode = await d.wait((m) => m.t === "outfit" && m.creature?.mount?.ability === "ride");
+if (rode.creature.mount.species !== "rapidash") throw new Error("ride mount is not Rapidash");
+d.send({ t: "order", ability: "hide" });
+const noHide = await d.wait((m) => m.t === "info", 800).then((m) => m, () => null);
+if (noHide && /Hide!/.test(noHide.text || "")) throw new Error("Rapidash must not Hide");
 console.log("SMOKE OK", {
   start,
   walked: { x: moved.x, y: moved.y },
   restored: { x: map2.you.x, y: map2.you.y },
   out: out.plate,
+  demo: demoChar,
+  fly: flew.creature.mount,
+  ride: rode.creature.mount,
 });
-b.ws.close();
+d.ws.close();
 process.exit(0);

@@ -1,9 +1,9 @@
 import Phaser from "phaser";
 import { MAP } from "../../server/map.js";
+import { LOOK_NAME } from "../../server/species.js";
 
 const TILE = 32;
 const SPRITE_COL = [0, 1, 1, 2, 2, 3, 3, 0];
-const LOOK = { 1: "bulbasaur", 4: "charmander", 7: "squirtle", 10: "caterpie" };
 
 function tileWorld(x, y, size) {
   if (size > TILE) return { x: x * TILE - (size - TILE), y: y * TILE - (size - TILE) };
@@ -70,11 +70,12 @@ export class GameScene extends Phaser.Scene {
     this.load.image("wood", "/assets/tiles/wood.png");
     this.load.image("cave", "/assets/tiles/cave.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
-    for (const name of Object.values(LOOK)) {
+    for (const name of Object.values(LOOK_NAME)) {
       this.load.spritesheet(name, `/assets/pokemon/${name}/sheet.png`, {
         frameWidth: 32,
         frameHeight: 32,
       });
+      this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
   }
 
@@ -85,12 +86,16 @@ export class GameScene extends Phaser.Scene {
     this.creatureLayer = this.add.layer();
     this.roofLayer = this.add.layer();
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
     this.input.keyboard.enabled = false;
+    this.input.keyboard.clearCaptures?.();
     this.input.mouse?.disableContextMenu();
     document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
-    this.input.on("pointerdown", (p) => this.onPointer(p));
+    this.input.on("pointerdown", (p) => {
+      document.getElementById("chat-input")?.blur();
+      this.onPointer(p);
+    });
     this.targetId = null;
     this.targetMark = this.add.graphics();
     this.targetMark.setDepth(4);
@@ -218,8 +223,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   textureFor(c) {
-    if (c.kind === "player") return "human";
-    return LOOK[c.look] || "caterpie";
+    if (c.kind === "player") {
+      if (c.mount?.look != null) return LOOK_NAME[c.mount.look] || "charizard";
+      return "human";
+    }
+    return LOOK_NAME[c.look] || "caterpie";
   }
 
   spawn(c) {
@@ -318,7 +326,7 @@ export class GameScene extends Phaser.Scene {
     const plate = this.plates.get(id);
     if (!st || !plate) return;
     if (st.kind === "player") plate.setText(st.name);
-    else plate.setText(`${st.name} [${st.level || 5}]  ${st.hp ?? 0}/${st.hpMax ?? 0}`);
+    else plate.setText(`${st.name} [${st.level || 5}]`);
   }
 
   applyCorpseLook(id) {
@@ -328,12 +336,18 @@ export class GameScene extends Phaser.Scene {
     st.dead = true;
     st.moving = false;
     st.hp = 0;
+    const name = LOOK_NAME[st.look] || "caterpie";
+    const corpseKey = `${name}-corpse`;
+    if (this.textures.exists(corpseKey)) sprite.setTexture(corpseKey, 0);
     sprite.setOrigin(0.5, 0.5);
-    sprite.setAngle(90);
-    sprite.setTint(0x8a8a8a);
-    sprite.setFrame(frameIndex(4, false, 0));
-    this.setHpBar(id, 0, st.hpMax);
-    this.refreshPlate(id);
+    sprite.setAngle(0);
+    sprite.clearTint();
+    sprite.setScale(1);
+    const plate = this.plates.get(id);
+    plate?.setVisible(false);
+    const bar = this.hpBars.get(id);
+    bar?.bg.setVisible(false);
+    bar?.fg.setVisible(false);
   }
 
   layoutCreature(id) {
@@ -345,17 +359,40 @@ export class GameScene extends Phaser.Scene {
     const pos = tileWorld(d.x, d.y, size);
     const walking = st.moving && !st.dead;
     const depth = Math.round(d.y) * 10 + 6;
+    const ability = st.mount?.ability;
     if (st.dead && size === 32) {
       sprite.setOrigin(0.5, 0.5);
-      sprite.setAngle(90);
-      sprite.setTint(0x8a8a8a);
-      sprite.setPosition(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2);
-      sprite.setFrame(frameIndex(4, false, 0));
+      sprite.setAngle(0);
+      sprite.setScale(1);
+      sprite.setPosition(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2 + 4);
+      this.plates.get(id)?.setVisible(false);
+      const bar = this.hpBars.get(id);
+      bar?.bg.setVisible(false);
+      bar?.fg.setVisible(false);
     } else {
+      sprite.setVisible(true);
+      this.plates.get(id)?.setVisible(true);
+      const bar = this.hpBars.get(id);
+      bar?.bg.setVisible(true);
+      bar?.fg.setVisible(true);
       sprite.setOrigin(0, 0);
       sprite.setAngle(0);
       sprite.clearTint();
-      sprite.setPosition(pos.x, pos.y);
+      let px = pos.x;
+      let py = pos.y;
+      if (ability === "fly") {
+        py -= 10;
+        sprite.setScale(1);
+      } else if (ability === "hide") {
+        sprite.setScale(0.55);
+        py += 10;
+      } else if (ability === "ride") {
+        sprite.setScale(1.12);
+        py -= 2;
+      } else {
+        sprite.setScale(1);
+      }
+      sprite.setPosition(px, py);
       sprite.setFrame(frameIndex(st.dir || 4, walking, st.phase));
     }
     sprite.setDepth(depth);
@@ -401,10 +438,13 @@ export class GameScene extends Phaser.Scene {
     if (msg.t === "moved") this.animateMove(msg);
     if (msg.t === "fx") {
       this.flash(msg.to);
+      this.flash(msg.from);
+      this.playStrike(msg.from, msg.to);
       if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
       this.refreshPlate(msg.to);
       if (msg.dmg != null) this.floatDamage(msg.to, msg.dmg);
     }
+    if (msg.t === "outfit" && msg.creature) this.spawn(msg.creature);
     if (msg.t === "down") {
       const st = this.state.get(msg.id);
       if (st) {
@@ -491,6 +531,31 @@ export class GameScene extends Phaser.Scene {
     const s = this.sprites.get(id);
     if (!s) return;
     this.tweens.add({ targets: s, alpha: 0.3, yoyo: true, duration: 80, repeat: 1 });
+  }
+
+  playStrike(fromId, toId) {
+    const a = this.state.get(fromId);
+    const b = this.state.get(toId);
+    if (!a || !b) return;
+    const da = this.displayTile(a);
+    const db = this.displayTile(b);
+    const x0 = da.x * TILE + TILE / 2;
+    const y0 = da.y * TILE;
+    const x1 = db.x * TILE + TILE / 2;
+    const y1 = db.y * TILE;
+    const g = this.add.graphics();
+    g.setDepth(2500);
+    g.lineStyle(2, 0xffe066, 1);
+    g.lineBetween(x0, y0, x1, y1);
+    g.fillStyle(0xfff3a0, 1);
+    g.fillCircle(x0, y0, 4);
+    g.fillCircle(x1, y1, 6);
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 280,
+      onComplete: () => g.destroy(),
+    });
   }
 
   updateRoofs() {
@@ -599,9 +664,16 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.input.keyboard.enabled = true;
+    if (this.keys.ENTER && Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
+      document.getElementById("chat-input")?.focus();
+      return;
+    }
     const dir = this.currentDir();
     if (dir != null) this.net.send({ t: "walk", dir });
-    if (this.keys.ESC && Phaser.Input.Keyboard.JustDown(this.keys.ESC)) this.hud?.selectItem(null);
+    if (this.keys.ESC && Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
+      this.hud?.selectItem(null);
+      document.getElementById("chat-input")?.blur();
+    }
     const move = this.moveKey();
     if (move != null) this.net.send({ t: "move", n: move });
   }

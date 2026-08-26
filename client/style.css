@@ -441,6 +441,29 @@ body.use-with * {
 .hot-slot.on:hover { filter: brightness(1.35); }
 .hot-slot.off { opacity: 0.55; cursor: default; }
 
+.order-bar {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  bottom: 118px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 6;
+}
+.order-bar.hidden { display: none !important; }
+.order-btn {
+  min-width: 76px;
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #e8d5a3;
+}
+.order-btn.on {
+  filter: var(--frame-lit);
+  color: #7dce6a;
+}
+
 #hud-combat {
   right: 10px;
   bottom: 10px;

@@ -102,8 +102,14 @@ export function inBounds(x, y) {
   return x >= 0 && y >= 0 && x < MAP.w && y < MAP.h;
 }
 
-export function walkable(x, y) {
-  return inBounds(x, y) && MAP.walls[y][x] === 0 && MAP.ground[y][x] !== 4;
+export function isWater(x, y) {
+  return inBounds(x, y) && MAP.ground[y][x] === 4;
+}
+
+export function walkable(x, y, opts = {}) {
+  if (!inBounds(x, y) || MAP.walls[y][x] !== 0) return false;
+  if (MAP.ground[y][x] === 4) return !!opts.surf;
+  return true;
 }
 
 export function hasRoof(x, y) {

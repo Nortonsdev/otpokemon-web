@@ -1,11 +1,5 @@
 import { WindowManager } from "./windows.js";
-
-const LOOK_FILE = {
-  1: "bulbasaur",
-  4: "charmander",
-  7: "squirtle",
-  10: "caterpie",
-};
+import { SPECIES } from "../../server/species.js";
 
 function clock() {
   const d = new Date();
@@ -19,8 +13,7 @@ function genderMark(p) {
 }
 
 function portraitUrl(p) {
-  const look = LOOK_FILE[p.look] || "caterpie";
-  return `/assets/pokemon/${look}/portrait.png`;
+  return `/assets/pokemon/${p.species || "caterpie"}/portrait.png`;
 }
 
 export class Hud {
@@ -65,7 +58,10 @@ export class Hud {
     });
     this.render();
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") this.selectItem(null);
+      if (e.key === "Escape") {
+        this.selectItem(null);
+        document.getElementById("chat-input")?.blur();
+      }
     });
   }
 
@@ -129,7 +125,7 @@ export class Hud {
       this.render();
     }
     if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
-    if (msg.t === "info") this.log(msg.text, /causou |Pegou|escapou|vivo|derrotado/.test(msg.text) ? "combate" : "sistema");
+    if (msg.t === "info") this.log(msg.text, /causou |Catch successful|escapou|vivo|derrotado|Fly|Ride|Hide|Surf/.test(msg.text) ? "combate" : "sistema");
     if (msg.t === "err") this.log(msg.text, "sistema");
     if (msg.t === "moved" && this.you && msg.id === this.you.id) {
       this.you.x = msg.x;
@@ -172,6 +168,11 @@ export class Hud {
     if (msg.t === "target") {
       this.setTarget({ id: msg.id, name: msg.name, plate: msg.plate });
     }
+    if (msg.t === "outfit" && msg.creature) {
+      if (this.you && msg.creature.id === this.you.id) this.you = { ...this.you, ...msg.creature };
+      this.creatures.set(msg.creature.id, msg.creature);
+      this.renderOrders();
+    }
   }
 
   render() {
@@ -206,6 +207,31 @@ export class Hud {
     this.renderBattle();
     this.renderBags();
     this.renderHotbar(out);
+    this.renderOrders();
+  }
+
+  renderOrders() {
+    const bar = document.getElementById("order-bar");
+    if (!bar) return;
+    const mount = this.party.mount;
+    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
+    const specKey = mount?.species || out?.species;
+    const abs = (specKey && SPECIES[specKey]?.abilities) || [];
+    bar.innerHTML = "";
+    if (!abs.length) {
+      bar.classList.add("hidden");
+      return;
+    }
+    bar.classList.remove("hidden");
+    for (const ab of abs) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "order-btn" + (mount?.ability === ab ? " on" : "");
+      btn.textContent = ab === "fly" ? "FLY" : ab === "ride" ? "RIDE" : ab === "hide" ? "HIDE" : "SURF";
+      btn.title = btn.textContent;
+      btn.onclick = () => this.net.send({ t: "order", ability: ab });
+      bar.appendChild(btn);
+    }
   }
 
   renderPokebar() {
@@ -215,7 +241,7 @@ export class Hud {
     for (let i = 0; i < 6; i++) {
       const p = this.party.slots?.[i];
       const row = document.createElement("div");
-      const isOut = this.party.out === i;
+      const isOut = this.party.out === i || this.party.mount?.slot === i;
       row.className = "poke-row" + (p ? "" : " empty") + (isOut ? " out" : "");
       row.dataset.slot = String(i);
       if (p) {
@@ -270,6 +296,7 @@ export class Hud {
     list.innerHTML = "";
     const rows = [...this.creatures.values()].filter((c) => {
       if (!c) return false;
+      if (c.dead) return false;
       if (c.id === this.you?.id) return false;
       if (c.masterId && c.masterId === this.you?.id) return false;
       return c.kind === "wild" || c.wild || c.kind === "player";
@@ -353,9 +380,5 @@ export class Hud {
 }
 
 function moveCount(species) {
-  if (species === "bulbasaur") return 2;
-  if (species === "charmander") return 1;
-  if (species === "squirtle") return 1;
-  if (species === "caterpie") return 1;
-  return 0;
+  return SPECIES[species]?.moves?.length || 0;
 }
