@@ -87,12 +87,11 @@ export class GameScene extends Phaser.Scene {
     document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
     this.input.on("pointerdown", (p) => this.onPointer(p));
     this.targetId = null;
-    this.targetMark = this.add
-      .rectangle(0, 0, TILE, TILE, 0xff1a1a, 0)
-      .setStrokeStyle(2, 0xe02020, 1)
-      .setOrigin(0, 0)
-      .setVisible(false)
-      .setDepth(4);
+    this.targetMark = this.add.rectangle(0, 0, TILE - 2, TILE - 2, 0xff2020, 0.18);
+    this.targetMark.setStrokeStyle(3, 0xff3030, 1);
+    this.targetMark.setOrigin(0, 0);
+    this.targetMark.setVisible(false);
+    this.targetMark.setDepth(1000);
     this.cameras.main.setRoundPixels(true);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
@@ -331,8 +330,8 @@ export class GameScene extends Phaser.Scene {
       this.targetMark.setVisible(false);
       return;
     }
-    this.targetMark.setPosition(st.x * TILE, st.y * TILE);
-    this.targetMark.setDepth(st.y * 10 + 4);
+    this.targetMark.setPosition(st.x * TILE + 1, st.y * TILE + 1);
+    this.targetMark.setDepth(1000);
     this.targetMark.setVisible(true);
   }
 
@@ -464,5 +463,6 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.net.send({ t: "catch" });
     const move = this.moveKey();
     if (move != null) this.net.send({ t: "move", n: move });
+    this.layoutTarget();
   }
 }

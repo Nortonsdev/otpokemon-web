@@ -132,7 +132,8 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   color: #c0caf5;
   font-size: 13px;
 }
-.hud-identity #hud-name { font-weight: 700; color: #7dce6a; letter-spacing: 0.04em; }
+.hud-identity { min-width: 160px; }
+.hud-identity #hud-name { font-weight: 700; color: #7dce6a; letter-spacing: 0.04em; white-space: nowrap; }
 .hud-meta { display: flex; gap: 10px; color: #9aa5ce; font-size: 11px; }
 .hud-top-center { display: flex; align-items: center; gap: 10px; }
 .gold-chip { color: #e0af68; font-weight: 700; }
