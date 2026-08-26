@@ -679,8 +679,8 @@ export class World {
       return;
     }
     const t = this.now();
-    if (t < poke.busyUntil) return;
-    poke.busyUntil = t + STEP_MS;
+    if (t < (poke.atkBusyUntil || 0)) return;
+    poke.atkBusyUntil = t + STEP_MS;
     const dmg = Math.max(2, Math.floor(move.power / 5) + randomInt(1, 3));
     target.hp = Math.max(0, (target.hp || 1) - dmg);
     this.broadcastArea({
