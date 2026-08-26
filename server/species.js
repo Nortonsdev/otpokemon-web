@@ -109,6 +109,11 @@ export function speciesKeyByLook(look) {
 export const STARTERS = ["bulbasaur", "charmander", "squirtle"];
 
 export const BALL = {
-  item: "pokeball",
-  rate: 1,
+  pokeball: { item: "pokeball", rate: 1 },
+  premierball: { item: "premierball", rate: 1.15 },
+};
+
+export const POTIONS = {
+  small_potion: { heal: 35 },
+  great_potion: { heal: 80 },
 };

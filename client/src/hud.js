@@ -1,6 +1,18 @@
 import { WindowManager } from "./windows.js";
 import { SPECIES } from "../../server/species.js";
 
+const ITEM_META = {
+  pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true },
+  premierball: { label: "Premier Ball", icon: "/assets/items/premierball.png", catch: true },
+  small_potion: { label: "Small Potion", icon: "/assets/items/small_potion.png", heal: true },
+  great_potion: { label: "Great Potion", icon: "/assets/items/great_potion.png", heal: true },
+};
+
+const VIP_DEMO = [
+  { name: "Yuutu", online: true },
+  { name: "Frajola Roncaria", online: false },
+];
+
 function clock() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -30,6 +42,8 @@ export class Hud {
     this.creatures = new Map();
     this.rowDrag = null;
     this.selectedItem = null;
+    this.mapData = null;
+    this.minimapZoom = 1;
   }
 
   bindGame() {
@@ -56,6 +70,15 @@ export class Hud {
       }
       this.flushLog();
     });
+    document.getElementById("minimap-zoom-in")?.addEventListener("click", () => {
+      this.minimapZoom = Math.min(2.5, this.minimapZoom + 0.25);
+      this.drawMinimap();
+    });
+    document.getElementById("minimap-zoom-out")?.addEventListener("click", () => {
+      this.minimapZoom = Math.max(0.5, this.minimapZoom - 0.25);
+      this.drawMinimap();
+    });
+    this.renderVip();
     this.render();
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -66,10 +89,7 @@ export class Hud {
   }
 
   selectItem(item) {
-    if (item === "pokeball") {
-      const balls = this.bag.find((i) => i.item === "pokeball");
-      if (!balls?.count) item = null;
-    }
+    if (item && !this.bag.find((i) => i.item === item && i.count > 0)) item = null;
     this.selectedItem = item || null;
     document.body.classList.toggle("use-with", !!this.selectedItem);
     this.renderBags();
@@ -104,8 +124,6 @@ export class Hud {
 
   setTarget(creature) {
     this.target = creature;
-    const el = document.getElementById("hud-target-name");
-    if (el) el.textContent = creature ? creature.plate || creature.name : "Sem alvo";
     this.renderBattle();
   }
 
@@ -115,9 +133,11 @@ export class Hud {
       this.party = msg.party;
       this.bag = msg.bag || [];
       this.creatures = new Map((msg.creatures || []).map((c) => [c.id, c]));
+      this.mapData = msg.map;
       if (msg.hud) this.windows.merge(msg.hud);
       if (this.bound) this.windows.applyAll();
       this.render();
+      this.drawMinimap();
     }
     if (msg.t === "party") {
       this.party = msg.party;
@@ -125,12 +145,13 @@ export class Hud {
       this.render();
     }
     if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
-    if (msg.t === "info") this.log(msg.text, /causou |Catch successful|escapou|vivo|derrotado|Fly|Ride|Hide|Surf/.test(msg.text) ? "combate" : "sistema");
+    if (msg.t === "info") this.log(msg.text, /causou |Catch successful|escapou|vivo|derrotado|Fly|Ride|Hide|Surf|curou|Recovery/.test(msg.text) ? "combate" : "sistema");
     if (msg.t === "err") this.log(msg.text, "sistema");
     if (msg.t === "moved" && this.you && msg.id === this.you.id) {
       this.you.x = msg.x;
       this.you.y = msg.y;
       this.you.dir = msg.dir;
+      this.drawMinimap();
     }
     if (msg.t === "moved") {
       const c = this.creatures.get(msg.id);
@@ -138,15 +159,18 @@ export class Hud {
         c.x = msg.x;
         c.y = msg.y;
       }
+      this.drawMinimap();
     }
     if (msg.t === "appear") {
       this.creatures.set(msg.creature.id, msg.creature);
       this.renderBattle();
+      this.drawMinimap();
     }
     if (msg.t === "disappear") {
       this.creatures.delete(msg.id);
       if (this.target?.id === msg.id) this.setTarget(null);
       else this.renderBattle();
+      this.drawMinimap();
     }
     if (msg.t === "down") {
       const c = this.creatures.get(msg.id);
@@ -156,6 +180,7 @@ export class Hud {
         c.plate = `${c.name} [${c.level || 5}]  0/${c.hpMax}`;
       }
       this.renderBattle();
+      this.drawMinimap();
     }
     if (msg.t === "fx") {
       const c = this.creatures.get(msg.to);
@@ -175,33 +200,86 @@ export class Hud {
     }
   }
 
+  renderVip() {
+    const list = document.getElementById("vip-list");
+    if (!list) return;
+    list.innerHTML = "";
+    for (const row of VIP_DEMO) {
+      const li = document.createElement("li");
+      li.className = row.online ? "vip-on" : "vip-off";
+      li.textContent = row.name;
+      list.appendChild(li);
+    }
+  }
+
+  drawMinimap() {
+    const canvas = document.getElementById("minimap-canvas");
+    if (!canvas || !this.mapData) return;
+    const ctx = canvas.getContext("2d");
+    const w = this.mapData.w;
+    const h = this.mapData.h;
+    const scale = (canvas.width / w) * this.minimapZoom;
+    const sy = (canvas.height / h) * this.minimapZoom;
+    const s = Math.min(scale, sy);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const colors = ["#3a7d2a", "#8a7a52", "#555", "#2a4a22", "#6b4a2a", "#2a4a6a", "#4a3828"];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const g = this.mapData.ground[y][x];
+        const wall = this.mapData.walls[y][x];
+        ctx.fillStyle = wall ? "#333" : colors[g] || "#3a7d2a";
+        ctx.fillRect(x * s, y * s, Math.ceil(s), Math.ceil(s));
+      }
+    }
+    for (const [, c] of this.creatures) {
+      if (c.dead) continue;
+      ctx.fillStyle = c.kind === "player" ? "#7dce6a" : c.wild ? "#e0af68" : "#7aa2f7";
+      ctx.fillRect(c.x * s, c.y * s, Math.max(2, s), Math.max(2, s));
+    }
+    if (this.you) {
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(this.you.x * s - 1, this.you.y * s - 1, s + 2, s + 2);
+    }
+  }
+
   render() {
     const nameEl = document.getElementById("hud-name");
     if (!nameEl) return;
     nameEl.textContent = this.you?.name || "—";
-    document.getElementById("hud-level").textContent = this.you?.level || 1;
+    const lv = this.you?.level || 1;
+    document.getElementById("hud-level").textContent = lv;
+    document.getElementById("status-level").textContent = lv;
 
     const hp = this.you?.hp ?? 150;
     const hpMax = this.you?.hpMax ?? 150;
-    document.getElementById("player-hp-text").textContent = `${hp} / ${hpMax}`;
-    document.getElementById("player-hp-fill").style.width = `${(hp / hpMax) * 100}%`;
+    const hpPct = Math.round((hp / hpMax) * 100);
+    document.getElementById("player-hp-fill").style.width = `${hpPct}%`;
+    document.getElementById("player-hp-pct").textContent = `${hpPct}%`;
+
+    const xpPct = this.you?.xpPct ?? 0;
+    document.getElementById("hud-xp-fill").style.width = `${xpPct}%`;
+    document.getElementById("hud-xp-pct").textContent = `${xpPct.toFixed(1)}%`;
+    document.getElementById("hud-fish-fill").style.width = `${this.you?.fishPct ?? 0}%`;
+    document.getElementById("hud-fish-pct").textContent = `${this.you?.fishPct ?? 0}%`;
+    document.getElementById("hud-stm-fill").style.width = `${this.you?.stmPct ?? 100}%`;
+    document.getElementById("hud-stm-pct").textContent = `${this.you?.stmPct ?? 100}%`;
+
+    const balls = this.bag.find((i) => i.item === "pokeball")?.count || 0;
+    document.getElementById("hud-balls").textContent = balls;
+    const gold = document.getElementById("hud-gold");
+    const goldSide = document.getElementById("hud-gold-side");
+    const goldVal = this.you?.gold ?? 0;
+    if (gold) gold.textContent = goldVal.toFixed(2);
+    if (goldSide) goldSide.textContent = goldVal.toFixed(2);
 
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
-    const pokeText = document.getElementById("poke-hp-text");
-    const pokeFill = document.getElementById("poke-hp-fill");
-    const outTitle = document.getElementById("out-title");
-    const outImg = document.getElementById("out-portrait");
-    if (!out) {
-      pokeText.textContent = "0 / 0";
-      pokeFill.style.width = "0%";
-      if (outTitle) outTitle.textContent = "Nenhum Pokémon fora";
-      if (outImg) outImg.removeAttribute("src");
-    } else {
-      pokeText.textContent = `${out.hp} / ${out.hpMax}`;
-      pokeFill.style.width = `${(out.hp / Math.max(1, out.hpMax)) * 100}%`;
-      if (outTitle) outTitle.textContent = `[${out.level}] ${out.name}`;
-      if (outImg) outImg.src = portraitUrl(out);
-    }
+    const portrait = document.getElementById("player-portrait");
+    if (portrait) portrait.src = out ? portraitUrl(out) : "/assets/human/portrait.png";
+    document.getElementById("out-nature").textContent = out?.nature || "—";
+    const spec = out ? SPECIES[out.species] : null;
+    const abs = spec?.abilities || [];
+    document.getElementById("out-ability").textContent = abs.length ? abs.join(", ") : "—";
 
     this.renderPokebar();
     this.renderBattle();
@@ -320,30 +398,34 @@ export class Hud {
   }
 
   renderBags() {
-    const balls = this.bag.find((i) => i.item === "pokeball");
-    const fillGrid = (id, count, first) => {
-      const grid = document.getElementById(id);
-      if (!grid) return;
-      grid.innerHTML = "";
-      for (let i = 0; i < count; i++) {
-        const cell = document.createElement("div");
-        cell.className = "bag-cell";
-        if (i === 0 && first) {
-          cell.classList.add("has-item");
-          if (this.selectedItem === "pokeball") cell.classList.add("use-with");
-          cell.innerHTML = `<img class="portrait" src="/assets/hud/slots/pokeball.png" alt="ball" style="width:24px;height:24px;image-rendering:pixelated" /><span class="bag-count">${first}</span>`;
-          cell.title = `Pokébola ×${first} — botão direito para usar`;
-          cell.oncontextmenu = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            this.selectItem(this.selectedItem === "pokeball" ? null : "pokeball");
-          };
-        }
-        grid.appendChild(cell);
+    const grid = document.getElementById("bolsa");
+    if (!grid) return;
+    grid.innerHTML = "";
+    const items = ["small_potion", "great_potion", "premierball", "pokeball"];
+    for (const key of items) {
+      const meta = ITEM_META[key];
+      const entry = this.bag.find((i) => i.item === key);
+      const count = entry?.count || 0;
+      const cell = document.createElement("div");
+      cell.className = "bag-cell has-item" + (this.selectedItem === key ? " use-with" : "");
+      cell.innerHTML = `<img src="${meta.icon}" alt="${meta.label}" /><span class="bag-count">${count}</span>`;
+      cell.title = `${meta.label} ×${count}`;
+      if (meta.catch) {
+        cell.oncontextmenu = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!count) return;
+          this.selectItem(this.selectedItem === key ? null : key);
+        };
       }
-    };
-    fillGrid("bolsa", 10, balls?.count || 0);
-    fillGrid("mochila", 10, 0);
+      if (meta.heal) {
+        cell.onclick = () => {
+          if (!count) return;
+          this.net.send({ t: "use", item: key });
+        };
+      }
+      grid.appendChild(cell);
+    }
   }
 
   renderHotbar(out) {
@@ -351,31 +433,58 @@ export class Hud {
     if (!bar) return;
     const known = out ? moveCount(out.species) : 0;
     bar.innerHTML = "";
-    for (let i = 1; i <= 20; i++) {
-      const n = i <= 10 ? i : i - 10;
-      const on = out && i <= 10 && n <= known;
+    const slots = [
+      { key: "Tab", label: "M1", move: 1 },
+      { key: "1", label: "M2", move: 2 },
+      { key: "2", label: "M3", move: 3 },
+      { key: "F", label: "M4", move: 4 },
+      { key: "E", label: "M5", move: 5 },
+      { key: "R", label: "M6", move: 6 },
+      { key: "3", label: "M7", move: 7 },
+      { key: "4", label: "M8", move: 8 },
+      { key: "A", label: "M9", move: 9 },
+      { key: "S", label: "M10", move: 10 },
+      { key: "ball", item: "pokeball" },
+      { key: "pot", item: "small_potion" },
+    ];
+    slots.forEach((slot, i) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "hot-slot" + (on ? " on" : " off");
-      btn.title = i <= 10 ? `M${n}` : "";
-      if (i <= 10) {
-        btn.innerHTML = `<img src="/assets/hud/moves/${n}_${on ? "on" : "off"}.png" alt="M${n}" /><span>M${n}</span>`;
-        if (on) btn.onclick = () => this.net.send({ t: "move", n });
-      } else if (i === 11) {
-        const balls = this.bag.find((b) => b.item === "pokeball");
-        const count = balls?.count || 0;
-        btn.className = "hot-slot on" + (this.selectedItem === "pokeball" ? " use-with" : "");
-        btn.title = count ? `Pokébola ×${count} — botão direito para usar` : "Pokébola";
-        btn.innerHTML = `<img src="/assets/hud/slots/pokeball.png" alt="ball" /><span>${count}</span>`;
-        btn.oncontextmenu = (e) => {
-          e.preventDefault();
-          this.selectItem(this.selectedItem === "pokeball" ? null : "pokeball");
-        };
-      } else {
-        btn.textContent = "+";
+      btn.className = "hot-slot";
+      if (slot.move) {
+        const on = out && slot.move <= known;
+        btn.classList.add(on ? "on" : "off");
+        if (on && out) {
+          btn.innerHTML = `<img src="/assets/pokemon/${out.species}/portrait.png" alt="" /><span class="hot-key">${slot.key}</span>`;
+          btn.onclick = () => this.net.send({ t: "move", n: slot.move });
+        } else {
+          btn.innerHTML = `<span class="hot-key">${slot.key}</span>`;
+        }
+      } else if (slot.item) {
+        const entry = this.bag.find((b) => b.item === slot.item);
+        const count = entry?.count || 0;
+        const meta = ITEM_META[slot.item];
+        btn.classList.add(count ? "on" : "off");
+        btn.classList.toggle("use-with", this.selectedItem === slot.item);
+        btn.innerHTML = `<img src="${meta.icon}" alt="" /><span class="hot-count">${count || ""}</span>`;
+        if (meta.catch) {
+          btn.oncontextmenu = (e) => {
+            e.preventDefault();
+            if (!count) return;
+            this.selectItem(this.selectedItem === slot.item ? null : slot.item);
+          };
+        }
+        if (meta.heal) {
+          btn.onclick = () => count && this.net.send({ t: "use", item: slot.item });
+        }
       }
+      const angle = (i / slots.length) * Math.PI * 2 - Math.PI / 2;
+      const rx = 88 + Math.cos(angle) * 72;
+      const ry = 44 + Math.sin(angle) * 28;
+      btn.style.left = `${rx}px`;
+      btn.style.top = `${ry}px`;
       bar.appendChild(btn);
-    }
+    });
   }
 }
 

@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 THING_LAST_ATTR = 255
 ATTR_GROUND = 0
@@ -27,8 +27,17 @@ ATTR_USABLE = 34
 LOOKS = {
     1: "bulbasaur",
     4: "charmander",
+    6: "charizard",
     7: "squirtle",
     10: "caterpie",
+    78: "rapidash",
+}
+
+ITEMS = {
+    "pokeball": (26661,),
+    "premierball": (26678,),
+    "small_potion": (8878,),
+    "great_potion": (8879,),
 }
 
 
@@ -194,8 +203,11 @@ def parse_dat(path: Path) -> dict[int, ThingType]:
         f"DAT signature={signature:#x} items={item_count} "
         f"creatures={creature_count} effects={effect_count} missiles={missile_count}"
     )
+    items: dict[int, ThingType] = {}
     for item_id in range(100, item_count + 1):
-        read_thing(r, item_id, "item")
+        thing = read_thing(r, item_id, "item")
+        if item_id in {i for ids in ITEMS.values() for i in ids}:
+            items[item_id] = thing
     creatures: dict[int, ThingType] = {}
     for look_id in range(1, creature_count + 1):
         thing = read_thing(r, look_id, "creature")
@@ -223,7 +235,7 @@ def parse_dat(path: Path) -> dict[int, ThingType]:
     for missile_id in range(1, missile_count + 1):
         read_thing(r, missile_id, "missile")
     print(f"DAT parse complete, pos={r.pos}/{len(data)}")
-    return creatures
+    return creatures, items
 
 
 def decode_sprite(mm: mmap.mmap, sprite_id: int) -> Image.Image:
@@ -263,37 +275,45 @@ def decode_sprite(mm: mmap.mmap, sprite_id: int) -> Image.Image:
     return img
 
 
-def group_sprite_index(group: FrameGroup, x: int, phase: int) -> int:
-    # w=h=l=y=z=0 for 1x1 single-layer looks
+def corpse_from(frame: Image.Image) -> Image.Image:
+    fallen = frame.rotate(90, expand=False, resample=Image.Resampling.NEAREST)
+    dark = ImageEnhance.Brightness(fallen).enhance(0.55)
+    out = Image.new("RGBA", (frame.width, frame.height), (0, 0, 0, 0))
+    out.paste(dark, (0, max(0, (frame.height - dark.height) // 2 - 4)), dark)
+    return out
+
+
+def group_sprite_index(group: FrameGroup, x: int, y: int, z: int, layer: int, phase: int, w: int, h: int) -> int:
     return (
         (
-            ((phase % group.phases) * group.pattern_z)
-            * group.pattern_y
-            * group.pattern_x
-            + x
-        )
-        if group.width == 1 and group.height == 1 and group.layers == 1
-        else (
             (
                 (
-                    (
-                        (
-                            ((phase % group.phases) * group.pattern_z + 0) * group.pattern_y
-                            + 0
-                        )
-                        * group.pattern_x
-                        + x
-                    )
-                    * group.layers
-                    + 0
+                    (((phase % group.phases) * group.pattern_z + z) * group.pattern_y + y)
+                    * group.pattern_x
+                    + x
                 )
-                * group.height
-                + 0
+                * group.layers
+                + layer
             )
-            * group.width
-            + 0
+            * group.height
+            + h
         )
+        * group.width
+        + w
     )
+
+
+def compose_frame(group: FrameGroup, mm: mmap.mmap, direction: int, phase: int) -> Image.Image:
+    fw, fh = group.width * 32, group.height * 32
+    frame = Image.new("RGBA", (fw, fh), (0, 0, 0, 0))
+    for h in range(group.height):
+        for w in range(group.width):
+            for layer in range(max(1, group.layers)):
+                idx = group_sprite_index(group, direction, 0, 0, layer, phase, w, h)
+                sid = group.sprite_ids[idx] if 0 <= idx < len(group.sprite_ids) else 0
+                tile = decode_sprite(mm, sid)
+                frame.paste(tile, (w * 32, h * 32), tile)
+    return frame
 
 
 def export_look(thing: ThingType, mm: mmap.mmap, out_dir: Path) -> None:
@@ -302,33 +322,59 @@ def export_look(thing: ThingType, mm: mmap.mmap, out_dir: Path) -> None:
     look_dir.mkdir(parents=True, exist_ok=True)
     idle = next((g for g in thing.groups if g.group_type == 0), thing.groups[0])
     walk = next((g for g in thing.groups if g.group_type == 1), thing.groups[-1])
+    fw, fh = idle.width * 32, idle.height * 32
     dirs = ["north", "east", "south", "west"]
-    sheet = Image.new("RGBA", (128, 96), (0, 0, 0, 0))
-    rows: list[tuple[FrameGroup, int]] = [(idle, 0), (walk, 0), (walk, min(1, walk.phases - 1))]
-    for row, (group, phase) in enumerate(rows):
+    walk_phases = [0, min(1, walk.phases - 1)] if walk.phases > 1 else [0, 0]
+    sheet = Image.new("RGBA", (fw * 4, fh * 3), (0, 0, 0, 0))
+    for row, phase in enumerate([0, *walk_phases]):
+        group = idle if row == 0 else walk
         for x, dname in enumerate(dirs):
-            idx = group_sprite_index(group, x, phase)
-            sprite_id = group.sprite_ids[idx] if 0 <= idx < len(group.sprite_ids) else 0
-            frame = decode_sprite(mm, sprite_id)
+            frame = compose_frame(group, mm, x, phase)
             if row == 0:
-                pose = f"idle_{dname}"
+                frame.save(look_dir / f"idle_{dname}.png")
             else:
-                pose = f"walk{row}_{dname}"
-            frame.save(look_dir / f"{pose}.png")
-            sheet.paste(frame, (x * 32, row * 32))
+                frame.save(look_dir / f"walk{row}_{dname}.png")
+            sheet.paste(frame, (x * fw, row * fh))
             if dname == "south" and row == 0:
-                frame.save(look_dir / "portrait.png")
-                frame.save(out_dir / f"{name}_portrait.png")
+                portrait = frame.copy()
+                portrait.thumbnail((32, 32), Image.Resampling.NEAREST)
+                portrait.save(look_dir / "portrait.png")
+                portrait.save(out_dir / f"{name}_portrait.png")
     sheet.save(look_dir / "sheet.png")
     sheet.save(out_dir / f"{name}_sheet.png")
-    print(f"exported {name} -> {look_dir}")
+    south = compose_frame(idle, mm, 2, 0)
+    corpse = corpse_from(south if south.height <= 32 else south.resize((32, 32), Image.Resampling.NEAREST))
+    corpse.save(look_dir / "corpse.png")
+    print(f"exported {name} -> {look_dir} ({fw}x{fh})")
+
+
+def export_item(thing: ThingType, mm: mmap.mmap, out_dir: Path, name: str) -> bool:
+    group = thing.groups[0]
+    sprite_ids = [sid for sid in group.sprite_ids if sid > 0]
+    if not sprite_ids:
+        print(f"skip item {name} id={thing.thing_id} (no sprite ids)")
+        return False
+    if group.width == 1 and group.height == 1:
+        img = decode_sprite(mm, sprite_ids[0])
+    else:
+        img = compose_frame(group, mm, 0, 0)
+        if img.width > 32 or img.height > 32:
+            img = img.resize((32, 32), Image.Resampling.NEAREST)
+    if not img.getbbox():
+        print(f"skip item {name} id={thing.thing_id} (empty frame)")
+        return False
+    dest = out_dir / "items" / f"{name}.png"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    img.save(dest)
+    print(f"exported item {name} id={thing.thing_id} -> {dest}")
+    return True
 
 
 def main() -> int:
     root = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/assets/ruby/extracted")
     out_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "client/public/assets/pokemon")
     out_dir.mkdir(parents=True, exist_ok=True)
-    creatures = parse_dat(root / "Ruby.dat")
+    creatures, items = parse_dat(root / "Ruby.dat")
     missing = [look for look in LOOKS if look not in creatures]
     if missing:
         raise SystemExit(f"missing looks: {missing}")
@@ -339,6 +385,12 @@ def main() -> int:
             print(f"SPR signature={sig:#x} spriteCount={count}")
             for look_id, thing in creatures.items():
                 export_look(thing, mm, out_dir)
+            for name, ids in ITEMS.items():
+                for iid in ids:
+                    thing = items.get(iid)
+                    if thing:
+                        export_item(thing, mm, out_dir.parent, name)
+                        break
         finally:
             mm.close()
     print("done")

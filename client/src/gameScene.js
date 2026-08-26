@@ -1,9 +1,19 @@
 import Phaser from "phaser";
-import { MAP } from "../../server/map.js";
+import { MAP, SPAWN } from "../../server/map.js";
 import { LOOK_NAME } from "../../server/species.js";
 
 const TILE = 32;
+const LARGE_MONS = new Set(["charizard", "rapidash"]);
 const SPRITE_COL = [0, 1, 1, 2, 2, 3, 3, 0];
+
+function monFrame(name) {
+  return LARGE_MONS.has(name) ? 64 : 32;
+}
+
+function creatureSize(tex) {
+  if (tex === "human" || LARGE_MONS.has(tex)) return 64;
+  return 32;
+}
 
 function tileWorld(x, y, size) {
   if (size > TILE) return { x: x * TILE - (size - TILE), y: y * TILE - (size - TILE) };
@@ -71,9 +81,10 @@ export class GameScene extends Phaser.Scene {
     this.load.image("cave", "/assets/tiles/cave.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
     for (const name of Object.values(LOOK_NAME)) {
+      const fw = monFrame(name);
       this.load.spritesheet(name, `/assets/pokemon/${name}/sheet.png`, {
-        frameWidth: 32,
-        frameHeight: 32,
+        frameWidth: fw,
+        frameHeight: fw,
       });
       this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
@@ -177,7 +188,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
     this.cameras.main.setRoundPixels(false);
-    this.cameras.main.centerOn(8 * TILE + TILE / 2, 12 * TILE + TILE / 2);
+    this.cameras.main.centerOn(SPAWN.x * TILE + TILE / 2, SPAWN.y * TILE + TILE / 2);
   }
 
   enterWorld(payload) {
@@ -240,7 +251,7 @@ export class GameScene extends Phaser.Scene {
   spawn(c) {
     if (this.sprites.has(c.id)) this.despawn(c.id);
     const tex = this.textureFor(c);
-    const size = tex === "human" ? 64 : 32;
+    const size = creatureSize(tex);
     const pos = tileWorld(c.x, c.y, size);
     const sprite = this.add.sprite(pos.x, pos.y, tex, frameIndex(c.dir || 4, false, 0));
     sprite.setOrigin(0, 0);
@@ -298,7 +309,7 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.sprites.get(id);
     const plate = this.plates.get(id);
     if (!sprite || !plate) return;
-    const size = sprite.texture.key === "human" ? 64 : 32;
+    const size = creatureSize(sprite.texture.key);
     const cx = spriteX + size / 2;
     const plateY = size === 64 ? spriteY + 8 : spriteY - 2;
     plate.setPosition(cx, plateY);
@@ -362,16 +373,16 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.sprites.get(id);
     if (!st || !sprite) return;
     const d = this.displayTile(st);
-    const size = sprite.texture.key === "human" ? 64 : 32;
+    const size = creatureSize(sprite.texture.key);
     const pos = tileWorld(d.x, d.y, size);
     const walking = st.moving && !st.dead;
     const depth = Math.round(d.y) * 10 + 6;
     const ability = st.mount?.ability;
-    if (st.dead && size === 32) {
+    if (st.dead) {
       sprite.setOrigin(0.5, 0.5);
       sprite.setAngle(0);
       sprite.setScale(1);
-      sprite.setPosition(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2 + 4);
+      sprite.setPosition(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2 + (size > 32 ? 8 : 4));
       this.plates.get(id)?.setVisible(false);
       const bar = this.hpBars.get(id);
       bar?.bg.setVisible(false);
@@ -633,12 +644,18 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const item = this.hud?.selectedItem;
-    if (item === "pokeball") {
+    if (item === "pokeball" || item === "premierball") {
       if (who) {
-        this.net.send({ t: "use", item: "pokeball", id: who.id });
+        this.net.send({ t: "use", item, id: who.id });
         if (who.dead) this.hud.selectItem(null);
       } else {
         this.hud.selectItem(null);
+      }
+      return;
+    }
+    if (item === "small_potion" || item === "great_potion") {
+      if (who && who.masterId === this.youId) {
+        this.net.send({ t: "use", item, id: who.id });
       }
       return;
     }

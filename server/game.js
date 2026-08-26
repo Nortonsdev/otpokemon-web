@@ -6,13 +6,14 @@ import {
   DIR,
   PARTY_CAP,
   PLAYER_HP,
+  POTIONS,
   SPECIES,
   STARTERS,
   STEP_MS,
   applyRubyHealth,
   behind,
 } from "./species.js";
-import { MAP, WILD_GROUPS, hasRoof, inBounds, tileName, walkable } from "./map.js";
+import { MAP, SPAWN, WILD_GROUPS, hasRoof, inBounds, tileName, walkable } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 
 let nextId = 1;
@@ -169,8 +170,8 @@ export class World {
     const record = {
       name: charName,
       account: client.account,
-      x: MAP.w ? 8 : 8,
-      y: 12,
+      x: SPAWN.x,
+      y: SPAWN.y,
       z: MAP.z,
       dir: DIR.S,
       hp: PLAYER_HP,
@@ -181,8 +182,8 @@ export class World {
       target: null,
       mount: null,
     };
-    record.x = 8;
-    record.y = 12;
+    record.x = SPAWN.x;
+    record.y = SPAWN.y;
     this.save.characters[charName] = record;
     this.save.accounts[client.account].chars.push(charName);
     this.persist();
@@ -236,8 +237,8 @@ export class World {
       rec = {
         name,
         account: "demo",
-        x: 8,
-        y: 12,
+        x: SPAWN.x,
+        y: SPAWN.y,
         z: MAP.z,
         dir: DIR.S,
         hp: PLAYER_HP,
@@ -248,7 +249,12 @@ export class World {
         target: null,
       };
     }
-    rec.bag = [{ item: "pokeball", count: 20 }];
+    rec.bag = [
+      { item: "small_potion", count: 87 },
+      { item: "great_potion", count: 8 },
+      { item: "premierball", count: 31 },
+      { item: "pokeball", count: 158 },
+    ];
     const party = (rec.party || []).filter(Boolean).map((p) => this.ensureMon(p));
     if (!party.some((p) => p.species === "charizard")) party.unshift(this.makeMon("charizard", 36));
     if (!party.some((p) => p.species === "rapidash")) {
@@ -260,8 +266,8 @@ export class World {
     if (rec.out < 0) rec.out = 0;
     rec.mount = null;
     if (!walkable(rec.x, rec.y)) {
-      rec.x = 8;
-      rec.y = 12;
+      rec.x = SPAWN.x;
+      rec.y = SPAWN.y;
     }
     this.save.characters[name] = rec;
     this.persist();
@@ -283,6 +289,10 @@ export class World {
       dir: rec.dir ?? DIR.S,
       hp: rec.hp,
       hpMax: rec.hpMax,
+      gold: rec.gold ?? 925.79,
+      xpPct: rec.xpPct ?? 9,
+      fishPct: rec.fishPct ?? 31,
+      stmPct: rec.stmPct ?? 100,
       look: 128,
       busyUntil: 0,
       targetId: null,
@@ -295,8 +305,8 @@ export class World {
       outId: null,
     };
     if (!walkable(player.x, player.y)) {
-      player.x = 8;
-      player.y = 12;
+      player.x = SPAWN.x;
+      player.y = SPAWN.y;
     }
     this.creatures.set(player.id, player);
     this.occupy(player);
@@ -389,7 +399,7 @@ export class World {
   }
 
   publicCreature(c) {
-    return {
+    const base = {
       id: c.id,
       kind: c.kind,
       name: c.name,
@@ -410,6 +420,13 @@ export class World {
         ? { ability: c.mount.ability, species: c.mount.species, look: c.mount.look }
         : null,
     };
+    if (c.kind === "player") {
+      base.gold = c.gold ?? 925.79;
+      base.xpPct = c.xpPct ?? 9;
+      base.fishPct = c.fishPct ?? 31;
+      base.stmPct = c.stmPct ?? 100;
+    }
+    return base;
   }
 
   partyPayload(player) {
@@ -511,14 +528,36 @@ export class World {
   }
 
   use(player, msg) {
-    if (msg && msg.item === "pokeball") {
+    const item = String(msg?.item || "");
+    if (item === "pokeball" || item === "premierball") {
       if (msg.id != null) {
         const id = Number(msg.id);
         if (this.creatures.has(id)) player.targetId = id;
       }
-      return this.catchBall(player);
+      return this.catchBall(player, item);
+    }
+    if (item === "small_potion" || item === "great_potion") {
+      return this.usePotion(player, item, msg.id != null ? Number(msg.id) : null);
     }
     this.sys(player, "Nada acontece.");
+  }
+
+  usePotion(player, item, targetId) {
+    const potion = POTIONS[item];
+    const stack = player.bag.find((i) => i.item === item);
+    if (!stack || stack.count <= 0) return this.sys(player, "Você não tem essa poção.");
+    let poke = null;
+    if (player.outId) poke = this.creatures.get(player.outId);
+    if (targetId && this.creatures.get(targetId)?.masterId === player.id) {
+      poke = this.creatures.get(targetId);
+    }
+    if (!poke || poke.dead) return this.sys(player, "Solte um Pokémon para curar.");
+    if (poke.hp >= poke.hpMax) return this.sys(player, `${poke.name} já está com HP cheio.`);
+    stack.count -= 1;
+    poke.hp = Math.min(poke.hpMax, poke.hp + potion.heal);
+    this.sys(player, `${poke.name} recuperou HP.`);
+    this.syncParty(player);
+    this.snapshotPlayer(player);
   }
 
   say(player, text) {
@@ -884,8 +923,9 @@ export class World {
     this.ensureWild();
   }
 
-  catchBall(player) {
-    const balls = player.bag.find((i) => i.item === "pokeball");
+  catchBall(player, ballItem = "pokeball") {
+    const ball = BALL[ballItem] || BALL.pokeball;
+    const balls = player.bag.find((i) => i.item === ball.item);
     if (!balls || balls.count <= 0) return this.sys(player, "Você não tem Pokébolas.");
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
     if (!target || !target.wild) return this.sys(player, "Você não tem um alvo.");
@@ -893,7 +933,7 @@ export class World {
     if (player.party.filter(Boolean).length >= PARTY_CAP) return this.sys(player, "A party está cheia.");
     balls.count -= 1;
     const spec = SPECIES[target.species];
-    const rate = spec.catchRate * BALL.rate;
+    const rate = spec.catchRate * ball.rate;
     const roll = randomInt(1, 101);
     this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id });
     if (roll <= rate) {

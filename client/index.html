@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -15,26 +15,26 @@
           <span class="gem" aria-hidden="true"></span>
           <h1>OTPokemon</h1>
         </div>
-        <p class="muted">Create your account</p>
-        <label>Account <input id="user" value="demo" autocomplete="username" /></label>
-        <label>Password <input id="pass" type="password" value="demo" autocomplete="current-password" /></label>
+        <p class="muted">Crie sua conta</p>
+        <label>Conta <input id="user" value="demo" autocomplete="username" /></label>
+        <label>Senha <input id="pass" type="password" value="demo" autocomplete="current-password" /></label>
         <div class="row">
           <button id="btn-login">Login</button>
-          <button id="btn-register" class="ghost">Create account</button>
+          <button id="btn-register" class="ghost">Criar conta</button>
         </div>
         <p id="login-msg" class="msg"></p>
-        <p class="hint">Default login <code>demo/demo</code></p>
+        <p class="hint">Login padrão <code>demo/demo</code></p>
       </section>
 
       <section id="screen-chars" class="panel character-card center hidden">
-        <h2>Characters</h2>
+        <h2>Personagens</h2>
         <ul id="char-list"></ul>
         <hr />
-        <h3>Create character</h3>
-        <label>Name <input id="char-name" maxlength="19" /></label>
-        <p>Starter</p>
+        <h3>Criar personagem</h3>
+        <label>Nome <input id="char-name" maxlength="19" /></label>
+        <p>Inicial</p>
         <div id="starters" class="starters"></div>
-        <button id="btn-create">Create character</button>
+        <button id="btn-create">Criar personagem</button>
         <p id="char-msg" class="msg"></p>
       </section>
 
@@ -54,6 +54,32 @@
           </div>
         </header>
 
+        <aside id="hud-minimap" class="float-window" data-win="minimap">
+          <header class="win-head"><span class="win-title">Minimapa</span></header>
+          <div class="win-body minimap-body">
+            <div class="minimap-tools">
+              <button type="button" id="minimap-zoom-in" title="Zoom +">+</button>
+              <button type="button" id="minimap-zoom-out" title="Zoom −">−</button>
+            </div>
+            <canvas id="minimap-canvas" width="120" height="160"></canvas>
+          </div>
+        </aside>
+
+        <aside id="hud-vip" class="float-window" data-win="vip">
+          <header class="win-head"><span class="win-title">Lista VIP</span></header>
+          <div class="win-body">
+            <ul id="vip-list" class="vip-list"></ul>
+          </div>
+        </aside>
+
+        <aside id="hud-nature" class="float-window" data-win="nature">
+          <header class="win-head"><span class="win-title">Pokémon</span></header>
+          <div class="win-body nature-body">
+            <div><span class="muted">Nature</span> <b id="out-nature">—</b></div>
+            <div><span class="muted">Ability</span> <b id="out-ability">—</b></div>
+          </div>
+        </aside>
+
         <aside id="hud-pokebar" class="float-window" data-win="pokebar">
           <header class="win-head">
             <span class="win-title">Lista de Pokemon</span>
@@ -64,30 +90,28 @@
           </div>
         </aside>
 
-        <aside id="hud-outstatus" class="float-window" data-win="outstatus">
-          <header class="win-head"><span class="win-title">Pokémon</span></header>
-          <div class="win-body out-body">
-            <img id="out-portrait" class="out-portrait" alt="" />
-            <div class="out-meta">
-              <div id="out-title">Nenhum Pokémon fora</div>
-              <div class="vital-bar hp">
-                <div id="poke-hp-fill" class="vital-fill"></div>
-                <span id="poke-hp-text">0 / 0</span>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <aside id="hud-loot" class="float-window" data-win="loot">
-          <header class="win-head"><span class="win-title">Loot da sessão</span></header>
-          <div class="win-body loot-empty">—</div>
-        </aside>
-
         <aside id="hud-battle" class="float-window" data-win="battle">
           <header class="win-head"><span class="win-title">Batalha</span></header>
           <div class="win-body">
             <div id="battle-list"></div>
-            <div id="hud-target-name" class="alvo-name">Sem alvo</div>
+          </div>
+        </aside>
+
+        <aside id="hud-status" class="float-window" data-win="status">
+          <header class="win-head"><span class="win-title">Status</span></header>
+          <div class="win-body status-body">
+            <img id="player-portrait" class="status-portrait" src="/assets/human/portrait.png" alt="" />
+            <div class="status-meta">
+              <div class="status-lv">Lv <b id="status-level">1</b></div>
+              <div class="stat-row hp"><span>HP</span><div class="stat-bar"><div id="player-hp-fill" class="stat-fill"></div></div><span id="player-hp-pct">100%</span></div>
+              <div class="stat-row exp"><span>EXP</span><div class="stat-bar"><div id="hud-xp-fill" class="stat-fill"></div></div><span id="hud-xp-pct">0%</span></div>
+              <div class="stat-row fish"><span>FISH</span><div class="stat-bar"><div id="hud-fish-fill" class="stat-fill"></div></div><span id="hud-fish-pct">0%</span></div>
+              <div class="stat-row stm"><span>STM</span><div class="stat-bar"><div id="hud-stm-fill" class="stat-fill"></div></div><span id="hud-stm-pct">100%</span></div>
+              <div class="status-chips">
+                <span class="chip" title="Pokébolas">⚪ <b id="hud-balls">0</b></span>
+                <span class="chip gold" title="Gold">● <b id="hud-gold-side">0</b></span>
+              </div>
+            </div>
           </div>
         </aside>
 
@@ -107,11 +131,15 @@
             </div>
             <div class="inv-label">Bolsa</div>
             <div id="bolsa" class="bag-grid"></div>
-            <div class="inv-label">Mochila</div>
-            <div id="mochila" class="bag-grid"></div>
             <div class="cap-row">Capacidade <span id="hud-cap">0.00 oz</span></div>
           </div>
         </aside>
+
+        <div id="order-bar" class="order-bar hidden"></div>
+
+        <div id="hud-hotdock" class="hotdock">
+          <div id="hotbar" class="hotbar-circle"></div>
+        </div>
 
         <div id="chat" class="float-window" data-win="chat">
           <header class="win-head"><span class="win-title">Chat</span></header>
@@ -127,26 +155,6 @@
               <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10" />
               <button type="button" id="chat-send">Enviar</button>
             </div>
-          </div>
-        </div>
-
-        <div id="order-bar" class="order-bar hidden"></div>
-
-        <div id="hud-vitals" class="float-window" data-win="vitals">
-          <header class="win-head"><span class="win-title">Status</span></header>
-          <div class="win-body vitals-body">
-            <div class="vital-col">
-              <div class="vital-bar hp">
-                <div id="player-hp-fill" class="vital-fill"></div>
-                <span id="player-hp-text">150 / 150</span>
-              </div>
-              <div class="xp-row">
-                <span>Lv <b id="hud-xp-lv">1</b></span>
-                <div class="xp-bar"><div id="hud-xp-fill"></div></div>
-                <span id="hud-xp-pct">0.0%</span>
-              </div>
-            </div>
-            <div id="hotbar" class="hotbar"></div>
           </div>
         </div>
       </section>

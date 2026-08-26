@@ -1,51 +1,52 @@
 import { TILE } from "./species.js";
 
-export const MAP_W = 28;
-export const MAP_H = 22;
+export const MAP_W = 32;
+export const MAP_H = 23;
 export const MAP_Z = 7;
-export const SPAWN = { x: 8, y: 12, z: MAP_Z };
+export const SPAWN = { x: 14, y: 16, z: MAP_Z };
 
-// 0 grass 1 path 2 wall 3 roof-grass 4 wood house+roof 5 stone 6 water 7 cave dirt
+// G grass  P path  W wall  R roof-grass  4 wood house  T tree  S stone  ~ water  D cave
 const RAW = `
-WWWWWWWWWWWWWWWWWWWWWWWWWWWW
-WGGGGGGGGGGGGGGGGG~~~~GGGGGW
-WGGGGGGGGGGGGGGGGG~~~~GGGGGW
-WGGPPPPPPPPPGGGGGGGGGGGGGGGW
-WGGPGGGGGGGPGGGGGRRRRGGGGGGW
-WGGPGGGGGGGPGGGGR444RGGGGGGW
-WGGPGGGGGGGPGGGGR444RGGGGGGW
-WGGPGGGGGGGPGGGGWWGWWGGGGGGW
-WGGPPPPPPPPPGGGGGGGGGGGGGGGW
-WGGGGGGGGGGGGGGGGGGGGGGGGGGW
-WGGGGGGSSSSSSSSSSGGGGGGGGGGW
-WGGGGGGSCCCCCCCCSGGGGGGGGGGW
-WGGGGGGSCCCCCCCCSGGGGGGGGGGW
-WGGGGGGSCCCCCCCCSGGGGGGGGGGW
-WGGGGGGSSSSSSSSSSGGGGGGGGGGW
-WGGGGGGGGGGGGGGGGGGGGGGGGGGW
-WGGDDDDDDDDDDDDDDDDDGGGGGGGW
-WGGDGGGGGGGGGGGGGGGDGGGGGGGW
-WGGDDDDDDDDDDDDDDDDDGGGGGGGW
-WGGGGGGGGGGGGGGGGGGGGGGGGGGW
-WGGGGGGGGGGGGGGGGGGGGGGGGGGW
-WWWWWWWWWWWWWWWWWWWWWWWWWWWW
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
+WGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW
+WGGGGGGTTTGGGGGGGGGGTTTGGGGGGGGW
+WGGPPPPPPPPPPPPPPPPPPPPPPPPPGGGW
+WGGPGGGGGGGGGGGGGGGGGGGGGGGPGGGW
+WGGPGGGGGGGGGGGGGGGGGGGGGGGPGGGW
+WGGPGGGTTTGGG4444GGGTTTGGGGPGGGW
+WGGPGGGRRRRGG4444GGRRRRGGGGPGGGW
+WGGPGGGRRRRGG4444GGRRRRGGGGPGGGW
+WGGPGGGWWWWGG4444GGWWWWGGGGPGGGW
+WGGPPPPPPPPPPPPPPPPPPPPPPPPPGGGW
+WGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW
+WGGGGGGSSSSSSSSSSSSSSSSGGGGGGGGW
+WGGGGGGSCCCCCCCCCCCCCCSGGGGGGGGW
+WGGGGGGSCCCCCCCCCCCCCCSGGGGGGGGW
+WGGGGGGSCCCCCCCCCCCCCCSGGGGGGGGW
+WGGGGGGSSSSSSSSSSSSSSSSGGGGGGGGW
+WGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW
+WGGDDDDDDDDDDDDDDDDDDDDDDDDGGGGW
+WGGDGGGGGGGGGGGGGGGGGGGGGGGDGGGW
+WGGDDDDDDDDDDDDDDDDDDDDDDDDGGGGW
+WGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGW
+WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW
 `.trim().split("\n");
 
-const CH = { W: 2, G: 0, P: 1, R: 3, "4": 4, C: 0, S: 5, "~": 6, D: 7 };
+const CH = { W: 2, G: 0, P: 1, R: 3, "4": 4, C: 0, S: 5, T: 3, "~": 6, D: 7 };
 
 export const ITEMS = [
-  { x: 4, y: 9, kind: "flower" },
-  { x: 5, y: 10, kind: "rose" },
-  { x: 3, y: 14, kind: "flower" },
-  { x: 19, y: 10, kind: "flower" },
-  { x: 20, y: 15, kind: "rose" },
-  { x: 9, y: 10, kind: "gold" },
-  { x: 10, y: 10, kind: "gold" },
-  { x: 9, y: 14, kind: "gold" },
-  { x: 4, y: 17, kind: "flower" },
-  { x: 22, y: 18, kind: "rose" },
-  { x: 16, y: 4, kind: "flower" },
-  { x: 12, y: 8, kind: "rose" },
+  { x: 6, y: 10, kind: "flower" },
+  { x: 7, y: 11, kind: "rose" },
+  { x: 5, y: 15, kind: "flower" },
+  { x: 24, y: 11, kind: "flower" },
+  { x: 25, y: 16, kind: "rose" },
+  { x: 12, y: 12, kind: "gold" },
+  { x: 13, y: 12, kind: "gold" },
+  { x: 12, y: 16, kind: "gold" },
+  { x: 6, y: 19, kind: "flower" },
+  { x: 26, y: 20, kind: "rose" },
+  { x: 18, y: 5, kind: "flower" },
+  { x: 14, y: 9, kind: "rose" },
 ];
 
 export function buildMap() {
@@ -67,8 +68,8 @@ export function buildMap() {
         roofs[y][x] = 0;
       } else if (kind === 3) {
         ground[y][x] = 0;
-        walls[y][x] = 0;
-        roofs[y][x] = 1;
+        walls[y][x] = 1;
+        roofs[y][x] = 0;
       } else if (kind === 4) {
         ground[y][x] = 3;
         walls[y][x] = 0;
@@ -98,27 +99,24 @@ export function buildMap() {
 
 export const MAP = buildMap();
 
-/** Fixed wild packs: Caterpie in the cave, Charizard/Rapidash on grass (near + further). */
 export const WILD_GROUPS = [
-  { species: "caterpie", want: 2, spots: MAP.wildSpawns },
+  { species: "caterpie", want: 3, spots: MAP.wildSpawns },
   {
     species: "charizard",
-    want: 4,
+    want: 3,
     spots: [
-      { x: 5, y: 9 },
-      { x: 12, y: 8 },
-      { x: 3, y: 2 },
-      { x: 23, y: 19 },
+      { x: 8, y: 11 },
+      { x: 16, y: 8 },
+      { x: 4, y: 3 },
     ],
   },
   {
     species: "rapidash",
-    want: 4,
+    want: 3,
     spots: [
-      { x: 4, y: 15 },
-      { x: 17, y: 9 },
-      { x: 24, y: 4 },
-      { x: 2, y: 20 },
+      { x: 6, y: 18 },
+      { x: 22, y: 11 },
+      { x: 27, y: 4 },
     ],
   },
 ];
@@ -148,14 +146,11 @@ export function itemsAt(x, y) {
 export function tileName(x, y) {
   if (!inBounds(x, y)) return "void";
   if (MAP.walls[y][x]) return "wall";
-  if (MAP.ground[y][x] === 4) return "water";
-  if (MAP.roofs[y][x] && MAP.ground[y][x] === 3) return "house";
-  if (MAP.roofs[y][x]) return "roof";
-  const dropped = itemsAt(x, y);
-  if (dropped.length) return dropped.map((it) => it.kind).join(", ");
-  if (MAP.ground[y][x] === 1) return "path";
-  if (MAP.ground[y][x] === 2) return "stone";
-  if (MAP.ground[y][x] === 3) return "wood";
-  if (MAP.ground[y][x] === 5) return "dirt";
+  const g = MAP.ground[y][x];
+  if (g === 1) return "path";
+  if (g === 2) return "stone";
+  if (g === 3) return "wood floor";
+  if (g === 4) return "water";
+  if (g === 5) return "cave";
   return "grass";
 }

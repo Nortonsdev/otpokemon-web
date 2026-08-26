@@ -1,23 +1,25 @@
-const STORAGE_KEY = "otpokemon-hud-v1";
+const STORAGE_KEY = "otpokemon-hud-v2";
 
 export const WINDOW_DEFS = [
+  { id: "minimap", title: "Minimapa" },
+  { id: "vip", title: "Lista VIP" },
+  { id: "nature", title: "Pokémon" },
   { id: "pokebar", title: "Lista de Pokemon", wrench: true },
-  { id: "outstatus", title: "Pokémon" },
-  { id: "loot", title: "Loot" },
   { id: "battle", title: "Batalha" },
+  { id: "status", title: "Status" },
   { id: "inv", title: "Inventário" },
   { id: "chat", title: "Chat" },
-  { id: "vitals", title: "Status" },
 ];
 
 const DEFAULTS = {
-  pokebar: { x: 10, y: 50, open: true, locked: true, min: false },
-  outstatus: { x: 248, y: 50, open: true, locked: true, min: false },
-  loot: { x: 10, y: 318, open: true, locked: true, min: false },
+  minimap: { x: 10, y: 50, open: true, locked: true, min: false },
+  vip: { x: 10, y: 248, open: true, locked: true, min: false },
+  nature: { x: 10, y: 360, open: true, locked: true, min: false },
+  pokebar: { x: 10, y: 430, open: true, locked: true, min: false },
   battle: { x: 10, y: 0, open: true, locked: true, min: false, bottom: 168 },
-  inv: { x: 0, y: 50, open: true, locked: true, min: false, right: 10 },
-  chat: { x: 10, y: 0, open: true, locked: true, min: false, bottom: 10 },
-  vitals: { x: 0, y: 0, open: true, locked: true, min: false, bottom: 10, center: true },
+  status: { x: 0, y: 50, open: true, locked: true, min: false, right: 10 },
+  inv: { x: 0, y: 248, open: true, locked: true, min: false, right: 10 },
+  chat: { x: 0, y: 0, open: true, locked: true, min: false, bottom: 10, center: true, wide: true },
 };
 
 function clone(obj) {
@@ -130,6 +132,7 @@ export class WindowManager {
     delete w.right;
     delete w.bottom;
     delete w.center;
+    delete w.wide;
     this.drag = { id, dx: e.clientX - r.left, dy: e.clientY - r.top };
     e.preventDefault();
   }
@@ -160,12 +163,19 @@ export class WindowManager {
     el.classList.toggle("win-closed", !w.open);
     el.classList.toggle("win-min", !!w.min);
     el.classList.toggle("win-locked", !!w.locked);
+    el.classList.toggle("win-wide", !!w.wide);
     el.style.left = `${w.x}px`;
     el.style.top = `${w.y}px`;
     el.style.right = "auto";
     el.style.bottom = "auto";
     el.style.transform = "none";
-    if (w.center && w.bottom != null) {
+    if (w.wide && w.center && w.bottom != null) {
+      el.style.left = "50%";
+      el.style.top = "auto";
+      el.style.bottom = `${w.bottom}px`;
+      el.style.transform = "translateX(-50%)";
+      el.style.width = "min(720px, calc(100vw - 280px))";
+    } else if (w.center && w.bottom != null) {
       el.style.left = "50%";
       el.style.top = "auto";
       el.style.bottom = `${w.bottom}px`;
