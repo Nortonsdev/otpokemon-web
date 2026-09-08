@@ -282,6 +282,7 @@ export class GameScene extends Phaser.Scene {
 
   isValidTarget(st) {
     if (!st) return false;
+    if (st.kind === "npc" || st.canTarget === false) return false;
     if (this.isOwnCreature(st)) return false;
     return true;
   }
@@ -398,7 +399,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   textureFor(c) {
-    if (c.kind === "player") {
+    if (c.kind === "player" || c.kind === "npc") {
       if (c.mount?.look != null) return LOOK_NAME[c.mount.look] || "charizard";
       return "human";
     }
@@ -428,7 +429,7 @@ export class GameScene extends Phaser.Scene {
         fontFamily: "Tahoma, Verdana, Arial, sans-serif",
         fontSize: `${NAME_PX}px`,
         fontStyle: "bold",
-        color: "#3dcc4a",
+        color: c.kind === "npc" ? "#00d4e8" : "#3dcc4a",
         stroke: "#000000",
         strokeThickness: 1,
         resolution: 3,
@@ -452,7 +453,7 @@ export class GameScene extends Phaser.Scene {
     const cx = pos.x + size / 2;
     const outline = this.add.rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000).setOrigin(0.5, 0);
     const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
-    const fg = this.add.rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, 0x2fc24a).setOrigin(0, 0);
+    const fg = this.add.rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, c.kind === "npc" ? 0x00d4e8 : 0x2fc24a).setOrigin(0, 0);
     outline.setDepth(c.y * 10 + 11);
     track.setDepth(c.y * 10 + 12);
     fg.setDepth(c.y * 10 + 13);
@@ -541,15 +542,24 @@ export class GameScene extends Phaser.Scene {
     const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
     const ratio = hpPercent(hp ?? st?.hp ?? 0, max);
     bar.fg.width = BAR_W * ratio;
-    bar.fg.setFillStyle(hpColorHex(ratio));
+    if (st?.kind === "npc") bar.fg.setFillStyle(0x00d4e8);
+    else bar.fg.setFillStyle(hpColorHex(ratio));
   }
 
   refreshPlate(id) {
     const st = this.state.get(id);
     const plate = this.plates.get(id);
     if (!st || !plate) return;
-    if (st.kind === "player") plate.setText(st.name);
-    else plate.setText(`${st.name} [${st.level || 5}]`);
+    if (st.kind === "npc") {
+      plate.setText(`${st.name} (!)`);
+      plate.setColor("#00d4e8");
+    } else if (st.kind === "player") {
+      plate.setText(st.name);
+      plate.setColor("#3dcc4a");
+    } else {
+      plate.setText(`${st.name} [${st.level || 5}]`);
+      plate.setColor("#3dcc4a");
+    }
     const sprite = this.sprites.get(id);
     if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
   }
@@ -893,6 +903,11 @@ export class GameScene extends Phaser.Scene {
     const tx = Math.floor(worldX / TILE);
     const ty = Math.floor(worldY / TILE);
     const who = this.creatureAt(worldX, worldY);
+    if (who?.kind === "npc") {
+      if (right) this.net.send({ t: "look", x: tx, y: ty });
+      else this.hud?.openNpcDialog(who);
+      return;
+    }
     if (right) {
       if (this.isOwnCreature(who)) {
         this.net.send({ t: "look", x: tx, y: ty });

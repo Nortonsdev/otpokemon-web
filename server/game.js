@@ -31,6 +31,7 @@ export class World {
     this.wildRespawnAt = 0;
     this.ensureDemoAccount();
     this.ensureWild();
+    this.ensureNpcs();
     this.dirty = false;
   }
 
@@ -415,7 +416,13 @@ export class World {
       level: c.level || (c.kind === "player" ? 1 : 5),
       masterId: c.masterId || null,
       wild: !!c.wild,
-      plate: c.kind === "player" ? c.name : `${c.name} [${c.level || 5}]`,
+      canTarget: c.kind !== "npc" && c.canTarget !== false,
+      plate:
+        c.kind === "npc"
+          ? `${c.name} (!)`
+          : c.kind === "player"
+            ? c.name
+            : `${c.name} [${c.level || 5}]`,
       dead: !!c.dead,
       mount: c.mount
         ? { ability: c.mount.ability, species: c.mount.species, look: c.mount.look }
@@ -516,6 +523,7 @@ export class World {
 
   isForbiddenTarget(player, c) {
     if (!c) return true;
+    if (c.kind === "npc" || c.canTarget === false) return true;
     if (c.id === player.id) return true;
     if (c.masterId != null && c.masterId === player.id) return true;
     if (player.outId != null && c.id === player.outId) return true;
@@ -535,7 +543,7 @@ export class World {
     const who = this.occupant(x, y) || this.corpseAt(x, y);
     let text;
     if (who) {
-      if (who.kind === "player") text = `You see ${who.name}.`;
+      if (who.kind === "player" || who.kind === "npc") text = `You see ${who.name}.`;
       else if (who.dead) text = `Você vê o corpo de um ${who.name}.`;
       else text = `You see ${who.name} [${who.level || 5}]. Health: ${who.hp} / ${who.hpMax}.`;
     } else text = `You see ${tileName(x, y)}.`;
@@ -1011,6 +1019,52 @@ export class World {
     }
     opts.sort((a, b) => a.dist - b.dist || a.diag - b.diag);
     return opts.length ? opts[0].dir : null;
+  }
+
+  spawnNpc(def) {
+    if ([...this.creatures.values()].some((c) => c.kind === "npc" && c.name === def.name)) return;
+    let { x, y } = def;
+    if (!walkable(x, y) || this.occupant(x, y)) {
+      const nearby = [];
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = def.x + dx;
+          const ny = def.y + dy;
+          if (walkable(nx, ny) && !this.occupant(nx, ny)) nearby.push({ x: nx, y: ny });
+        }
+      }
+      if (!nearby.length) return;
+      x = nearby[0].x;
+      y = nearby[0].y;
+    }
+    const npc = {
+      id: cid(),
+      kind: "npc",
+      name: def.name,
+      x,
+      y,
+      z: MAP.z,
+      dir: DIR.S,
+      look: 128,
+      hp: 150,
+      hpMax: 150,
+      level: 1,
+      canTarget: false,
+      wild: false,
+      busyUntil: 0,
+    };
+    this.creatures.set(npc.id, npc);
+    this.occupy(npc);
+  }
+
+  ensureNpcs() {
+    for (const def of [
+      { name: "Enfermeira Joy", x: 10, y: 10 },
+      { name: "Oficial Jenny", x: 20, y: 10 },
+      { name: "Professor Carvalho", x: 8, y: 4 },
+    ]) {
+      this.spawnNpc(def);
+    }
   }
 
   corpseAt(x, y) {

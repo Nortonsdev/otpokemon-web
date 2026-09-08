@@ -81,6 +81,9 @@ export class Hud {
     });
     this.renderVip();
     this.render();
+    document.getElementById("npc-dialog-ok")?.addEventListener("click", () => {
+      this.windows.action("npc", "close");
+    });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         this.selectItem(null);
@@ -128,6 +131,15 @@ export class Hud {
   setTarget(creature) {
     this.target = creature;
     this.renderBattle();
+  }
+
+  openNpcDialog(who) {
+    if (!who || who.kind !== "npc") return;
+    const title = document.getElementById("npc-dialog-title");
+    const text = document.getElementById("npc-dialog-text");
+    if (title) title.textContent = who.name || "NPC";
+    if (text) text.textContent = "Oi, o que você quer?";
+    this.windows.open("npc");
   }
 
   handle(msg) {
@@ -244,7 +256,8 @@ export class Hud {
     }
     for (const [, c] of this.creatures) {
       if (c.dead) continue;
-      ctx.fillStyle = c.kind === "player" ? "#7dce6a" : c.wild ? "#e0af68" : "#7aa2f7";
+      ctx.fillStyle =
+        c.kind === "player" ? "#7dce6a" : c.kind === "npc" ? "#00d4e8" : c.wild ? "#e0af68" : "#7aa2f7";
       ctx.fillRect(c.x * s, c.y * s, Math.max(2, s), Math.max(2, s));
     }
     if (this.you) {

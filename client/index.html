@@ -40,6 +40,7 @@
 
       <section id="screen-game" class="hidden">
         <header id="hud-top">
+          <div id="hud-top-icons" class="hud-top-icons"></div>
           <div id="hud-taskbar" class="hud-taskbar"></div>
         </header>
 
@@ -61,13 +62,15 @@
           </div>
         </aside>
 
-        <aside id="hud-pokebar" class="ot-window myst-pokebar" data-win="pokebar">
+        <aside id="hud-pokebar" class="ot-window miniwindow" data-win="pokebar">
           <header class="win-head">
             <span class="win-title">Lista de Pokemon</span>
             <span class="win-stages">Stages</span>
           </header>
           <div class="win-body pokebar-body">
-            <div id="pokebar-list" class="pokebar-list"></div>
+            <div class="pokebar-stage">
+              <div id="pokebar-list" class="pokebar-list"></div>
+            </div>
           </div>
         </aside>
 
@@ -86,8 +89,8 @@
           </div>
         </aside>
 
-        <aside id="hud-pokeinfo" class="ot-window player-info" data-win="status">
-          <header class="win-head"><span class="win-title">PokeInfo</span></header>
+        <aside id="hud-pokeinfo" class="ot-window miniwindow player-info" data-win="status">
+          <header class="win-head"><span class="win-title">Player Info</span></header>
           <div class="win-body pi-body">
             <div class="pi-wrap">
               <div class="pi-panel-glow" aria-hidden="true"></div>
@@ -156,6 +159,16 @@
               <button type="button" class="inv-btn">POKEDEX</button>
             </div>
             <div id="bolsa" class="bag-grid"></div>
+          </div>
+        </aside>
+
+        <aside id="hud-npc" class="ot-window miniwindow npc-dialog win-closed" data-win="npc">
+          <header class="win-head"><span class="win-title" id="npc-dialog-title">NPC</span></header>
+          <div class="win-body npc-dialog-body">
+            <div class="npc-dialog-frame">
+              <p id="npc-dialog-text">Oi, o que você quer?</p>
+              <button type="button" class="otp-btn" id="npc-dialog-ok">Ok</button>
+            </div>
           </div>
         </aside>
 

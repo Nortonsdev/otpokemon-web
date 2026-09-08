@@ -123,6 +123,17 @@ if (!wildDash) throw new Error("no wild Rapidash on map");
 if (wildZard.hpMax !== wild.hpMax) throw new Error(`wild Charizard hpMax ${wildZard.hpMax} != Caterpie`);
 if (wildDash.hpMax !== wild.hpMax) throw new Error(`wild Rapidash hpMax ${wildDash.hpMax} != Caterpie`);
 
+const npcs = (map1.creatures || []).filter((c) => c.kind === "npc");
+if (npcs.length < 2) throw new Error(`expected NPCs on map, got ${npcs.length}`);
+if (npcs.some((c) => c.canTarget !== false)) throw new Error("NPC must have canTarget false");
+if (!npcs.every((c) => String(c.plate || "").includes("(!)"))) throw new Error("NPC plate must include (!)");
+a.send({ t: "target", id: npcs[0].id });
+const npcLock = await a.wait((m) => m.t === "target", 1200);
+if (npcLock.id != null && npcLock.id !== 0) throw new Error(`server accepted NPC target ${npcLock.id}`);
+a.send({ t: "attack", id: npcs[0].id });
+const npcAtk = await a.wait((m) => m.t === "info" && /alvo/.test(m.text || ""), 1200);
+if (!npcAtk) throw new Error("attacking NPC must be rejected");
+
 a.send({ t: "target", id: outId });
 const ownLock = await a.wait((m) => m.t === "target" || (m.t === "info" && /alvo/.test(m.text || "")), 1200);
 if (ownLock.t === "target" && ownLock.id === outId) throw new Error("must not target own poke");
