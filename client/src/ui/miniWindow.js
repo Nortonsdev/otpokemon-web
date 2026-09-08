@@ -109,6 +109,7 @@ export class WindowManager {
       if (min === "0" || min === "1") w.min = min === "1";
       const lock = localStorage.getItem(`${POS_PREFIX}${def.id}.lock`);
       if (lock === "0" || lock === "1") w.locked = lock === "1";
+      else if (MINI_IDS.has(def.id)) w.locked = !!DEFAULTS[def.id].locked;
     }
   }
 
