@@ -5,7 +5,7 @@ const STOPS = [
   { t: 0.02, rgb: [0, 0, 0] },
   { t: 0.24, rgb: [210, 24, 24] },
   { t: 0.59, rgb: [240, 210, 20] },
-  { t: 1, rgb: [10, 220, 48] },
+  { t: 1, rgb: [47, 194, 74] },
 ];
 
 export function hpPercent(hp, hpMax) {

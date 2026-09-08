@@ -11,7 +11,7 @@ function rgbEq(a, b) {
     throw new Error(`hpColor ${a} != ${b}`);
   }
 }
-rgbEq(hpColorRgb(1), [10, 220, 48]);
+rgbEq(hpColorRgb(1), [47, 194, 74]);
 rgbEq(hpColorRgb(0.59), [240, 210, 20]);
 rgbEq(hpColorRgb(0.24), [210, 24, 24]);
 rgbEq(hpColorRgb(0.02), [0, 0, 0]);

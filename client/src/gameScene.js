@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { MAP, SPAWN } from "../../server/map.js";
-import { LOOK_NAME } from "../../server/species.js";
+import { LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
 
 const TILE = 32;
@@ -16,9 +16,10 @@ function creatureSize(tex) {
   return 32;
 }
 
-const NAME_PX = 8;
-const BAR_W = 24;
-const BAR_H = 2;
+const NAME_PX = 7;
+const BAR_W = 22;
+const BAR_H = 3;
+const BAR_PAD = 1;
 
 function tileWorld(x, y, size) {
   if (size > TILE) {
@@ -138,7 +139,7 @@ export class GameScene extends Phaser.Scene {
     this.ensurePlaceholder();
     this.ensureAttackedTexture();
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,C,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
     this.input.keyboard.enabled = false;
     this.input.keyboard.clearCaptures?.();
@@ -212,10 +213,7 @@ export class GameScene extends Phaser.Scene {
   clearWorld() {
     for (const s of this.sprites.values()) s.destroy();
     for (const p of this.plates.values()) p.destroy();
-    for (const bar of this.hpBars.values()) {
-      bar.bg.destroy();
-      bar.fg.destroy();
-    }
+    for (const bar of this.hpBars.values()) this.destroyHpBar(bar);
     this.sprites.clear();
     this.plates.clear();
     this.hpBars.clear();
@@ -452,13 +450,16 @@ export class GameScene extends Phaser.Scene {
       walkMs: 0,
     });
     const cx = pos.x + size / 2;
-    const bg = this.add.rectangle(cx, plateY, BAR_W, BAR_H, 0x050505).setOrigin(0.5, 1);
-    bg.setDepth(c.y * 10 + 11);
-    const fg = this.add.rectangle(cx - BAR_W / 2, plateY, BAR_W, BAR_H, 0x0acc30).setOrigin(0, 1);
-    fg.setDepth(c.y * 10 + 12);
-    this.addActor(bg);
+    const outline = this.add.rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000).setOrigin(0.5, 0);
+    const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
+    const fg = this.add.rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, 0x2fc24a).setOrigin(0, 0);
+    outline.setDepth(c.y * 10 + 11);
+    track.setDepth(c.y * 10 + 12);
+    fg.setDepth(c.y * 10 + 13);
+    this.addActor(outline);
+    this.addActor(track);
     this.addActor(fg);
-    this.hpBars.set(c.id, { bg, fg });
+    this.hpBars.set(c.id, { outline, track, fg });
     this.setHpBar(c.id, c.hp, c.hpMax);
     this.refreshPlate(c.id);
     if (c.dead) this.applyCorpseLook(c.id);
@@ -467,13 +468,27 @@ export class GameScene extends Phaser.Scene {
   despawn(id) {
     this.sprites.get(id)?.destroy();
     this.plates.get(id)?.destroy();
-    const bar = this.hpBars.get(id);
-    bar?.bg.destroy();
-    bar?.fg.destroy();
+    this.destroyHpBar(this.hpBars.get(id));
     this.sprites.delete(id);
     this.plates.delete(id);
     this.hpBars.delete(id);
     this.state.delete(id);
+  }
+
+  destroyHpBar(bar) {
+    if (!bar) return;
+    bar.outline?.destroy();
+    bar.track?.destroy();
+    bar.bg?.destroy();
+    bar.fg?.destroy();
+  }
+
+  setHpBarVisible(bar, visible) {
+    if (!bar) return;
+    bar.outline?.setVisible(visible);
+    bar.track?.setVisible(visible);
+    bar.bg?.setVisible(visible);
+    bar.fg?.setVisible(visible);
   }
 
   uiScale() {
@@ -495,17 +510,23 @@ export class GameScene extends Phaser.Scene {
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const barBottom = nameBottom - plate.displayHeight - ui;
-    bar.bg.setScale(ui);
-    bar.fg.setScale(ui);
-    bar.bg.setSize(BAR_W, BAR_H);
-    bar.bg.setOrigin(0.5, 1);
-    bar.bg.setPosition(cx, barBottom);
-    bar.bg.setDepth(depth + 2);
+    const barTop = nameBottom + ui;
+    const innerTop = barTop + BAR_PAD * ui;
+    const outW = BAR_W + BAR_PAD * 2;
+    const outH = BAR_H + BAR_PAD * 2;
+    for (const part of [bar.outline, bar.track, bar.fg]) part?.setScale(ui);
+    bar.outline?.setSize(outW, outH);
+    bar.outline?.setOrigin(0.5, 0);
+    bar.outline?.setPosition(cx, barTop);
+    bar.outline?.setDepth(depth + 2);
+    bar.track?.setSize(BAR_W, BAR_H);
+    bar.track?.setOrigin(0.5, 0);
+    bar.track?.setPosition(cx, innerTop);
+    bar.track?.setDepth(depth + 3);
     bar.fg.height = BAR_H;
-    bar.fg.setOrigin(0, 1);
-    bar.fg.setPosition(cx - (BAR_W * ui) / 2, barBottom);
-    bar.fg.setDepth(depth + 3);
+    bar.fg.setOrigin(0, 0);
+    bar.fg.setPosition(cx - (BAR_W * ui) / 2, innerTop);
+    bar.fg.setDepth(depth + 4);
     this.setHpBar(id, st?.hp, st?.hpMax);
   }
 
@@ -549,9 +570,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setScale(1);
     const plate = this.plates.get(id);
     plate?.setVisible(false);
-    const bar = this.hpBars.get(id);
-    bar?.bg.setVisible(false);
-    bar?.fg.setVisible(false);
+    this.setHpBarVisible(this.hpBars.get(id), false);
   }
 
   layoutCreature(id) {
@@ -575,17 +594,13 @@ export class GameScene extends Phaser.Scene {
         d.y * TILE + (foot * TILE) / 2 + (size > TILE ? 4 : 0)
       );
       this.plates.get(id)?.setVisible(false);
-      const bar = this.hpBars.get(id);
-      bar?.bg.setVisible(false);
-      bar?.fg.setVisible(false);
+      this.setHpBarVisible(this.hpBars.get(id), false);
       sprite.setDepth(depth);
       return;
     }
     sprite.setVisible(true);
       this.plates.get(id)?.setVisible(true);
-      const bar = this.hpBars.get(id);
-      bar?.bg.setVisible(true);
-      bar?.fg.setVisible(true);
+      this.setHpBarVisible(this.hpBars.get(id), true);
       sprite.setOrigin(0, 0);
       sprite.setAngle(0);
       sprite.clearTint();
@@ -746,35 +761,38 @@ export class GameScene extends Phaser.Scene {
     st.y = msg.y;
     st.moving = true;
     st.walkStart = this.now();
-    st.walkMs = Math.max(80, msg.ms || 200);
+    st.walkMs = Math.max(80, msg.ms || STEP_MS);
     st.phase = st.phase ? 0 : 1;
     if (msg.id === this.youId) this.updateRoofs();
   }
 
   floatDamage(id, dmg) {
     const st = this.state.get(id);
-    const sprite = this.sprites.get(id);
-    if (!st || !sprite) return;
+    if (!st || dmg == null || dmg <= 0) return;
+    const ui = this.uiScale();
     const d = this.displayTile(st);
     const x = d.x * TILE + TILE / 2;
-    const y = d.y * TILE - 6;
+    const y = d.y * TILE - 4;
     const txt = this.add
-      .text(x, y, String(dmg), {
-        fontFamily: "system-ui, sans-serif",
-        fontSize: "16px",
+      .text(x, y, `-${dmg}`, {
+        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
+        fontSize: "11px",
         fontStyle: "bold",
-        color: "#ff4040",
+        color: "#ff5a4a",
         stroke: "#000000",
-        strokeThickness: 4,
+        strokeThickness: 2,
+        resolution: 2,
       })
       .setOrigin(0.5, 1);
+    txt.setScale(ui);
     txt.setDepth(2000);
     this.addActor(txt);
     this.tweens.add({
       targets: txt,
-      y: y - 26,
+      y: y - 18,
       alpha: 0,
-      duration: 700,
+      duration: 620,
+      ease: "Cubic.easeOut",
       onComplete: () => txt.destroy(),
     });
   }
@@ -786,27 +804,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   playStrike(fromId, toId) {
-    const a = this.state.get(fromId);
     const b = this.state.get(toId);
-    if (!a || !b) return;
-    const da = this.displayTile(a);
+    if (!b) return;
     const db = this.displayTile(b);
-    const x0 = da.x * TILE + TILE / 2;
-    const y0 = da.y * TILE;
     const x1 = db.x * TILE + TILE / 2;
-    const y1 = db.y * TILE;
+    const y1 = db.y * TILE + 6;
     const g = this.add.graphics();
-    g.setDepth(2500);
+    g.setDepth(Math.round(db.y) * 10 + 14);
     this.addActor(g);
-    g.lineStyle(2, 0xffe066, 1);
-    g.lineBetween(x0, y0, x1, y1);
-    g.fillStyle(0xfff3a0, 1);
-    g.fillCircle(x0, y0, 4);
-    g.fillCircle(x1, y1, 6);
+    g.fillStyle(0xffe8a0, 0.85);
+    g.fillCircle(x1, y1, 3);
+    g.fillStyle(0xff4040, 0.55);
+    g.fillCircle(x1, y1, 5);
     this.tweens.add({
       targets: g,
       alpha: 0,
-      duration: 280,
+      duration: 180,
       onComplete: () => g.destroy(),
     });
   }
@@ -980,5 +993,8 @@ export class GameScene extends Phaser.Scene {
     }
     const move = this.moveKey();
     if (move != null) this.net.send({ t: "move", n: move });
+    if (this.keys.C && Phaser.Input.Keyboard.JustDown(this.keys.C)) {
+      if (this.targetId != null) this.net.send({ t: "use", item: "pokeball", id: this.targetId });
+    }
   }
 }
