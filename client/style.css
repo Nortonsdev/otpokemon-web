@@ -334,9 +334,13 @@ html.mw-ready .miniwindow {
 .miniwindow > .win-head .win-tools {
   opacity: 1;
   pointer-events: auto;
-  gap: 1px;
+  gap: 2px;
   flex: none;
+  position: relative;
+  z-index: 9;
+  user-select: none;
 }
+.miniwindow > .win-head { user-select: none; }
 .mw-tool {
   margin: 0 1px 0 0 !important;
   padding: 0 !important;

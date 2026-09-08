@@ -168,6 +168,11 @@ export class WindowManager {
     }
     el.addEventListener("mousedown", () => this.raise(def.id), true);
     head.addEventListener("mousedown", (e) => this.onHeadDown(def.id, e));
+    head.addEventListener("dblclick", (e) => {
+      if (e.target.closest("[data-act]")) return;
+      e.preventDefault();
+      this.action(def.id, "min");
+    });
     head.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-act]");
       if (!btn) return;
