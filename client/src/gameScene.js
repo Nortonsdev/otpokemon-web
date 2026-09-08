@@ -16,7 +16,8 @@ function creatureSize(tex) {
   return 32;
 }
 
-const NAME_PX = 7;
+const NAME_PX = 9;
+const NAME_RES = 4;
 const BAR_W = 22;
 const BAR_H = 3;
 const BAR_PAD = 1;
@@ -424,20 +425,13 @@ export class GameScene extends Phaser.Scene {
       sprite.setTint(texTint(want));
     }
     const plateY = want === "human" || size === 64 ? pos.y + 4 : pos.y - 2;
-    const plate = this.add
-      .text(pos.x + size / 2, plateY, c.plate || c.name, {
-        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-        fontSize: `${NAME_PX}px`,
-        fontStyle: "bold",
-        color: c.kind === "npc" ? "#00d4e8" : "#3dcc4a",
-        stroke: "#000000",
-        strokeThickness: 1,
-        resolution: 3,
-        padding: { x: 2, y: 1 },
-      })
-      .setOrigin(0.5, 1);
-    plate.setDepth(c.y * 10 + 10);
-    this.addActor(plate);
+    const plate = this.makeNameplate(
+      pos.x + size / 2,
+      plateY,
+      c.plate || c.name,
+      c.kind === "npc" ? "#00d4e8" : "#2fc24a",
+      c.y * 10 + 10
+    );
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
     this.state.set(c.id, {
@@ -495,6 +489,24 @@ export class GameScene extends Phaser.Scene {
   uiScale() {
     const z = this.cameras.main?.zoom || 1;
     return z > 0 ? 1 / z : 1;
+  }
+
+  makeNameplate(x, y, text, color, depth) {
+    const plate = this.add
+      .text(x, y, text, {
+        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
+        fontSize: `${NAME_PX}px`,
+        fontStyle: "bold",
+        color,
+        stroke: "#000000",
+        strokeThickness: 4,
+        resolution: NAME_RES,
+        padding: { x: 2, y: 0 },
+      })
+      .setOrigin(0.5, 1);
+    plate.setDepth(depth);
+    this.addActor(plate);
+    return plate;
   }
 
   layoutNameplate(id, spriteX, spriteY, depth) {
@@ -555,10 +567,10 @@ export class GameScene extends Phaser.Scene {
       plate.setColor("#00d4e8");
     } else if (st.kind === "player") {
       plate.setText(st.name);
-      plate.setColor("#3dcc4a");
+      plate.setColor("#2fc24a");
     } else {
       plate.setText(`${st.name} [${st.level || 5}]`);
-      plate.setColor("#3dcc4a");
+      plate.setColor("#2fc24a");
     }
     const sprite = this.sprites.get(id);
     if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
