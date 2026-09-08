@@ -1,0 +1,16 @@
+{
+  "name": "poketibia",
+  "version": "0.0.0",
+  "private": true,
+  "description": "pokétibia — Fase 0: Vite + TypeScript + Canvas 2D skeleton",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7"
+  }
+}
