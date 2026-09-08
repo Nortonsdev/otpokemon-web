@@ -86,6 +86,8 @@ export class GameScene extends Phaser.Scene {
     this.pendingWorld = null;
     this.targetId = null;
     this.targetMark = null;
+    this.targetGizmo = null;
+    this.targetPulse = null;
     this.glow = null;
   }
 
@@ -110,6 +112,7 @@ export class GameScene extends Phaser.Scene {
       });
       this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
+    this.load.image("attacked", "/assets/fx/attacked.png");
     this.load.on("loaderror", (file) => {
       const key = file?.key || file?.src || "unknown";
       if (this.missingSpriteLog.has(`load:${key}`)) return;
@@ -128,6 +131,7 @@ export class GameScene extends Phaser.Scene {
     this.groundLayer.setDepth(0);
     this.actorLayer.setDepth(100);
     this.ensurePlaceholder();
+    this.ensureAttackedTexture();
     this.keys = this.input.keyboard.addKeys(
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
@@ -147,10 +151,30 @@ export class GameScene extends Phaser.Scene {
       this.onPointer(p);
     });
     this.targetId = null;
-    this.targetMark = this.add.graphics();
+    this.targetMark = this.add.image(0, 0, "attacked");
+    this.targetMark.setOrigin(0.5, 0.82);
+    this.targetMark.setVisible(false);
+    this.targetMark.setAlpha(0.7);
+    this.targetMark.setScale(0.92);
+    this.targetGizmo = this.add.graphics();
+    this.targetGizmo.setVisible(false);
     this.glow = this.add.graphics();
     this.actorLayer.add(this.targetMark);
+    this.actorLayer.add(this.targetGizmo);
     this.actorLayer.add(this.glow);
+    this.targetPulse?.stop();
+    this.targetPulse = this.tweens.add({
+      targets: this.targetMark,
+      props: {
+        alpha: { from: 0.62, to: 0.78 },
+        scaleX: { from: 0.86, to: 0.98 },
+        scaleY: { from: 0.72, to: 0.84 },
+      },
+      duration: 720,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
     this.cameras.main.setRoundPixels(false);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
@@ -196,18 +220,21 @@ export class GameScene extends Phaser.Scene {
     this.roofSprites = [];
     this.youId = null;
     this.targetId = null;
-    this.targetMark?.clear();
+    this.targetMark?.setVisible(false);
+    this.targetGizmo?.clear();
+    this.targetGizmo?.setVisible(false);
     this.glow?.clear();
   }
 
   clearActorLayer() {
     if (!this.actorLayer) return;
-    const keep = new Set([this.glow, this.targetMark].filter(Boolean));
+    const keep = new Set([this.glow, this.targetMark, this.targetGizmo].filter(Boolean));
     for (const child of [...(this.actorLayer.list || [])]) {
       if (!keep.has(child)) child.destroy();
     }
     if (this.glow && this.glow.displayList !== this.actorLayer) this.actorLayer.add(this.glow);
     if (this.targetMark && this.targetMark.displayList !== this.actorLayer) this.actorLayer.add(this.targetMark);
+    if (this.targetGizmo && this.targetGizmo.displayList !== this.actorLayer) this.actorLayer.add(this.targetGizmo);
   }
 
   ensurePlaceholder() {
@@ -222,6 +249,47 @@ export class GameScene extends Phaser.Scene {
     g.fillRect(12, 16, 8, 12);
     g.generateTexture("missing-creature", 32, 32);
     g.destroy();
+  }
+
+  ensureAttackedTexture() {
+    if (this.textureLooksValid("attacked")) return;
+    this.logMissingSprite("attacked");
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.lineStyle(2, 0xe02820, 0.9);
+    g.strokeEllipse(16, 23, 24, 12);
+    g.lineStyle(2, 0xe02820, 1);
+    g.strokeLineShape(new Phaser.Geom.Line(4, 16, 11, 16));
+    g.strokeLineShape(new Phaser.Geom.Line(4, 16, 4, 23));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 16, 21, 16));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 16, 28, 23));
+    g.strokeLineShape(new Phaser.Geom.Line(4, 30, 11, 30));
+    g.strokeLineShape(new Phaser.Geom.Line(4, 30, 4, 23));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 30, 21, 30));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 30, 28, 23));
+    g.generateTexture("attacked", 32, 32);
+    g.destroy();
+  }
+
+  isOwnCreature(st) {
+    if (!st) return false;
+    if (st.id === this.youId) return true;
+    if (st.masterId != null && st.masterId === this.youId) return true;
+    return false;
+  }
+
+  isValidTarget(st) {
+    if (!st) return false;
+    if (this.isOwnCreature(st)) return false;
+    return true;
+  }
+
+  clearTarget(send = true) {
+    if (send && this.live && this.targetId != null) this.net.send({ t: "target", id: null });
+    this.targetId = null;
+    this.hud?.setTarget(null);
+    this.targetMark?.setVisible(false);
+    this.targetGizmo?.clear();
+    this.targetGizmo?.setVisible(false);
   }
 
   logMissingSprite(key) {
@@ -581,32 +649,71 @@ export class GameScene extends Phaser.Scene {
       }
       this.applyCorpseLook(msg.id);
     }
-    if (msg.t === "target") this.setTarget(msg.id);
-    if (msg.t === "disappear" && msg.id === this.targetId) this.setTarget(null);
+    if (msg.t === "target") {
+      if (msg.id == null) this.clearTarget(false);
+      else if (this.isValidTarget(this.state.get(msg.id))) this.setTarget(msg.id);
+      else this.clearTarget(false);
+    }
+    if (msg.t === "disappear" && msg.id === this.targetId) this.clearTarget(false);
   }
 
   setTarget(id) {
-    this.targetId = id || null;
-    const st = id ? this.state.get(id) : null;
-    this.hud?.setTarget(st || null);
+    const st = id != null ? this.state.get(id) : null;
+    if (!this.isValidTarget(st)) {
+      this.clearTarget(false);
+      return;
+    }
+    this.targetId = st.id;
+    this.hud?.setTarget(st);
     this.layoutTarget();
   }
 
   layoutTarget() {
-    if (!this.targetMark) return;
-    this.targetMark.clear();
-    const st = this.targetId ? this.state.get(this.targetId) : null;
-    if (!st) return;
+    const mark = this.targetMark;
+    const gizmo = this.targetGizmo;
+    const st = this.targetId != null ? this.state.get(this.targetId) : null;
+    if (!this.isValidTarget(st)) {
+      mark?.setVisible(false);
+      gizmo?.clear();
+      gizmo?.setVisible(false);
+      return;
+    }
     const d = this.displayTile(st);
     const cx = d.x * TILE + TILE / 2;
-    const cy = d.y * TILE + TILE / 2;
-    this.targetMark.setDepth(Math.round(d.y) * 10 + 12);
-    this.targetMark.fillStyle(0xff2020, 0.22);
-    this.targetMark.fillCircle(cx, cy, 18);
-    this.targetMark.lineStyle(4, 0xff2a2a, 1);
-    this.targetMark.strokeCircle(cx, cy, 18);
-    this.targetMark.lineStyle(2, 0xfff0f0, 0.95);
-    this.targetMark.strokeCircle(cx, cy, 10);
+    const feetY = d.y * TILE + TILE - 2;
+    const depth = Math.round(d.y) * 10 + 8;
+    if (mark) {
+      this.addActor(mark);
+      if (this.textures.exists("attacked")) mark.setTexture("attacked");
+      mark.setOrigin(0.5, 0.82);
+      mark.setPosition(cx, feetY);
+      mark.setDepth(depth);
+      mark.setVisible(true);
+      mark.setActive(true);
+    }
+    if (gizmo) {
+      this.addActor(gizmo);
+      gizmo.clear();
+      gizmo.setVisible(true);
+      gizmo.setDepth(depth);
+      const pulse = 0.66 + 0.08 * Math.sin((this.now() || 0) / 180);
+      gizmo.lineStyle(2, 0xff2a22, pulse);
+      gizmo.strokeEllipse(cx, feetY - 5, 26, 11);
+      const x0 = cx - 13;
+      const x1 = cx + 13;
+      const y0 = feetY - 11;
+      const y1 = feetY + 1;
+      const arm = 6;
+      gizmo.lineBetween(x0, y0, x0 + arm, y0);
+      gizmo.lineBetween(x0, y0, x0, y0 + arm);
+      gizmo.lineBetween(x1, y0, x1 - arm, y0);
+      gizmo.lineBetween(x1, y0, x1, y0 + arm);
+      gizmo.lineBetween(x0, y1, x0 + arm, y1);
+      gizmo.lineBetween(x0, y1, x0, y1 - arm);
+      gizmo.lineBetween(x1, y1, x1 - arm, y1);
+      gizmo.lineBetween(x1, y1, x1, y1 - arm);
+    }
+    this.actorLayer?.queueDepthSort?.();
   }
 
   animateMove(msg) {
@@ -700,31 +807,39 @@ export class GameScene extends Phaser.Scene {
     const ty = Math.floor(worldY / TILE);
     let best = null;
     let bestDepth = -Infinity;
+    let own = null;
+    let ownDepth = -Infinity;
+    const consider = (st, depth) => {
+      if (!st || st.id === this.youId) return;
+      if (this.isOwnCreature(st)) {
+        if (depth >= ownDepth) {
+          own = st;
+          ownDepth = depth;
+        }
+        return;
+      }
+      if (depth >= bestDepth) {
+        best = st;
+        bestDepth = depth;
+      }
+    };
     for (const [, st] of this.state) {
-      if (st.id === this.youId) continue;
       const d = this.displayTile(st);
       const onTile =
         (Math.floor(d.x + 0.001) === tx && Math.floor(d.y + 0.001) === ty) ||
         (st.x === tx && st.y === ty);
       if (!onTile) continue;
-      const depth = Math.round(d.y) * 10;
-      if (depth >= bestDepth) {
-        best = st;
-        bestDepth = depth;
-      }
+      consider(st, Math.round(d.y) * 10);
     }
     if (best) return best;
     for (const [id, sprite] of this.sprites) {
-      if (id === this.youId) continue;
+      const st = this.state.get(id);
+      if (!st || id === this.youId) continue;
       const b = sprite.getBounds();
-      if (Phaser.Geom.Rectangle.Contains(b, worldX, worldY)) {
-        if (sprite.depth >= bestDepth) {
-          best = this.state.get(id);
-          bestDepth = sprite.depth;
-        }
-      }
+      if (!Phaser.Geom.Rectangle.Contains(b, worldX, worldY)) continue;
+      consider(st, sprite.depth);
     }
-    return best;
+    return best || own;
   }
 
   handleWorldClick(clientX, clientY, button) {
@@ -747,14 +862,17 @@ export class GameScene extends Phaser.Scene {
     const ty = Math.floor(worldY / TILE);
     const who = this.creatureAt(worldX, worldY);
     if (right) {
-      if (who && !who.dead) this.net.send({ t: "attack", id: who.id });
-      else if (who) this.net.send({ t: "target", id: who.id });
+      if (this.isOwnCreature(who)) {
+        this.net.send({ t: "look", x: tx, y: ty });
+        return;
+      }
+      if (this.isValidTarget(who) && !who.dead) this.net.send({ t: "attack", id: who.id });
       else this.net.send({ t: "look", x: tx, y: ty });
       return;
     }
     const item = this.hud?.selectedItem;
     if (item === "pokeball" || item === "premierball") {
-      if (who) {
+      if (who && this.isValidTarget(who) && who.wild) {
         this.net.send({ t: "use", item, id: who.id });
         if (who.dead) this.hud.selectItem(null);
       } else {
@@ -763,11 +881,21 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (item === "small_potion" || item === "great_potion") {
-      if (who && who.masterId === this.youId) {
+      if (who && this.isOwnCreature(who) && who.id !== this.youId) {
         this.net.send({ t: "use", item, id: who.id });
       }
       return;
     }
+    if (this.isValidTarget(who)) {
+      this.setTarget(who.id);
+      this.net.send({ t: "target", id: who.id });
+      return;
+    }
+    if (this.isOwnCreature(who)) {
+      this.net.send({ t: "look", x: tx, y: ty });
+      return;
+    }
+    this.clearTarget();
     this.net.send({ t: "walkTo", x: tx, y: ty });
   }
 
@@ -828,6 +956,7 @@ export class GameScene extends Phaser.Scene {
     if (dir != null) this.net.send({ t: "walk", dir });
     if (this.keys.ESC && Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
       this.hud?.selectItem(null);
+      this.clearTarget();
       document.getElementById("chat-input")?.blur();
     }
     const move = this.moveKey();

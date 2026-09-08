@@ -100,6 +100,20 @@ if (!wildDash) throw new Error("no wild Rapidash on map");
 if (wildZard.hpMax !== wild.hpMax) throw new Error(`wild Charizard hpMax ${wildZard.hpMax} != Caterpie`);
 if (wildDash.hpMax !== wild.hpMax) throw new Error(`wild Rapidash hpMax ${wildDash.hpMax} != Caterpie`);
 
+a.send({ t: "target", id: outId });
+const ownLock = await a.wait((m) => m.t === "target" || (m.t === "info" && /alvo/.test(m.text || "")), 1200);
+if (ownLock.t === "target" && ownLock.id === outId) throw new Error("must not target own poke");
+if (ownLock.t === "target" && ownLock.id != null) throw new Error(`own-poke target id ${ownLock.id}`);
+a.send({ t: "attack", id: outId });
+const ownAtk = await a.wait((m) => m.t === "info" && /alvo/.test(m.text || ""), 1200);
+if (!ownAtk) throw new Error("attacking own poke must be rejected");
+a.send({ t: "target", id: wild.id });
+const wildLock = await a.wait((m) => m.t === "target" && m.id === wild.id, 1200);
+if (!wildLock) throw new Error("wild target not set");
+a.send({ t: "target", id: null });
+const cleared = await a.wait((m) => m.t === "target" && (m.id == null || m.id === 0), 1200);
+if (!cleared) throw new Error("clear target did not echo");
+
 a.send({ t: "pokebar", slot: 0 });
 await a.wait((m) => m.t === "disappear" && m.id === outId);
 a.send({ t: "attack", id: wild.id });

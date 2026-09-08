@@ -514,6 +514,21 @@ export class World {
     if (creature.kind === "player") this.snapshotPlayer(creature);
   }
 
+  isForbiddenTarget(player, c) {
+    if (!c) return true;
+    if (c.id === player.id) return true;
+    if (c.masterId != null && c.masterId === player.id) return true;
+    if (player.outId != null && c.id === player.outId) return true;
+    return false;
+  }
+
+  sendTarget(player, c) {
+    const client = this.clientOf(player);
+    if (!client) return;
+    if (!c) this.send(client.ws, { t: "target", id: null });
+    else this.send(client.ws, { t: "target", id: c.id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
+  }
+
   look(player, x, y) {
     x = Number(x);
     y = Number(y);
@@ -532,7 +547,8 @@ export class World {
     if (item === "pokeball" || item === "premierball") {
       if (msg.id != null) {
         const id = Number(msg.id);
-        if (this.creatures.has(id)) player.targetId = id;
+        const c = this.creatures.get(id);
+        if (c && c.wild && !this.isForbiddenTarget(player, c)) player.targetId = id;
       }
       return this.catchBall(player, item);
     }
@@ -569,32 +585,36 @@ export class World {
   }
 
   setTarget(player, id) {
-    id = Number(id);
-    if (id === player.id) {
+    if (id == null || id === "" || id === false) {
       player.targetId = null;
+      this.sendTarget(player, null);
+      return;
+    }
+    id = Number(id);
+    if (!Number.isFinite(id)) {
+      player.targetId = null;
+      this.sendTarget(player, null);
       return;
     }
     const c = this.creatures.get(id);
-    if (!c) {
+    if (!c || this.isForbiddenTarget(player, c)) {
       player.targetId = null;
-      this.sys(player, "Você não tem um alvo.");
+      this.sendTarget(player, null);
       return;
     }
     player.targetId = id;
-    const client = this.clientOf(player);
-    if (client) this.send(client.ws, { t: "target", id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
+    this.sendTarget(player, c);
   }
 
   attack(player, id) {
     id = Number(id);
     const c = this.creatures.get(id);
-    if (!c || c.id === player.id) {
+    if (!c || this.isForbiddenTarget(player, c)) {
       this.sys(player, "Você não tem um alvo.");
       return;
     }
     player.targetId = id;
-    const client = this.clientOf(player);
-    if (client) this.send(client.ws, { t: "target", id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
+    this.sendTarget(player, c);
     if (!c.wild || c.dead) return;
     this.useMove(player, 1);
   }
@@ -829,7 +849,7 @@ export class World {
     const move = spec.moves[n - 1];
     if (!move) return;
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
-    if (!target || target.id === poke.id || target.id === player.id) {
+    if (!target || this.isForbiddenTarget(player, target) || target.id === poke.id) {
       this.sys(player, "Você não tem um alvo.");
       return;
     }

@@ -82,6 +82,8 @@ export class Hud {
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         this.selectItem(null);
+        this.setTarget(null);
+        this.net.send({ t: "target", id: null });
         document.getElementById("chat-input")?.blur();
       }
     });
@@ -190,7 +192,8 @@ export class Hud {
       this.renderBattle();
     }
     if (msg.t === "target") {
-      this.setTarget({ id: msg.id, name: msg.name, plate: msg.plate });
+      if (msg.id == null) this.setTarget(null);
+      else this.setTarget({ id: msg.id, name: msg.name, plate: msg.plate });
     }
     if (msg.t === "outfit" && msg.creature) {
       if (this.you && msg.creature.id === this.you.id) this.you = { ...this.you, ...msg.creature };
