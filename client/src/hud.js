@@ -511,6 +511,11 @@ export class Hud {
   }
 }
 
+function portraitUrl(p) {
+  const key = p?.species || "caterpie";
+  return `/assets/pokemon/${key}/portrait.png`;
+}
+
 function moveCount(species) {
   return SPECIES[species]?.moves?.length || 0;
 }

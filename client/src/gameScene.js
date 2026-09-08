@@ -52,6 +52,20 @@ function groundTexture(cell) {
   return "grass";
 }
 
+function texTint(name) {
+  if (name === "human") return 0x4a90d9;
+  if (name === "charizard") return 0xe07020;
+  if (name === "caterpie") return 0x70c040;
+  if (name === "rapidash") return 0xe8a040;
+  let h = 0;
+  for (const ch of String(name || "")) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
+  return 0x404040 + (h % 0xbfbfbf);
+}
+
+function hasAnimFrames(texture) {
+  return (texture?.frameTotal || 0) > 1;
+}
+
 export class GameScene extends Phaser.Scene {
   constructor(net, hud) {
     super("game");
@@ -66,8 +80,8 @@ export class GameScene extends Phaser.Scene {
     this.keys = null;
     this.roofSprites = [];
     this.groundLayer = null;
-    this.itemLayer = null;
-    this.wallLayer = null;
+    this.actorLayer = null;
+    this.missingSpriteLog = new Set();
     this.live = false;
     this.pendingWorld = null;
     this.targetId = null;
@@ -96,12 +110,24 @@ export class GameScene extends Phaser.Scene {
       });
       this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
+    this.load.on("loaderror", (file) => {
+      const key = file?.key || file?.src || "unknown";
+      if (this.missingSpriteLog.has(`load:${key}`)) return;
+      this.missingSpriteLog.add(`load:${key}`);
+      console.warn(`[otpokemon] sprite failed to load: ${file?.url || file?.src || key}`);
+    });
   }
 
   create() {
+    // Phaser Layers composite as a group and paint over non-layer objects
+    // regardless of child depth. Ground stays in a low layer; everything that
+    // must y-sort with CHAR/pokes (walls, roofs, items, creatures) lives in
+    // actorLayer so they are not buried under tiles.
     this.groundLayer = this.add.layer();
-    this.itemLayer = this.add.layer();
-    this.wallLayer = this.add.layer();
+    this.actorLayer = this.add.layer();
+    this.groundLayer.setDepth(0);
+    this.actorLayer.setDepth(100);
+    this.ensurePlaceholder();
     this.keys = this.input.keyboard.addKeys(
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
@@ -122,9 +148,9 @@ export class GameScene extends Phaser.Scene {
     });
     this.targetId = null;
     this.targetMark = this.add.graphics();
-    this.targetMark.setDepth(4);
     this.glow = this.add.graphics();
-    this.glow.setDepth(5);
+    this.actorLayer.add(this.targetMark);
+    this.actorLayer.add(this.glow);
     this.cameras.main.setRoundPixels(false);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
@@ -166,14 +192,67 @@ export class GameScene extends Phaser.Scene {
     this.hpBars.clear();
     this.state.clear();
     this.groundLayer.removeAll(true);
-    this.itemLayer.removeAll(true);
-    this.wallLayer.removeAll(true);
-    this.roofSprites.forEach((r) => r.destroy());
+    this.clearActorLayer();
     this.roofSprites = [];
     this.youId = null;
     this.targetId = null;
     this.targetMark?.clear();
     this.glow?.clear();
+  }
+
+  clearActorLayer() {
+    if (!this.actorLayer) return;
+    const keep = new Set([this.glow, this.targetMark].filter(Boolean));
+    for (const child of [...(this.actorLayer.list || [])]) {
+      if (!keep.has(child)) child.destroy();
+    }
+    if (this.glow && this.glow.displayList !== this.actorLayer) this.actorLayer.add(this.glow);
+    if (this.targetMark && this.targetMark.displayList !== this.actorLayer) this.actorLayer.add(this.targetMark);
+  }
+
+  ensurePlaceholder() {
+    if (this.textures.exists("missing-creature")) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x1a1a1a, 0.92);
+    g.fillRect(1, 1, 30, 30);
+    g.lineStyle(2, 0xffe066, 1);
+    g.strokeRect(1, 1, 30, 30);
+    g.fillStyle(0xffe066, 1);
+    g.fillCircle(16, 11, 5);
+    g.fillRect(12, 16, 8, 12);
+    g.generateTexture("missing-creature", 32, 32);
+    g.destroy();
+  }
+
+  logMissingSprite(key) {
+    if (this.missingSpriteLog.has(key)) return;
+    this.missingSpriteLog.add(key);
+    console.warn(`[otpokemon] missing map sprite "${key}" — drawing placeholder`);
+  }
+
+  textureLooksValid(key) {
+    if (!key || !this.textures.exists(key)) return false;
+    const tex = this.textures.get(key);
+    if (!tex || tex.key === "__MISSING") return false;
+    try {
+      const src = tex.getSourceImage();
+      return !!(src && src.width >= 8 && src.height >= 8);
+    } catch {
+      return false;
+    }
+  }
+
+  resolveTexture(c) {
+    const key = this.textureFor(c);
+    if (this.textureLooksValid(key)) return key;
+    this.logMissingSprite(key);
+    this.ensurePlaceholder();
+    return "missing-creature";
+  }
+
+  addActor(obj) {
+    if (obj && this.actorLayer && obj.displayList !== this.actorLayer) this.actorLayer.add(obj);
+    return obj;
   }
 
   enterPreview() {
@@ -198,17 +277,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   enterWorld(payload) {
-    if (!this.groundLayer) {
+    if (!this.groundLayer || !this.actorLayer) {
       this.pendingWorld = payload;
       return;
     }
+    this.pendingWorld = null;
     this.live = true;
     if (this.input?.keyboard) this.input.keyboard.enabled = true;
     this.clearWorld();
     this.mapData = payload.map;
     this.youId = payload.you.id;
     this.drawMap();
-    for (const c of payload.creatures) this.spawn(c);
+    for (const c of payload.creatures || []) this.spawn(c);
     this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
     this.cameras.main.setRoundPixels(false);
@@ -227,13 +307,14 @@ export class GameScene extends Phaser.Scene {
         if (walls[y][x]) {
           const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
           wall.setDepth(y * 10 + 5);
-          this.wallLayer.add(wall);
+          this.addActor(wall);
         }
         if (roofs[y][x]) {
           const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
           roof.setDepth(y * 10 + 8);
           roof.tileX = x;
           roof.tileY = y;
+          this.addActor(roof);
           this.roofSprites.push(roof);
         }
       }
@@ -241,7 +322,7 @@ export class GameScene extends Phaser.Scene {
     for (const it of items || []) {
       const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
       spr.setDepth(it.y * 10 + 2);
-      this.itemLayer.add(spr);
+      this.addActor(spr);
     }
   }
 
@@ -255,13 +336,22 @@ export class GameScene extends Phaser.Scene {
 
   spawn(c) {
     if (this.sprites.has(c.id)) this.despawn(c.id);
-    const tex = this.textureFor(c);
-    const size = creatureSize(tex);
+    const want = this.textureFor(c);
+    const tex = this.resolveTexture(c);
+    const size = creatureSize(want);
     const pos = tileWorld(c.x, c.y, size);
-    const sprite = this.add.sprite(pos.x, pos.y, tex, frameIndex(c.dir, false, 0));
+    const frame = hasAnimFrames(this.textures.get(tex)) ? frameIndex(c.dir, false, 0) : 0;
+    const sprite = this.add.sprite(pos.x, pos.y, tex, frame);
     sprite.setOrigin(0, 0);
+    sprite.setVisible(true);
+    sprite.setActive(true);
     sprite.setDepth(c.y * 10 + 9);
-    const plateY = tex === "human" ? pos.y + 8 : pos.y - 2;
+    this.addActor(sprite);
+    if (tex === "missing-creature") {
+      sprite.setDisplaySize(size, size);
+      sprite.setTint(texTint(want));
+    }
+    const plateY = want === "human" || size === 64 ? pos.y + 8 : pos.y - 2;
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, {
         fontFamily: "system-ui, sans-serif",
@@ -273,10 +363,12 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1);
     plate.setDepth(c.y * 10 + 10);
+    this.addActor(plate);
     this.sprites.set(c.id, sprite);
     this.plates.set(c.id, plate);
     this.state.set(c.id, {
       ...c,
+      spriteSize: size,
       moving: false,
       phase: 0,
       fromX: c.x,
@@ -291,6 +383,8 @@ export class GameScene extends Phaser.Scene {
     bg.setDepth(c.y * 10 + 11);
     const fg = this.add.rectangle(cx - 13, barY + 1, 26, 2, 0x3dcc4a).setOrigin(0, 0);
     fg.setDepth(c.y * 10 + 12);
+    this.addActor(bg);
+    this.addActor(fg);
     this.hpBars.set(c.id, { bg, fg });
     this.setHpBar(c.id, c.hp, c.hpMax);
     this.refreshPlate(c.id);
@@ -313,7 +407,8 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.sprites.get(id);
     const plate = this.plates.get(id);
     if (!sprite || !plate) return;
-    const size = creatureSize(sprite.texture.key);
+    const st = this.state.get(id);
+    const size = st?.spriteSize || creatureSize(sprite.texture.key);
     const cx = spriteX + size / 2;
     const plateY = size === 64 ? spriteY + 8 : spriteY - 2;
     plate.setPosition(cx, plateY);
@@ -377,11 +472,12 @@ export class GameScene extends Phaser.Scene {
     const sprite = this.sprites.get(id);
     if (!st || !sprite) return;
     const d = this.displayTile(st);
-    const size = creatureSize(sprite.texture.key);
+    const size = st.spriteSize || creatureSize(sprite.texture.key);
     const pos = tileWorld(d.x, d.y, size);
     const walking = st.moving && !st.dead;
     const depth = Math.round(d.y) * 10 + 9;
     const ability = st.mount?.ability;
+    const placeholder = sprite.texture.key === "missing-creature";
     if (st.dead) {
       sprite.setOrigin(0.5, 0.5);
       sprite.setAngle(0);
@@ -406,6 +502,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setOrigin(0, 0);
       sprite.setAngle(0);
       sprite.clearTint();
+      if (placeholder) sprite.setTint(texTint(this.textureFor(st)));
       let px = pos.x;
       let py = pos.y;
       if (ability === "fly") {
@@ -421,7 +518,7 @@ export class GameScene extends Phaser.Scene {
         sprite.setScale(1);
       }
       sprite.setPosition(px, py);
-      sprite.setFrame(frameIndex(st.dir, walking, st.phase));
+      if (hasAnimFrames(sprite.texture)) sprite.setFrame(frameIndex(st.dir, walking, st.phase));
       this.layoutNameplate(id, px, py, depth);
       sprite.setDepth(depth);
   }
@@ -546,6 +643,7 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1);
     txt.setDepth(2000);
+    this.addActor(txt);
     this.tweens.add({
       targets: txt,
       y: y - 26,
@@ -573,6 +671,7 @@ export class GameScene extends Phaser.Scene {
     const y1 = db.y * TILE;
     const g = this.add.graphics();
     g.setDepth(2500);
+    this.addActor(g);
     g.lineStyle(2, 0xffe066, 1);
     g.lineBetween(x0, y0, x1, y1);
     g.fillStyle(0xfff3a0, 1);

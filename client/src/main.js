@@ -100,8 +100,12 @@ net.on("map", (m) => {
   hud.handle(m);
   hud.bindGame();
   const g = ensureGame();
-  const scene = g.scene.getScene("game");
-  if (scene && scene.enterWorld) scene.enterWorld(m);
+  const pushWorld = () => {
+    const scene = g.scene.getScene("game") || g.scene.scenes?.[0];
+    if (scene?.enterWorld) scene.enterWorld(m);
+    else setTimeout(pushWorld, 40);
+  };
+  pushWorld();
 });
 net.on("loggedOut", () => {
   session.inWorld = false;
