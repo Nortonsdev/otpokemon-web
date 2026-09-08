@@ -382,6 +382,24 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   height: 9px;
   margin-bottom: 1px;
   cursor: default;
+  position: relative;
+  pointer-events: auto;
+}
+.pi-row[data-tip]:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 0;
+  top: calc(100% + 3px);
+  z-index: 30;
+  background: rgba(8, 10, 14, 0.96);
+  color: #f3f6fa;
+  border: 1px solid #c42830;
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px #000;
 }
 .pi-ico {
   width: 11px;
@@ -397,6 +415,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .pi-fill { height: 100%; width: 0; border-radius: 1px; }
+.pi-row.hp .pi-fill { background: rgb(10, 220, 48); }
 .pi-row.exp .pi-fill { background: #3a6ec8; }
 .pi-row.fish .pi-fill { background: #4eb4d0; }
 .pi-row.stm .pi-fill { background: #d88838; }
@@ -415,11 +434,23 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   min-width: 0;
 }
 .pi-balls {
-  width: 70px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
   height: 10px;
-  image-rendering: pixelated;
   flex: none;
 }
+.pi-ball {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2a3238;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 0 0 1px #0a0c10;
+}
+.pi-ball.filled {
+  background: radial-gradient(circle at 30% 28%, #ff9090 0 20%, #d03038 21% 48%, #1a1a1a 49% 58%, #ececec 59% 100%);
+}
+.pi-ball.faint { background: #4a5056; }
 .pi-chips {
   display: flex;
   gap: 4px;

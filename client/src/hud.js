@@ -271,17 +271,23 @@ export class Hud {
     hpFill.style.background = hpColorCss(hpRatio);
     document.getElementById("player-hp-pct").textContent = `${hpPct}%`;
     const hpRow = document.getElementById("player-hp-row");
-    if (hpRow) hpRow.title = `Health ${hpPct}% (${hp}/${hpMax})`;
+    if (hpRow) {
+      const tip = `Health ${hpPct}% (${hp}/${hpMax})`;
+      hpRow.title = tip;
+      hpRow.dataset.tip = tip;
+    }
 
     const xpPct = progress.expPercent;
     document.getElementById("hud-xp-fill").style.width = `${xpPct}%`;
     document.getElementById("hud-xp-pct").textContent = `${xpPct}%`;
     const xpRow = document.getElementById("player-xp-row");
     if (xpRow) {
-      xpRow.title =
+      const tip =
         progress.exp != null && progress.expNext != null
           ? `Experience ${xpPct}% (${progress.exp}/${progress.expNext})`
           : `Experience ${xpPct}%`;
+      xpRow.title = tip;
+      xpRow.dataset.tip = tip;
     }
 
     const fishPct = this.you?.fishPct ?? 31;
@@ -292,7 +298,11 @@ export class Hud {
     document.getElementById("hud-stm-fill").style.width = `${stmPct}%`;
     document.getElementById("hud-stm-pct").textContent = `${stmPct}%`;
     const stmRow = document.getElementById("player-stm-row");
-    if (stmRow) stmRow.title = `Stamina ${stmPct}% (${staminaClock(progress.staminaMinutes)})`;
+    if (stmRow) {
+      const tip = `Stamina ${stmPct}% (${staminaClock(progress.staminaMinutes)})`;
+      stmRow.title = tip;
+      stmRow.dataset.tip = tip;
+    }
 
     const balls = this.bag.find((i) => i.item === "pokeball")?.count || 0;
     document.getElementById("hud-balls").textContent = balls;
@@ -301,9 +311,17 @@ export class Hud {
     const cap = document.getElementById("hud-cap");
     if (cap) cap.textContent = String(progress.cap ?? 400);
 
-    const occupied = (this.party.slots || []).filter(Boolean).length;
-    const ballStrip = document.getElementById("player-party-balls");
-    if (ballStrip) ballStrip.src = `/assets/hud/pokeball${Math.max(0, Math.min(6, occupied))}.png`;
+    const ballWrap = document.getElementById("player-party-balls");
+    if (ballWrap) {
+      ballWrap.innerHTML = "";
+      for (let i = 0; i < 6; i++) {
+        const p = this.party.slots?.[i];
+        const el = document.createElement("span");
+        el.className = "pi-ball" + (p ? (p.hp > 0 ? " filled" : " faint") : "");
+        el.title = p ? `${p.name} ${p.hp}/${p.hpMax}` : "Empty";
+        ballWrap.appendChild(el);
+      }
+    }
 
     const portrait = document.getElementById("player-portrait");
     if (portrait) {
