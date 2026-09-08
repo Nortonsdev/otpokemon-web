@@ -18,11 +18,31 @@ function creatureSize(tex) {
 
 const NAME_PX = 9;
 const NAME_RES = 4;
-const NAME_STROKE = 2;
+const NAME_STROKE = 1;
 const NAME_BAR_GAP = 1;
 const BAR_W = 22;
 const BAR_H = 3;
 const BAR_PAD = 1;
+
+function nameplate3DColors(color) {
+  const h = color.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const hi = `#${[Math.min(255, r + 55), Math.min(255, g + 55), Math.min(255, b + 55)]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+  return { shadow: "#000000", highlight: hi };
+}
+
+function hpBevelColors(hex) {
+  const r = (hex >> 16) & 0xff;
+  const g = (hex >> 8) & 0xff;
+  const b = hex & 0xff;
+  const hi = (Math.min(255, r + 48) << 16) | (Math.min(255, g + 48) << 8) | Math.min(255, b + 48);
+  const lo = (Math.max(0, r - 48) << 16) | (Math.max(0, g - 48) << 8) | Math.max(0, b - 48);
+  return { hi, lo };
+}
 
 function tileWorld(x, y, size) {
   if (size > TILE) {
@@ -447,16 +467,9 @@ export class GameScene extends Phaser.Scene {
       walkMs: 0,
     });
     const cx = pos.x + size / 2;
-    const outline = this.add.rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000).setOrigin(0.5, 0);
-    const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
-    const fg = this.add.rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, c.kind === "npc" ? 0x00d4e8 : 0x2fc24a).setOrigin(0, 0);
-    outline.setDepth(c.y * 10 + 11);
-    track.setDepth(c.y * 10 + 12);
-    fg.setDepth(c.y * 10 + 13);
-    this.addActor(outline);
-    this.addActor(track);
-    this.addActor(fg);
-    this.hpBars.set(c.id, { outline, track, fg });
+    const barTop = plateY + NAME_BAR_GAP;
+    const bar = this.makeHpBar(cx, barTop, c.y * 10 + 11, c.kind);
+    this.hpBars.set(c.id, bar);
     this.setHpBar(c.id, c.hp, c.hpMax);
     this.refreshPlate(c.id);
     if (c.dead) this.applyCorpseLook(c.id);
@@ -476,16 +489,19 @@ export class GameScene extends Phaser.Scene {
     if (!bar) return;
     bar.outline?.destroy();
     bar.track?.destroy();
-    bar.bg?.destroy();
+    bar.topBevel?.destroy();
+    bar.botBevel?.destroy();
     bar.fg?.destroy();
+    bar.fgHi?.destroy();
+    bar.fgLo?.destroy();
+    bar.bg?.destroy();
   }
 
   setHpBarVisible(bar, visible) {
     if (!bar) return;
-    bar.outline?.setVisible(visible);
-    bar.track?.setVisible(visible);
-    bar.bg?.setVisible(visible);
-    bar.fg?.setVisible(visible);
+    for (const part of [bar.outline, bar.track, bar.topBevel, bar.botBevel, bar.fg, bar.fgHi, bar.fgLo, bar.bg]) {
+      part?.setVisible(visible);
+    }
   }
 
   uiScale() {
@@ -501,26 +517,78 @@ export class GameScene extends Phaser.Scene {
 
   sharpenNameplate(plate) {
     const res = this.nameplateResolution();
-    if (plate.style.resolution !== res) plate.setResolution(res);
+    for (const t of [plate.mainText, plate.shadowText, plate.highlightText]) {
+      if (t && t.style.resolution !== res) t.setResolution(res);
+    }
+  }
+
+  nameTextStyle(color, stroke = 0) {
+    return {
+      fontFamily: "Tahoma, Verdana, Arial, sans-serif",
+      fontSize: `${NAME_PX}px`,
+      fontStyle: "bold",
+      color,
+      stroke: stroke ? "#000000" : undefined,
+      strokeThickness: stroke,
+      resolution: this.nameplateResolution(),
+      padding: { x: 2, top: 2, bottom: 0 },
+    };
+  }
+
+  setPlateText(plate, text, color) {
+    const { shadow, highlight } = nameplate3DColors(color);
+    plate.shadowText.setText(text).setColor(shadow);
+    plate.highlightText.setText(text).setColor(highlight);
+    plate.mainText.setText(text).setColor(color);
+    this.sharpenNameplate(plate);
   }
 
   makeNameplate(x, y, text, color, depth) {
-    const plate = this.add
-      .text(x, y, text, {
-        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-        fontSize: `${NAME_PX}px`,
-        fontStyle: "bold",
-        color,
-        stroke: "#000000",
-        strokeThickness: NAME_STROKE,
-        resolution: this.nameplateResolution(),
-        padding: { x: NAME_STROKE + 1, top: NAME_STROKE, bottom: 0 },
-      })
+    const { shadow, highlight } = nameplate3DColors(color);
+    const container = this.add.container(Math.round(x), Math.round(y));
+    const shadowText = this.add
+      .text(1, 1, text, this.nameTextStyle(shadow))
       .setOrigin(0.5, 1);
-    this.sharpenNameplate(plate);
-    plate.setDepth(depth);
-    this.addActor(plate);
-    return plate;
+    const highlightText = this.add
+      .text(-1, -1, text, this.nameTextStyle(highlight))
+      .setOrigin(0.5, 1);
+    const mainText = this.add
+      .text(0, 0, text, this.nameTextStyle(color, NAME_STROKE))
+      .setOrigin(0.5, 1);
+    container.add([shadowText, highlightText, mainText]);
+    container.mainText = mainText;
+    container.shadowText = shadowText;
+    container.highlightText = highlightText;
+    container.setDepth(depth);
+    this.sharpenNameplate(container);
+    this.addActor(container);
+    return container;
+  }
+
+  makeHpBar(cx, barTop, depth, kind) {
+    const fill = kind === "npc" ? 0x00d4e8 : 0x2fc24a;
+    const outline = this.add
+      .rectangle(cx, barTop, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000)
+      .setOrigin(0.5, 0);
+    const innerTop = barTop + BAR_PAD;
+    const track = this.add.rectangle(cx, innerTop, BAR_W, BAR_H, 0x0c0c0c).setOrigin(0.5, 0);
+    const topBevel = this.add.rectangle(cx, innerTop, BAR_W, 1, 0x3a3a3a).setOrigin(0.5, 0);
+    const botBevel = this.add.rectangle(cx, innerTop + BAR_H - 1, BAR_W, 1, 0x000000).setOrigin(0.5, 0);
+    const fg = this.add.rectangle(cx - BAR_W / 2, innerTop, BAR_W, BAR_H, fill).setOrigin(0, 0);
+    const { hi, lo } = hpBevelColors(fill);
+    const fgHi = this.add.rectangle(cx - BAR_W / 2, innerTop, BAR_W, 1, hi).setOrigin(0, 0);
+    const fgLo = this.add
+      .rectangle(cx - BAR_W / 2, innerTop + BAR_H - 1, BAR_W, 1, lo)
+      .setOrigin(0, 0);
+    outline.setDepth(depth);
+    track.setDepth(depth + 1);
+    topBevel.setDepth(depth + 2);
+    botBevel.setDepth(depth + 3);
+    fg.setDepth(depth + 4);
+    fgHi.setDepth(depth + 5);
+    fgLo.setDepth(depth + 6);
+    for (const part of [outline, track, topBevel, botBevel, fg, fgHi, fgLo]) this.addActor(part);
+    return { outline, track, topBevel, botBevel, fg, fgHi, fgLo };
   }
 
   layoutNameplate(id, spriteX, spriteY, depth) {
@@ -531,7 +599,7 @@ export class GameScene extends Phaser.Scene {
     const size = st?.spriteSize || creatureSize(sprite.texture.key);
     const ui = this.uiScale();
     const res = this.nameplateResolution();
-    if (plate.style.resolution !== res) this.sharpenNameplate(plate);
+    if (plate.mainText?.style.resolution !== res) this.sharpenNameplate(plate);
     plate.setScale(ui);
     const cx = Math.round(spriteX + size / 2);
     const nameBottom = Math.round(size > TILE ? spriteY + 4 : spriteY - 2);
@@ -543,7 +611,8 @@ export class GameScene extends Phaser.Scene {
     const innerTop = Math.round(barTop + BAR_PAD * ui);
     const outW = BAR_W + BAR_PAD * 2;
     const outH = BAR_H + BAR_PAD * 2;
-    for (const part of [bar.outline, bar.track, bar.fg]) part?.setScale(ui);
+    const barParts = [bar.outline, bar.track, bar.topBevel, bar.botBevel, bar.fg, bar.fgHi, bar.fgLo];
+    for (const part of barParts) part?.setScale(ui);
     bar.outline?.setSize(outW, outH);
     bar.outline?.setOrigin(0.5, 0);
     bar.outline?.setPosition(cx, barTop);
@@ -552,10 +621,25 @@ export class GameScene extends Phaser.Scene {
     bar.track?.setOrigin(0.5, 0);
     bar.track?.setPosition(cx, innerTop);
     bar.track?.setDepth(depth + 3);
+    bar.topBevel?.setSize(BAR_W, 1);
+    bar.topBevel?.setOrigin(0.5, 0);
+    bar.topBevel?.setPosition(cx, innerTop);
+    bar.topBevel?.setDepth(depth + 4);
+    bar.botBevel?.setSize(BAR_W, 1);
+    bar.botBevel?.setOrigin(0.5, 0);
+    bar.botBevel?.setPosition(cx, Math.round(innerTop + (BAR_H - 1) * ui));
+    bar.botBevel?.setDepth(depth + 5);
+    const fgLeft = Math.round(cx - (BAR_W * ui) / 2);
     bar.fg.height = BAR_H;
     bar.fg.setOrigin(0, 0);
-    bar.fg.setPosition(Math.round(cx - (BAR_W * ui) / 2), innerTop);
-    bar.fg.setDepth(depth + 4);
+    bar.fg.setPosition(fgLeft, innerTop);
+    bar.fg.setDepth(depth + 6);
+    bar.fgHi?.setOrigin(0, 0);
+    bar.fgHi?.setPosition(fgLeft, innerTop);
+    bar.fgHi?.setDepth(depth + 7);
+    bar.fgLo?.setOrigin(0, 0);
+    bar.fgLo?.setPosition(fgLeft, Math.round(innerTop + (BAR_H - 1) * ui));
+    bar.fgLo?.setDepth(depth + 8);
     this.setHpBar(id, st?.hp, st?.hpMax);
   }
 
@@ -569,26 +653,26 @@ export class GameScene extends Phaser.Scene {
     if (!bar) return;
     const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
     const ratio = hpPercent(hp ?? st?.hp ?? 0, max);
-    bar.fg.width = BAR_W * ratio;
-    if (st?.kind === "npc") bar.fg.setFillStyle(0x00d4e8);
-    else bar.fg.setFillStyle(hpColorHex(ratio));
+    const fillW = Math.max(0, Math.round(BAR_W * ratio));
+    bar.fg.width = fillW;
+    bar.fgHi && (bar.fgHi.width = fillW);
+    bar.fgLo && (bar.fgLo.width = fillW);
+    let fill;
+    if (st?.kind === "npc") fill = 0x00d4e8;
+    else fill = hpColorHex(ratio);
+    bar.fg.setFillStyle(fill);
+    const { hi, lo } = hpBevelColors(fill);
+    bar.fgHi?.setFillStyle(hi);
+    bar.fgLo?.setFillStyle(lo);
   }
 
   refreshPlate(id) {
     const st = this.state.get(id);
     const plate = this.plates.get(id);
     if (!st || !plate) return;
-    if (st.kind === "npc") {
-      plate.setText(`${st.name} (!)`);
-      plate.setColor("#00d4e8");
-    } else if (st.kind === "player") {
-      plate.setText(st.name);
-      plate.setColor("#2fc24a");
-    } else {
-      plate.setText(`${st.name} [${st.level || 5}]`);
-      plate.setColor("#2fc24a");
-    }
-    this.sharpenNameplate(plate);
+    if (st.kind === "npc") this.setPlateText(plate, `${st.name} (!)`, "#00d4e8");
+    else if (st.kind === "player") this.setPlateText(plate, st.name, "#2fc24a");
+    else this.setPlateText(plate, `${st.name} [${st.level || 5}]`, "#2fc24a");
     const sprite = this.sprites.get(id);
     if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
   }
