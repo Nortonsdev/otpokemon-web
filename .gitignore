@@ -1,6 +1,7 @@
 node_modules/
 dist/
 server/data/
+.vercel
 *.log
 .DS_Store
 /tmp/
