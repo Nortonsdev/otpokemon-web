@@ -16,9 +16,9 @@ function creatureSize(tex) {
   return 32;
 }
 
-function nameplateScale(size) {
-  return Math.max(1, size / 32);
-}
+const NAME_PX = 8;
+const BAR_W = 24;
+const BAR_H = 2;
 
 function tileWorld(x, y, size) {
   if (size > TILE) {
@@ -424,21 +424,19 @@ export class GameScene extends Phaser.Scene {
       sprite.setDisplaySize(size, size);
       sprite.setTint(texTint(want));
     }
-    const plateY = want === "human" || size === 64 ? pos.y + 8 : pos.y - 2;
-    const s = nameplateScale(size);
+    const plateY = want === "human" || size === 64 ? pos.y + 4 : pos.y - 2;
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, {
         fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-        fontSize: "14px",
+        fontSize: `${NAME_PX}px`,
         fontStyle: "bold",
         color: "#3dcc4a",
         stroke: "#000000",
-        strokeThickness: 3,
-        resolution: 2,
-        padding: { x: 4, y: 2 },
+        strokeThickness: 1,
+        resolution: 3,
+        padding: { x: 2, y: 1 },
       })
       .setOrigin(0.5, 1);
-    plate.setScale(0.5 * s);
     plate.setDepth(c.y * 10 + 10);
     this.addActor(plate);
     this.sprites.set(c.id, sprite);
@@ -454,16 +452,13 @@ export class GameScene extends Phaser.Scene {
       walkMs: 0,
     });
     const cx = pos.x + size / 2;
-    const barY = plateY + 1;
-    const barW = 24 * s;
-    const barH = Math.max(1, 1.25 * s);
-    const bg = this.add.rectangle(cx, barY, barW + 2, barH + 1.5, 0x050505).setOrigin(0.5, 0);
+    const bg = this.add.rectangle(cx, plateY, BAR_W, BAR_H, 0x050505).setOrigin(0.5, 1);
     bg.setDepth(c.y * 10 + 11);
-    const fg = this.add.rectangle(cx - barW / 2, barY + 0.5, barW, barH, 0x0acc30).setOrigin(0, 0);
+    const fg = this.add.rectangle(cx - BAR_W / 2, plateY, BAR_W, BAR_H, 0x0acc30).setOrigin(0, 1);
     fg.setDepth(c.y * 10 + 12);
     this.addActor(bg);
     this.addActor(fg);
-    this.hpBars.set(c.id, { bg, fg, barW, barH });
+    this.hpBars.set(c.id, { bg, fg });
     this.setHpBar(c.id, c.hp, c.hpMax);
     this.refreshPlate(c.id);
     if (c.dead) this.applyCorpseLook(c.id);
@@ -481,30 +476,35 @@ export class GameScene extends Phaser.Scene {
     this.state.delete(id);
   }
 
+  uiScale() {
+    const z = this.cameras.main?.zoom || 1;
+    return z > 0 ? 1 / z : 1;
+  }
+
   layoutNameplate(id, spriteX, spriteY, depth) {
     const sprite = this.sprites.get(id);
     const plate = this.plates.get(id);
     if (!sprite || !plate) return;
     const st = this.state.get(id);
     const size = st?.spriteSize || creatureSize(sprite.texture.key);
-    const s = nameplateScale(size);
-    plate.setScale(0.5 * s);
+    const ui = this.uiScale();
+    plate.setScale(ui);
     const cx = spriteX + size / 2;
-    const plateY = size === 64 ? spriteY + 8 : spriteY - 2;
-    plate.setPosition(cx, plateY);
+    const nameBottom = size > TILE ? spriteY + 4 : spriteY - 2;
+    plate.setPosition(cx, nameBottom);
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const barW = Math.max(18 * s, Math.min(plate.displayWidth * 0.92 || 24 * s, 44 * s));
-    const barH = Math.max(1, 1.25 * s);
-    bar.barW = barW;
-    bar.barH = barH;
-    const barY = plateY + 1;
-    bar.bg.setSize(barW + 2, barH + 1.5);
-    bar.bg.setPosition(cx, barY);
+    const barBottom = nameBottom - plate.displayHeight - ui;
+    bar.bg.setScale(ui);
+    bar.fg.setScale(ui);
+    bar.bg.setSize(BAR_W, BAR_H);
+    bar.bg.setOrigin(0.5, 1);
+    bar.bg.setPosition(cx, barBottom);
     bar.bg.setDepth(depth + 2);
-    bar.fg.height = barH;
-    bar.fg.setPosition(cx - barW / 2, barY + 0.5);
+    bar.fg.height = BAR_H;
+    bar.fg.setOrigin(0, 1);
+    bar.fg.setPosition(cx - (BAR_W * ui) / 2, barBottom);
     bar.fg.setDepth(depth + 3);
     this.setHpBar(id, st?.hp, st?.hpMax);
   }
@@ -519,9 +519,7 @@ export class GameScene extends Phaser.Scene {
     if (!bar) return;
     const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
     const ratio = hpPercent(hp ?? st?.hp ?? 0, max);
-    const s = nameplateScale(st?.spriteSize || 32);
-    const barW = bar.barW || 24 * s;
-    bar.fg.width = barW * ratio;
+    bar.fg.width = BAR_W * ratio;
     bar.fg.setFillStyle(hpColorHex(ratio));
   }
 

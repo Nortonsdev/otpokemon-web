@@ -177,7 +177,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   inset: 0;
 }
 .player-info {
-  width: 253px;
+  width: 220px;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -332,12 +332,14 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .battle-hp > span { display: block; height: 100%; background: var(--ot-hp); border-radius: 2px; }
 
 /* ── RIGHT COLUMN ── */
-#hud-pokeinfo { top: 28px; right: 6px; width: 253px; }
-.pi-body { padding: 0; overflow: visible; }
+#hud-pokeinfo { top: 28px; right: 6px; width: 220px; }
+.pi-body { padding: 0; overflow: visible; width: 220px; height: 98px; }
 .pi-wrap {
   position: relative;
   width: 253px;
   height: 112px;
+  transform: scale(0.87);
+  transform-origin: top left;
   background: url(/assets/hud/playerinfo/HealthInfo.png) no-repeat 0 0;
   background-size: 253px 103px;
 }
