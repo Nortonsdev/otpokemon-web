@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { MAP, SPAWN } from "../../server/map.js";
 import { LOOK_NAME } from "../../server/species.js";
+import { hpColorHex, hpPercent } from "./hpColor.js";
 
 const TILE = 32;
 const LARGE_MONS = new Set(["charizard", "rapidash"]);
@@ -13,6 +14,10 @@ function monFrame(name) {
 function creatureSize(tex) {
   if (tex === "human" || LARGE_MONS.has(tex)) return 64;
   return 32;
+}
+
+function nameplateScale(size) {
+  return Math.max(1, size / 32);
 }
 
 function tileWorld(x, y, size) {
@@ -420,16 +425,20 @@ export class GameScene extends Phaser.Scene {
       sprite.setTint(texTint(want));
     }
     const plateY = want === "human" || size === 64 ? pos.y + 8 : pos.y - 2;
+    const s = nameplateScale(size);
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, {
-        fontFamily: "system-ui, sans-serif",
-        fontSize: "11px",
+        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
+        fontSize: "14px",
         fontStyle: "bold",
-        color: "#7dce6a",
+        color: "#3dcc4a",
         stroke: "#000000",
         strokeThickness: 3,
+        resolution: 2,
+        padding: { x: 4, y: 2 },
       })
       .setOrigin(0.5, 1);
+    plate.setScale(0.5 * s);
     plate.setDepth(c.y * 10 + 10);
     this.addActor(plate);
     this.sprites.set(c.id, sprite);
@@ -445,15 +454,16 @@ export class GameScene extends Phaser.Scene {
       walkMs: 0,
     });
     const cx = pos.x + size / 2;
-    const barY = plateY + 3;
-    const bg = this.add.rectangle(cx, barY, 28, 4, 0x111111).setOrigin(0.5, 0);
-    bg.setStrokeStyle(1, 0x000000, 0.9);
+    const barY = plateY + 1;
+    const barW = 24 * s;
+    const barH = Math.max(1, 1.25 * s);
+    const bg = this.add.rectangle(cx, barY, barW + 2, barH + 1.5, 0x050505).setOrigin(0.5, 0);
     bg.setDepth(c.y * 10 + 11);
-    const fg = this.add.rectangle(cx - 13, barY + 1, 26, 2, 0x3dcc4a).setOrigin(0, 0);
+    const fg = this.add.rectangle(cx - barW / 2, barY + 0.5, barW, barH, 0x0acc30).setOrigin(0, 0);
     fg.setDepth(c.y * 10 + 12);
     this.addActor(bg);
     this.addActor(fg);
-    this.hpBars.set(c.id, { bg, fg });
+    this.hpBars.set(c.id, { bg, fg, barW, barH });
     this.setHpBar(c.id, c.hp, c.hpMax);
     this.refreshPlate(c.id);
     if (c.dead) this.applyCorpseLook(c.id);
@@ -477,17 +487,26 @@ export class GameScene extends Phaser.Scene {
     if (!sprite || !plate) return;
     const st = this.state.get(id);
     const size = st?.spriteSize || creatureSize(sprite.texture.key);
+    const s = nameplateScale(size);
+    plate.setScale(0.5 * s);
     const cx = spriteX + size / 2;
     const plateY = size === 64 ? spriteY + 8 : spriteY - 2;
     plate.setPosition(cx, plateY);
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const barY = plateY + 3;
+    const barW = Math.max(18 * s, Math.min(plate.displayWidth * 0.92 || 24 * s, 44 * s));
+    const barH = Math.max(1, 1.25 * s);
+    bar.barW = barW;
+    bar.barH = barH;
+    const barY = plateY + 1;
+    bar.bg.setSize(barW + 2, barH + 1.5);
     bar.bg.setPosition(cx, barY);
     bar.bg.setDepth(depth + 2);
-    bar.fg.setPosition(cx - 13, barY + 1);
+    bar.fg.height = barH;
+    bar.fg.setPosition(cx - barW / 2, barY + 0.5);
     bar.fg.setDepth(depth + 3);
+    this.setHpBar(id, st?.hp, st?.hpMax);
   }
 
   setHpBar(id, hp, hpMax) {
@@ -499,11 +518,11 @@ export class GameScene extends Phaser.Scene {
     const bar = this.hpBars.get(id);
     if (!bar) return;
     const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
-    const ratio = Math.max(0, Math.min(1, (hp ?? st?.hp ?? 0) / max));
-    bar.fg.width = 26 * ratio;
-    if (ratio > 0.5) bar.fg.setFillStyle(0x3dcc4a);
-    else if (ratio > 0.2) bar.fg.setFillStyle(0xe0c040);
-    else bar.fg.setFillStyle(0xcc3d3d);
+    const ratio = hpPercent(hp ?? st?.hp ?? 0, max);
+    const s = nameplateScale(st?.spriteSize || 32);
+    const barW = bar.barW || 24 * s;
+    bar.fg.width = barW * ratio;
+    bar.fg.setFillStyle(hpColorHex(ratio));
   }
 
   refreshPlate(id) {
@@ -512,6 +531,8 @@ export class GameScene extends Phaser.Scene {
     if (!st || !plate) return;
     if (st.kind === "player") plate.setText(st.name);
     else plate.setText(`${st.name} [${st.level || 5}]`);
+    const sprite = this.sprites.get(id);
+    if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
   }
 
   applyCorpseLook(id) {

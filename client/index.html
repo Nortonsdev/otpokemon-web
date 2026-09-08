@@ -86,39 +86,47 @@
           </div>
         </aside>
 
-        <aside id="hud-pokeinfo" class="ot-window myst-pokeinfo" data-win="status">
+        <aside id="hud-pokeinfo" class="ot-window player-info" data-win="status">
           <header class="win-head"><span class="win-title">PokeInfo</span></header>
-          <div class="win-body pokeinfo-body">
-            <div class="pokeinfo-portrait-wrap">
-              <img id="player-portrait" class="pokeinfo-portrait" src="/assets/human/portrait.png" alt="" />
-              <span class="pokeinfo-lv-badge">Lv <b id="status-level">1</b></span>
-            </div>
-            <div class="pokeinfo-meta">
-              <div id="pokeinfo-name" class="pokeinfo-name">—</div>
-              <div class="stat-row hp">
-                <span class="stat-ico">♥</span><span class="stat-lbl">HP</span>
-                <div class="stat-bar"><div id="player-hp-fill" class="stat-fill"></div></div>
-                <span id="player-hp-pct" class="stat-pct">100%</span>
+          <div class="win-body pi-body">
+            <div class="pi-wrap">
+              <div class="pi-panel-glow" aria-hidden="true"></div>
+              <div class="pi-panel">
+                <div class="pi-nameplate" id="pokeinfo-name">—</div>
+                <div class="pi-row hp" id="player-hp-row">
+                  <img class="pi-ico" src="/assets/hud/playerinfo/hp.png" alt="" />
+                  <div class="pi-bar"><div id="player-hp-fill" class="pi-fill"></div></div>
+                  <span id="player-hp-pct" class="pi-pct">100%</span>
+                </div>
+                <div class="pi-row exp" id="player-xp-row">
+                  <img class="pi-ico" src="/assets/hud/playerinfo/exp.png" alt="" />
+                  <div class="pi-bar"><div id="hud-xp-fill" class="pi-fill"></div></div>
+                  <span id="hud-xp-pct" class="pi-pct">0%</span>
+                </div>
+                <div class="pi-row fish" id="player-fish-row">
+                  <img class="pi-ico" src="/assets/hud/playerinfo/fish.png" alt="" />
+                  <div class="pi-bar"><div id="hud-fish-fill" class="pi-fill"></div></div>
+                  <span id="hud-fish-pct" class="pi-pct">0%</span>
+                </div>
+                <div class="pi-row stm" id="player-stm-row">
+                  <img class="pi-ico" src="/assets/hud/playerinfo/stm.png" alt="" />
+                  <div class="pi-bar"><div id="hud-stm-fill" class="pi-fill"></div></div>
+                  <span id="hud-stm-pct" class="pi-pct">100%</span>
+                </div>
+                <div class="pi-footer">
+                  <img id="player-party-balls" class="pi-balls" src="/assets/hud/pokeball0.png" alt="" />
+                  <div class="pi-chips">
+                    <span class="pi-chip" title="Troféus"><img src="/assets/hud/playerinfo/trophy.png" alt="" /><b id="hud-trophies">0</b></span>
+                    <span class="pi-chip" title="Pokébolas"><img src="/assets/hud/playerinfo/pokeballs.png" alt="" /><b id="hud-balls">0</b></span>
+                    <span class="pi-chip" title="Capacidade"><img src="/assets/hud/playerinfo/backpack.png" alt="" /><b id="hud-cap">400</b></span>
+                  </div>
+                </div>
               </div>
-              <div class="stat-row exp">
-                <span class="stat-ico">★</span><span class="stat-lbl">EXP</span>
-                <div class="stat-bar"><div id="hud-xp-fill" class="stat-fill"></div></div>
-                <span id="hud-xp-pct" class="stat-pct">0%</span>
-              </div>
-              <div class="stat-row fish">
-                <span class="stat-ico">🎣</span><span class="stat-lbl">FISH</span>
-                <div class="stat-bar"><div id="hud-fish-fill" class="stat-fill"></div></div>
-                <span id="hud-fish-pct" class="stat-pct">0%</span>
-              </div>
-              <div class="stat-row stm">
-                <span class="stat-ico">⚡</span><span class="stat-lbl">STM</span>
-                <div class="stat-bar"><div id="hud-stm-fill" class="stat-fill"></div></div>
-                <span id="hud-stm-pct" class="stat-pct">100%</span>
-              </div>
-              <div class="pokeinfo-currency">
-                <span class="cur" title="Troféus">🏆 <b id="hud-trophies">0</b></span>
-                <span class="cur" title="Pokébolas">⚪ <b id="hud-balls">0</b></span>
-                <span class="cur gold" title="Gold">● <b id="hud-gold-side">0</b></span>
+              <div class="pi-portrait-col">
+                <div class="pi-ring">
+                  <img id="player-portrait" class="pi-portrait" src="/assets/human/portrait.png" alt="" />
+                </div>
+                <span class="pi-lv">Lv <b id="status-level">1</b></span>
               </div>
             </div>
           </div>

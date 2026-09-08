@@ -15,6 +15,7 @@ import {
 } from "./species.js";
 import { MAP, SPAWN, WILD_GROUPS, hasRoof, inBounds, tileName, walkable } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
+import { playerProgressFields } from "./otpProgress.js";
 
 let nextId = 1;
 function cid() {
@@ -279,6 +280,7 @@ export class World {
     const rec = this.save.characters[charName];
     if (!rec || rec.account !== client.account) return this.err(client, "Unknown character.");
     if (this.findPlayerByName(charName)) this.forceLogoutName(charName);
+    const progress = playerProgressFields(rec);
     const player = {
       id: cid(),
       kind: "player",
@@ -290,9 +292,8 @@ export class World {
       hp: rec.hp,
       hpMax: rec.hpMax,
       gold: rec.gold ?? 925.79,
-      xpPct: rec.xpPct ?? 9,
       fishPct: rec.fishPct ?? 31,
-      stmPct: rec.stmPct ?? 100,
+      ...progress,
       look: 128,
       busyUntil: 0,
       targetId: null,
@@ -422,9 +423,8 @@ export class World {
     };
     if (c.kind === "player") {
       base.gold = c.gold ?? 925.79;
-      base.xpPct = c.xpPct ?? 9;
       base.fishPct = c.fishPct ?? 31;
-      base.stmPct = c.stmPct ?? 100;
+      Object.assign(base, playerProgressFields(c));
     }
     return base;
   }

@@ -1,5 +1,7 @@
 import { WindowManager } from "./windows.js";
 import { SPECIES } from "../../server/species.js";
+import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
+import { hpColorCss, hpPercent } from "./hpColor.js";
 
 const ITEM_META = {
   pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true },
@@ -187,9 +189,16 @@ export class Hud {
       const c = this.creatures.get(msg.to);
       if (c && msg.hp != null) {
         c.hp = msg.hp;
+        if (msg.hpMax != null) c.hpMax = msg.hpMax;
         if (c.name) c.plate = `${c.name} [${c.level || 5}]  ${c.hp}/${c.hpMax}`;
       }
-      this.renderBattle();
+      if (this.you && msg.to === this.you.id && msg.hp != null) {
+        this.you.hp = msg.hp;
+        if (msg.hpMax != null) this.you.hpMax = msg.hpMax;
+        this.render();
+      } else {
+        this.renderBattle();
+      }
     }
     if (msg.t === "target") {
       if (msg.id == null) this.setTarget(null);
@@ -252,30 +261,58 @@ export class Hud {
     const lv = this.you?.level || 1;
     document.getElementById("status-level").textContent = lv;
 
+    const progress = playerProgressFields(this.you || {});
     const hp = this.you?.hp ?? 150;
     const hpMax = this.you?.hpMax ?? 150;
-    const hpPct = Math.round((hp / hpMax) * 100);
-    document.getElementById("player-hp-fill").style.width = `${hpPct}%`;
+    const hpRatio = hpPercent(hp, hpMax);
+    const hpPct = Math.round(hpRatio * 100);
+    const hpFill = document.getElementById("player-hp-fill");
+    hpFill.style.width = `${hpPct}%`;
+    hpFill.style.background = hpColorCss(hpRatio);
     document.getElementById("player-hp-pct").textContent = `${hpPct}%`;
+    const hpRow = document.getElementById("player-hp-row");
+    if (hpRow) hpRow.title = `Health ${hpPct}% (${hp}/${hpMax})`;
 
-    const xpPct = this.you?.xpPct ?? 0;
+    const xpPct = progress.expPercent;
     document.getElementById("hud-xp-fill").style.width = `${xpPct}%`;
-    document.getElementById("hud-xp-pct").textContent = `${xpPct.toFixed(1)}%`;
-    document.getElementById("hud-fish-fill").style.width = `${this.you?.fishPct ?? 0}%`;
-    document.getElementById("hud-fish-pct").textContent = `${this.you?.fishPct ?? 0}%`;
-    document.getElementById("hud-stm-fill").style.width = `${this.you?.stmPct ?? 100}%`;
-    document.getElementById("hud-stm-pct").textContent = `${this.you?.stmPct ?? 100}%`;
+    document.getElementById("hud-xp-pct").textContent = `${xpPct}%`;
+    const xpRow = document.getElementById("player-xp-row");
+    if (xpRow) {
+      xpRow.title =
+        progress.exp != null && progress.expNext != null
+          ? `Experience ${xpPct}% (${progress.exp}/${progress.expNext})`
+          : `Experience ${xpPct}%`;
+    }
+
+    const fishPct = this.you?.fishPct ?? 31;
+    document.getElementById("hud-fish-fill").style.width = `${fishPct}%`;
+    document.getElementById("hud-fish-pct").textContent = `${fishPct}%`;
+
+    const stmPct = progress.stmPercent;
+    document.getElementById("hud-stm-fill").style.width = `${stmPct}%`;
+    document.getElementById("hud-stm-pct").textContent = `${stmPct}%`;
+    const stmRow = document.getElementById("player-stm-row");
+    if (stmRow) stmRow.title = `Stamina ${stmPct}% (${staminaClock(progress.staminaMinutes)})`;
 
     const balls = this.bag.find((i) => i.item === "pokeball")?.count || 0;
     document.getElementById("hud-balls").textContent = balls;
-    const goldSide = document.getElementById("hud-gold-side");
-    const goldVal = this.you?.gold ?? 0;
-    if (goldSide) goldSide.textContent = goldVal.toFixed(2);
     const trophies = document.getElementById("hud-trophies");
-    if (trophies) trophies.textContent = "0";
+    if (trophies) trophies.textContent = String(progress.trophies ?? 0);
+    const cap = document.getElementById("hud-cap");
+    if (cap) cap.textContent = String(progress.cap ?? 400);
+
+    const occupied = (this.party.slots || []).filter(Boolean).length;
+    const ballStrip = document.getElementById("player-party-balls");
+    if (ballStrip) ballStrip.src = `/assets/hud/pokeball${Math.max(0, Math.min(6, occupied))}.png`;
 
     const portrait = document.getElementById("player-portrait");
-    if (portrait) portrait.src = "/assets/human/portrait.png";
+    if (portrait) {
+      portrait.src = "/assets/human/portrait.png";
+      portrait.onerror = () => {
+        portrait.removeAttribute("src");
+        portrait.style.background = "#0a0c12";
+      };
+    }
 
     this.renderPokebar();
     this.renderBattle();

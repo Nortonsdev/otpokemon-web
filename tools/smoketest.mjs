@@ -1,5 +1,25 @@
 import WebSocket from "ws";
 import { getMaxHealth } from "../server/species.js";
+import { hpColorRgb, hpPercent } from "../client/src/hpColor.js";
+import { playerProgressFields, staminaClock } from "../server/otpProgress.js";
+
+if (getMaxHealth({ hp: 39 }, 5) !== 18) throw new Error("Charmander lv5 max HP");
+if (getMaxHealth({ hp: 45 }, 2) !== 13) throw new Error("Caterpie lv2 max HP");
+
+function rgbEq(a, b) {
+  if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2]) {
+    throw new Error(`hpColor ${a} != ${b}`);
+  }
+}
+rgbEq(hpColorRgb(1), [10, 220, 48]);
+rgbEq(hpColorRgb(0.59), [240, 210, 20]);
+rgbEq(hpColorRgb(0.24), [210, 24, 24]);
+rgbEq(hpColorRgb(0.02), [0, 0, 0]);
+rgbEq(hpColorRgb(0), [0, 0, 0]);
+if (hpPercent(96, 150) < 0.63 || hpPercent(96, 150) > 0.65) throw new Error("hpPercent 96/150");
+const stub = playerProgressFields({});
+if (stub.expPercent !== 21) throw new Error(`exp stub ${stub.expPercent}`);
+if (staminaClock(stub.staminaMinutes) !== "42:00") throw new Error("stamina clock");
 
 if (getMaxHealth({ hp: 39 }, 5) !== 18) throw new Error("Charmander lv5 max HP");
 if (getMaxHealth({ hp: 45 }, 2) !== 13) throw new Error("Caterpie lv2 max HP");
@@ -62,6 +82,9 @@ a.send({ t: "enter", name: char });
 const map1 = await a.wait("map");
 const start = { x: map1.you.x, y: map1.you.y };
 if (map1.you.kind !== "player") throw new Error("player must be human, not pokemon");
+if (map1.you.exp == null || map1.you.expNext == null) throw new Error("player exp stubs missing");
+if (map1.you.staminaMinutes == null || map1.you.stmPercent == null) throw new Error("player stm stubs missing");
+if (staminaClock(map1.you.staminaMinutes) !== "42:00") throw new Error("player stamina display");
 if (map1.party.slots[0]?.species !== "charmander") throw new Error("starter missing");
 const starterHp = map1.party.slots[0].hpMax;
 if (starterHp !== 18) {
