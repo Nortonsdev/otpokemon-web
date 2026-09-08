@@ -16,17 +16,13 @@ function creatureSize(tex) {
   return 32;
 }
 
-const NAME_PX = 10;
+const NAME_PX = 9;
 const NAME_RES = 4;
-const NAME_STROKE = 4;
+const NAME_STROKE = 2;
+const NAME_BAR_GAP = 1;
 const BAR_W = 22;
 const BAR_H = 3;
 const BAR_PAD = 1;
-
-function nameFillRgb(color) {
-  const hex = String(color || "#2fc24a").replace("#", "");
-  return [parseInt(hex.slice(0, 2), 16) || 0, parseInt(hex.slice(2, 4), 16) || 0, parseInt(hex.slice(4, 6), 16) || 0];
-}
 
 function tileWorld(x, y, size) {
   if (size > TILE) {
@@ -188,7 +184,7 @@ export class GameScene extends Phaser.Scene {
       repeat: -1,
       ease: "Sine.InOut",
     });
-    this.cameras.main.setRoundPixels(false);
+    this.cameras.main.setRoundPixels(true);
     this.cameras.main.setBackgroundColor(0x111111);
     if (this.pendingWorld) {
       const payload = this.pendingWorld;
@@ -351,7 +347,7 @@ export class GameScene extends Phaser.Scene {
     this.drawMap();
     this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
-    this.cameras.main.setRoundPixels(false);
+    this.cameras.main.setRoundPixels(true);
     this.cameras.main.centerOn(SPAWN.x * TILE + TILE / 2, SPAWN.y * TILE + TILE / 2);
   }
 
@@ -370,7 +366,7 @@ export class GameScene extends Phaser.Scene {
     for (const c of payload.creatures || []) this.spawn(c);
     this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
-    this.cameras.main.setRoundPixels(false);
+    this.cameras.main.setRoundPixels(true);
     this.layoutAll();
     this.lockCamera();
     this.updateRoofs();
@@ -503,50 +499,9 @@ export class GameScene extends Phaser.Scene {
     return Math.max(NAME_RES, Math.ceil(zoom * dpr) * 2);
   }
 
-  hardenNameplate(plate) {
-    const canvas = plate.canvas;
-    const ctx = plate.context;
-    if (!canvas || !ctx) return;
-    const w = canvas.width;
-    const h = canvas.height;
-    if (w < 1 || h < 1) return;
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    const [fr, fg, fb] = nameFillRgb(plate.style.color);
-    for (let i = 0; i < d.length; i += 4) {
-      const a = d[i + 3];
-      if (a < 48) {
-        d[i] = 0;
-        d[i + 1] = 0;
-        d[i + 2] = 0;
-        d[i + 3] = 0;
-        continue;
-      }
-      const r = d[i];
-      const g = d[i + 1];
-      const b = d[i + 2];
-      const distFill = (r - fr) ** 2 + (g - fg) ** 2 + (b - fb) ** 2;
-      const distBlack = r * r + g * g + b * b;
-      if (distFill <= distBlack && g >= 70) {
-        d[i] = fr;
-        d[i + 1] = fg;
-        d[i + 2] = fb;
-        d[i + 3] = 255;
-      } else {
-        d[i] = 0;
-        d[i + 1] = 0;
-        d[i + 2] = 0;
-        d[i + 3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-    plate.texture?.refresh?.();
-  }
-
   sharpenNameplate(plate) {
     const res = this.nameplateResolution();
     if (plate.style.resolution !== res) plate.setResolution(res);
-    this.hardenNameplate(plate);
   }
 
   makeNameplate(x, y, text, color, depth) {
@@ -559,7 +514,7 @@ export class GameScene extends Phaser.Scene {
         stroke: "#000000",
         strokeThickness: NAME_STROKE,
         resolution: this.nameplateResolution(),
-        padding: { x: NAME_STROKE + 2, top: NAME_STROKE, bottom: 0 },
+        padding: { x: NAME_STROKE + 1, top: NAME_STROKE, bottom: 0 },
       })
       .setOrigin(0.5, 1);
     this.sharpenNameplate(plate);
@@ -578,14 +533,14 @@ export class GameScene extends Phaser.Scene {
     const res = this.nameplateResolution();
     if (plate.style.resolution !== res) this.sharpenNameplate(plate);
     plate.setScale(ui);
-    const cx = spriteX + size / 2;
-    const nameBottom = size > TILE ? spriteY + 4 : spriteY - 2;
+    const cx = Math.round(spriteX + size / 2);
+    const nameBottom = Math.round(size > TILE ? spriteY + 4 : spriteY - 2);
     plate.setPosition(cx, nameBottom);
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const barTop = nameBottom + ui;
-    const innerTop = barTop + BAR_PAD * ui;
+    const barTop = Math.round(nameBottom + NAME_BAR_GAP * ui);
+    const innerTop = Math.round(barTop + BAR_PAD * ui);
     const outW = BAR_W + BAR_PAD * 2;
     const outH = BAR_H + BAR_PAD * 2;
     for (const part of [bar.outline, bar.track, bar.fg]) part?.setScale(ui);
@@ -599,7 +554,7 @@ export class GameScene extends Phaser.Scene {
     bar.track?.setDepth(depth + 3);
     bar.fg.height = BAR_H;
     bar.fg.setOrigin(0, 0);
-    bar.fg.setPosition(cx - (BAR_W * ui) / 2, innerTop);
+    bar.fg.setPosition(Math.round(cx - (BAR_W * ui) / 2), innerTop);
     bar.fg.setDepth(depth + 4);
     this.setHpBar(id, st?.hp, st?.hpMax);
   }
