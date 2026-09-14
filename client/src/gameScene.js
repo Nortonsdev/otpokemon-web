@@ -78,12 +78,19 @@ function nameplateTextStyle(kind) {
   };
 }
 
+function isWildCreature(st) {
+  return st?.kind === "wild" || !!st?.wild;
+}
+
 function nameplateNameBottomY(spriteY, st, size) {
-  const wild = st?.kind === "wild" || st?.wild;
   const playerOrNpc = st?.kind === "player" || st?.kind === "npc";
-  if (wild) return spriteY - 5;
   if (playerOrNpc || size > TILE) return spriteY + 6;
   return spriteY - 3;
+}
+
+/** Topo da barra de HP para wilds: colada sob os pés do sprite (origin 0,0). */
+function wildHpBarTopY(spriteY, size) {
+  return spriteY + size;
 }
 
 function tileWorld(x, y, size) {
@@ -659,14 +666,19 @@ export class GameScene extends Phaser.Scene {
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
+    const wild = isWildCreature(st);
+    if (wild) plate.setVisible(false);
+    else plate.setVisible(true);
+
     const nameGap = Math.max(1, Math.round(1 * ui));
     const barBlockH = (BAR_H + BAR_PAD * 2) * ui;
     const z = Math.max(0.25, this.cameras.main?.zoom || 1);
     const textH = Math.max(1, Math.round(NAMEPLATE_SCREEN_PX / z));
     const playerStack = st?.kind === "player";
-    const barTop = playerStack
-      ? nameBottom - textH - nameGap - barBlockH
-      : nameBottom + nameGap;
+    let barTop;
+    if (wild) barTop = wildHpBarTopY(spriteY, size);
+    else if (playerStack) barTop = nameBottom - textH - nameGap - barBlockH;
+    else barTop = nameBottom + nameGap;
     const innerTop = barTop + BAR_PAD * ui;
     const outW = BAR_W + BAR_PAD * 2;
     const outH = BAR_H + BAR_PAD * 2;
@@ -708,12 +720,18 @@ export class GameScene extends Phaser.Scene {
     if (st.kind === "npc") {
       plate.setText(`${st.name} (!)`);
       plate.setColor("#00d4e8");
+      plate.setVisible(true);
     } else if (st.kind === "player") {
       plate.setText(st.name);
       plate.setColor("#7dce6a");
+      plate.setVisible(true);
+    } else if (isWildCreature(st)) {
+      plate.setText("");
+      plate.setVisible(false);
     } else {
       plate.setText(pokemonPlateText(st));
-      plate.setColor(st.kind === "wild" || st.wild ? "#7aa2f7" : "#ffffff");
+      plate.setColor("#ffffff");
+      plate.setVisible(true);
     }
     this.applyNameplateScreenScale(plate);
     const sprite = this.sprites.get(id);
@@ -765,7 +783,8 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     sprite.setVisible(true);
-      this.plates.get(id)?.setVisible(true);
+      const plate = this.plates.get(id);
+      if (plate) plate.setVisible(!isWildCreature(st));
       this.setHpBarVisible(this.hpBars.get(id), true);
       sprite.setOrigin(0, 0);
       sprite.setAngle(0);
