@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Build 32×32 look + corpse sheets for the 20-species milestone.
+"""Legacy PokeAPI placeholder builder (superseded by OTP2072026 export).
 
-Keeps the four Ruby.spr exports (Bulbasaur, Charmander, Squirtle, Caterpie).
-Other looks are trimmed PokeAPI sprites stamped into a 4×3 walk sheet.
-Dedicated fly/hide/ride frames are not in this repo — the client offsets those.
+Use tools/extract_otp207_sprites.py with the OTP2072026 zip
+(objectbuilder/Tibia.dat + Tibia.spr) for production Pokémon sheets.
 """
 from __future__ import annotations
 

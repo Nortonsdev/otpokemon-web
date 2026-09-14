@@ -13,7 +13,19 @@ import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchAudio } from "./catchSfx.js";
 
 const TILE = 32;
-const LARGE_MONS = new Set(["charizard", "rapidash"]);
+/** OTP2072026 looktypes that use 2×2 (64×64) sheets in objectbuilder/Tibia.dat */
+const LARGE_MONS = new Set([
+  "beedrill",
+  "bulbasaur",
+  "butterfree",
+  "charizard",
+  "kakuna",
+  "pidgeot",
+  "rapidash",
+  "raticate",
+  "squirtle",
+  "weedle",
+]);
 const SPRITE_COL = [0, 1, 1, 2, 2, 3, 3, 0];
 
 function monFrame(name) {
