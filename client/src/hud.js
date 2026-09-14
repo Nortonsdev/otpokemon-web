@@ -10,21 +10,21 @@ import {
   ITEM_BOX_SLOTS,
   itemBoxRowCount,
 } from "../../shared/itemBoxCaps.js";
-import { BALL_REGISTRY, CATCH_BALL_ITEMS, applyBallAtlas, ballIconHtml } from "./ballIcons.js";
+import { BALL_REGISTRY, CATCH_BALL_ITEMS, ballIconHtml } from "./ballIcons.js";
 
 const CATCH_REGISTRY = CATCH_BALL_ITEMS;
 
 const ITEM_META = {
-  premierball: { label: "Premier Ball", catch: true, atlas: true },
-  ultraball: { label: "Ultra Ball", catch: true, atlas: true },
-  masterball: { label: "Master Ball", catch: true, atlas: true },
+  premierball: { label: "Premier Ball", catch: true },
+  ultraball: { label: "Ultra Ball", catch: true },
+  masterball: { label: "Master Ball", catch: true },
   pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true },
   small_potion: { label: "Small Potion", icon: "/assets/items/small_potion.png", heal: true },
   great_potion: { label: "Great Potion", icon: "/assets/items/great_potion.png", heal: true },
 };
 
 function itemIconHtml(entry, count) {
-  if (entry?.atlas && entry.item) return ballIconHtml(entry.item, count);
+  if (entry?.item && BALL_REGISTRY[entry.item]) return ballIconHtml(entry.item, count);
   const icon = entry?.icon || entry;
   const n = Math.max(0, Number(count) || 0);
   const stack = n > 0 ? `<span class="item-stack">${n}</span>` : "";
@@ -625,6 +625,7 @@ export class Hud {
     const filled = [];
     for (const entry of this.lootBag) {
       if (!entry?.item || entry.count <= 0) continue;
+      if (entry.item === "pokeball") continue;
       const meta = ITEM_META[entry.item] || {
         label: entry.item,
         icon: "/assets/items/pokeball.png",
@@ -655,7 +656,6 @@ export class Hud {
       }
       grid.appendChild(cell);
     }
-    applyBallAtlas(grid);
   }
 
   renderCoinsWindow() {
@@ -850,7 +850,6 @@ export class Hud {
       }
       row.appendChild(btn);
     });
-    applyBallAtlas(bar);
   }
 }
 

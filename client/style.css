@@ -1215,8 +1215,8 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   right: 0;
   bottom: 0;
   font-size: 8px;
-  color: var(--otp-gold-label);
-  text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000;
 }
 .item-box-cell.use-with { outline: 1px solid #d4a848; border-color: #d4a848; }
 .item-box-cell.empty { opacity: 0.35; }
@@ -1359,12 +1359,6 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   height: 100%;
 }
 .poke-active-status .pas-hp-num { font-size: 7px; color: #aab8cc; }
-.item-box-cell .ball-atlas {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
 .hot-cd {
   position: absolute;
   inset: 0;
@@ -1397,8 +1391,8 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   position: absolute; right: 1px; bottom: 0;
   font-size: 8px; font-weight: 700;
   font-family: Verdana, Tahoma, sans-serif;
-  color: var(--otp-gold-label);
-  text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000;
   pointer-events: none;
 }
 

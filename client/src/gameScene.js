@@ -197,8 +197,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image("attacked", "/assets/fx/attacked.png");
     this.load.image("ball-pokeball", "/assets/items/pokeball.png");
     this.load.image("ball-premierball", "/assets/items/premierball.png");
-    this.load.image("ball-ultraball", "/assets/items/pokeball.png");
-    this.load.image("ball-masterball", "/assets/items/pokeball.png");
+    this.load.image("ball-ultraball", "/assets/items/ultraball.png");
+    this.load.image("ball-masterball", "/assets/items/masterball.png");
     this.load.audio("catching", "/assets/sfx/catching.ogg");
     this.load.audio("catch_fail", "/assets/sfx/catch_fail.ogg");
     this.load.audio("catch_sucess", "/assets/sfx/catch_sucess.ogg");
