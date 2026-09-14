@@ -1153,63 +1153,69 @@ export async function serializeOtbm(
     writer.writeString(map.zoneFile)
   }
 
-  // Tile areas — with periodic yields
+  // Tile areas — with periodic yields.
+  // Honor RME area order when present, but always emit tiles added after parse
+  // (house/zone/brush edits on empty sqm are not in `_areaSequence`).
   let tileCount = 0
+  const written = new Set<string>()
+  const writeTile = async (tile: OtbmTile) => {
+    const key = tileKey(tile.x, tile.y, tile.z)
+    if (written.has(key)) return
+    written.add(key)
+    serializeTile(writer, tile, saveVersion)
+    tileCount++
+    if (tileCount % YIELD_EVERY === 0) {
+      onProgress?.(tileCount, totalTiles)
+      await yieldToMain()
+    }
+  }
 
-  if (map._areaSequence) {
+  const openArea = (baseX: number, baseY: number, baseZ: number) => {
+    writer.startNode(OTBM_TILE_AREA)
+    writer.writeU16(baseX)
+    writer.writeU16(baseY)
+    writer.writeU8(baseZ)
+  }
+
+  if (map._areaSequence?.length) {
     for (const area of map._areaSequence) {
-      writer.startNode(OTBM_TILE_AREA)
-      writer.writeU16(area.baseX)
-      writer.writeU16(area.baseY)
-      writer.writeU8(area.baseZ)
-
+      openArea(area.baseX, area.baseY, area.baseZ)
       for (const key of area.tileKeys) {
         const tile = map.tiles.get(key)
-        if (tile) {
-          serializeTile(writer, tile, saveVersion)
-          tileCount++
-          if (tileCount % YIELD_EVERY === 0) {
-            onProgress?.(tileCount, totalTiles)
-            await yieldToMain()
-          }
-        }
+        if (tile) await writeTile(tile)
       }
-
+      const extras = [...map.tiles.values()].filter(
+        (t) =>
+          (t.x & 0xff00) === area.baseX &&
+          (t.y & 0xff00) === area.baseY &&
+          t.z === area.baseZ &&
+          !written.has(tileKey(t.x, t.y, t.z)),
+      )
+      for (const tile of extras) await writeTile(tile)
       writer.endNode()
     }
-  } else {
-    let curBaseX = -1
-    let curBaseY = -1
-    let curBaseZ = -1
-    let areaOpen = false
-
-    for (const tile of map.tiles.values()) {
-      const baseX = tile.x & 0xFF00
-      const baseY = tile.y & 0xFF00
-      const baseZ = tile.z
-
-      if (baseX !== curBaseX || baseY !== curBaseY || baseZ !== curBaseZ) {
-        if (areaOpen) writer.endNode()
-        writer.startNode(OTBM_TILE_AREA)
-        writer.writeU16(baseX)
-        writer.writeU16(baseY)
-        writer.writeU8(baseZ)
-        curBaseX = baseX
-        curBaseY = baseY
-        curBaseZ = baseZ
-        areaOpen = true
-      }
-
-      serializeTile(writer, tile, saveVersion)
-      tileCount++
-      if (tileCount % YIELD_EVERY === 0) {
-        onProgress?.(tileCount, totalTiles)
-        await yieldToMain()
-      }
-    }
-
-    if (areaOpen) writer.endNode()
   }
+
+  let curBaseX = -1
+  let curBaseY = -1
+  let curBaseZ = -1
+  let areaOpen = false
+  for (const tile of map.tiles.values()) {
+    if (written.has(tileKey(tile.x, tile.y, tile.z))) continue
+    const baseX = tile.x & 0xff00
+    const baseY = tile.y & 0xff00
+    const baseZ = tile.z
+    if (baseX !== curBaseX || baseY !== curBaseY || baseZ !== curBaseZ) {
+      if (areaOpen) writer.endNode()
+      openArea(baseX, baseY, baseZ)
+      curBaseX = baseX
+      curBaseY = baseY
+      curBaseZ = baseZ
+      areaOpen = true
+    }
+    await writeTile(tile)
+  }
+  if (areaOpen) writer.endNode()
 
   if (totalTiles > 0) onProgress?.(totalTiles, totalTiles)
 

@@ -125,6 +125,21 @@ assert(parseOtbm(exported).tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_T
 assert((parseOtbm(exported).tiles.get(tileKey(5, 2, 7)).flags & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "export SAFE");
 rmSync(tmp, { recursive: true, force: true });
 
+const parsedAreas = parseOtbm(bytes);
+parsedAreas.tiles.set(tileKey(0, 5, 7), {
+  x: 0,
+  y: 5,
+  z: 7,
+  flags: TILESTATE_NOPVPZONE,
+  houseId: 9,
+  items: [{ id: BUILTIN_TILE_IDS.path }],
+});
+const withNew = await serializeOtbm(parsedAreas);
+const reNew = parseOtbm(withNew);
+assert(reNew.tiles.get(tileKey(0, 5, 7))?.houseId === 9, "new HOUSETILE survives _areaSequence");
+assert(reNew.tiles.get(tileKey(0, 5, 7))?.items[0].id === BUILTIN_TILE_IDS.path, "new path tile survives _areaSequence");
+assert((reNew.tiles.get(tileKey(0, 5, 7)).flags & TILESTATE_NOPVPZONE) === TILESTATE_NOPVPZONE, "new NOPVP survives _areaSequence");
+
 const { isCombatSafeZone } = await import("../shared/safeZone.js");
 assert(isCombatSafeZone(5, 2, { flags: runtime.flags, spawn: { x: 99, y: 99 } }), "OTBM SAFE gates swap far from temple");
 assert(!isCombatSafeZone(0, 0, { flags: runtime.flags, spawn: { x: 99, y: 99 } }), "non-SAFE tile blocks swap");
