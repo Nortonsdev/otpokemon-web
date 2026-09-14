@@ -34,6 +34,14 @@ body,
 .editor-stage {
   position: relative;
   height: 100%;
+  /* Remere chrome slots: left brushes, top tools, right Z, bottom status, BR minimap */
+  --chrome-gap: 12px;
+  --brushes-w: 292px;
+  --minimap-w: 168px;
+  --minimap-h: 118px;
+  --guest-w: 88px;
+  --map-left: calc(var(--chrome-gap) + var(--brushes-w) + var(--chrome-gap));
+  --map-right: calc(var(--chrome-gap) + var(--minimap-w) + var(--chrome-gap));
 }
 
 .canvas-wrap {
@@ -61,10 +69,10 @@ body,
 
 .brushes-panel {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  bottom: 12px;
-  width: 292px;
+  top: var(--chrome-gap);
+  left: var(--chrome-gap);
+  bottom: var(--chrome-gap);
+  width: var(--brushes-w);
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -165,8 +173,8 @@ body,
 
 .top-chrome {
   position: absolute;
-  top: 12px;
-  left: 320px;
+  top: var(--chrome-gap);
+  left: var(--map-left);
   z-index: 6;
   display: flex;
   align-items: center;
@@ -174,7 +182,7 @@ body,
   padding: 6px 8px;
   border-radius: 14px;
   width: max-content;
-  max-width: calc(100% - 400px);
+  max-width: calc(100% - var(--map-left) - var(--guest-w) - var(--chrome-gap) * 2);
 }
 
 .menus {
@@ -276,8 +284,8 @@ body,
 
 .guest-link {
   position: absolute;
-  top: 14px;
-  right: 16px;
+  top: var(--chrome-gap);
+  right: var(--chrome-gap);
   z-index: 6;
   color: var(--ed-muted);
   text-decoration: none;
@@ -293,8 +301,8 @@ body,
 
 .floor-dock {
   position: absolute;
-  right: 12px;
-  top: 42%;
+  right: var(--chrome-gap);
+  top: max(64px, 22%);
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -339,9 +347,11 @@ body,
 
 .status-pill {
   position: absolute;
-  left: 50%;
-  bottom: 12px;
-  transform: translateX(-12%);
+  left: var(--map-left);
+  right: var(--map-right);
+  bottom: var(--chrome-gap);
+  width: max-content;
+  margin-inline: auto;
   z-index: 5;
   display: flex;
   gap: 16px;
@@ -355,19 +365,21 @@ body,
 
 .status-msg {
   position: absolute;
-  left: 320px;
-  bottom: 44px;
+  left: var(--map-left);
+  right: var(--map-right);
+  bottom: 48px;
   z-index: 5;
+  display: block;
+  text-align: center;
   font-size: 12px;
   color: var(--ed-accent);
-  max-width: 50%;
   pointer-events: none;
 }
 
 .minimap-dock {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
+  right: var(--chrome-gap);
+  bottom: var(--chrome-gap);
   z-index: 5;
   border-radius: 10px;
   overflow: hidden;
@@ -433,7 +445,5 @@ body,
 .hidden { display: none !important; }
 
 @media (max-width: 900px) {
-  .brushes-panel { width: 240px; }
-  .top-chrome { left: 256px; max-width: calc(100% - 270px); }
-  .status-msg { left: 256px; }
+  .editor-stage { --brushes-w: 240px; }
 }
