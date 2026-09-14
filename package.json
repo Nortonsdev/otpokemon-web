@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "phaser": "^3.80.1",
+    "three": "^0.170.0",
     "ws": "^8.18.2"
   },
   "devDependencies": {
