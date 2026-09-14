@@ -41,13 +41,15 @@ O jogo é **um andar jogável**: o templo da primeira cidade (ou o Z com mais ti
 
 | Ferramenta | Atalho | Comportamento |
 |------------|--------|----------------|
-| Novo / Abrir / Salvar / Aplicar | Ctrl+O / Ctrl+S | OTBM download e `POST /api/map` |
-| Brush / Apagar / Preencher / Selecionar / Pan | B E F M H, espaço | Pintar, flood fill 4-conectado, retângulo, pan |
+| FILE Novo / Abrir / Salvar / Aplicar | Ctrl+O / Ctrl+S | OTBM download e `POST /api/map` |
+| Brush / Apagar / Preencher / Retângulo / Selecionar | B E F R M | Pintar, flood fill, retângulo, pan (espaço) |
+| Casa | H | Pinta `OTBM_HOUSETILE` + house id (Alt/direito remove) |
+| PVP / non-PVP / Segura | | Flags Remere + `OTBM_TILE_ZONE` (vermelho / amarelo / verde) |
+| Waypoint / Spawn / Ir para | | Clique no mapa; spawn persiste como zone id 4 |
 | Desfazer / Refazer | Ctrl+Z / Ctrl+Y | Histórico profundo do mapa |
-| Ir para… | | `x, y, z` ou `{x=…, y=…, z=…}` |
-| Cidades / Waypoints | | Modais estilo YATME; clique no mapa com as tools Templo/Waypoint |
-| DAT / SPR / XML / +PNG | | Paleta clássica; PNG avulso recebe IDs ≥ 100000 |
-| Andares | ▲ ▼ | Z 0–15 |
+| Cidades / Waypoints | MAP menu | Modais estilo YATME |
+| DAT / SPR / XML / +PNG | FILE | Paleta clássica; PNG avulso recebe IDs ≥ 100000 |
+| Andares | ▲ ▼ | Z 0–15 (▲ sobe no mundo = Z menor) |
 | Zoom | scroll, `+` / `-` | 0.25×–4× |
 
 ## Módulos

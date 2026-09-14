@@ -112,3 +112,44 @@ export function itemKindForId(id: number): string | undefined {
 }
 
 export const BUILTIN_PALETTE_IDS: number[] = Object.values(BUILTIN_TILE_IDS);
+
+export type PaletteTab = "all" | "terrain" | "doodad" | "items" | "raw";
+
+const BUILTIN_TAB: Record<number, Exclude<PaletteTab, "all" | "raw">> = {
+  [BUILTIN_TILE_IDS.grass]: "terrain",
+  [BUILTIN_TILE_IDS.path]: "terrain",
+  [BUILTIN_TILE_IDS.stone]: "terrain",
+  [BUILTIN_TILE_IDS.wood]: "terrain",
+  [BUILTIN_TILE_IDS.water]: "terrain",
+  [BUILTIN_TILE_IDS.cave]: "terrain",
+  [BUILTIN_TILE_IDS.marble]: "terrain",
+  [BUILTIN_TILE_IDS.wall]: "doodad",
+  [BUILTIN_TILE_IDS.roof]: "doodad",
+  [BUILTIN_TILE_IDS.flower]: "doodad",
+  [BUILTIN_TILE_IDS.rose]: "doodad",
+  [BUILTIN_TILE_IDS.gold]: "items",
+};
+
+export function paletteTabForId(
+  id: number,
+  catalog?: { items: Map<number, { isGround?: boolean; blocks?: boolean; stackable?: boolean }> } | null,
+): Exclude<PaletteTab, "all"> {
+  if (BUILTIN_TAB[id]) return BUILTIN_TAB[id];
+  const meta = catalog?.items.get(id);
+  if (meta?.isGround) return "terrain";
+  if (meta?.blocks) return "doodad";
+  if (meta) return meta.stackable ? "items" : "doodad";
+  if (id >= CUSTOM_ID_START) return "items";
+  return "raw";
+}
+
+export function displayNameForId(
+  id: number,
+  catalog?: { items: Map<number, { name?: string }> } | null,
+): string {
+  const fromCat = catalog?.items.get(id)?.name;
+  if (fromCat && !fromCat.startsWith("Item ")) return fromCat;
+  const builtin = builtinNameForId(id);
+  if (builtin) return builtin.replace(/^\w/, (c) => c.toUpperCase());
+  return `#${id}`;
+}

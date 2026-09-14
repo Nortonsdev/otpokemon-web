@@ -3,7 +3,16 @@
  */
 
 import type { OtbmMap, OtbmTile } from "./otbm.ts";
-import { tileKey } from "./otbm.ts";
+import {
+  tileKey,
+  ZONE_SPAWN,
+  ZONE_PVP,
+  ZONE_NOPVP,
+  ZONE_PROTECTION,
+  TILESTATE_PROTECTIONZONE,
+  TILESTATE_NOPVPZONE,
+  TILESTATE_PVPZONE,
+} from "./otbm.ts";
 import type { ClassicCatalog } from "./classicClient.ts";
 import {
   BUILTIN_TILE_IDS,
@@ -23,6 +32,10 @@ export interface RuntimeMap {
   roofs: number[][];
   items: Array<{ x: number; y: number; kind: string; itemId?: number }>;
   cells: Array<Array<{ items: number[] }>>;
+  /** Remere TILESTATE flags per cell (PZ / NoPvP / PvP). */
+  flags: number[][];
+  /** House id per cell (0 = none). */
+  houses: number[][];
   wildSpawns: Array<{ x: number; y: number }>;
   spawn: { x: number; y: number; z: number };
   tile: number;
@@ -51,16 +64,22 @@ function emptyGrid(w: number, h: number): RuntimeMap {
   const ground: number[][] = [];
   const walls: number[][] = [];
   const roofs: number[][] = [];
+  const flags: number[][] = [];
+  const houses: number[][] = [];
   const cells: Array<Array<{ items: number[] }>> = [];
   for (let y = 0; y < h; y++) {
     ground[y] = [];
     walls[y] = [];
     roofs[y] = [];
+    flags[y] = [];
+    houses[y] = [];
     cells[y] = [];
     for (let x = 0; x < w; x++) {
       ground[y][x] = GROUND.grass;
       walls[y][x] = 0;
       roofs[y][x] = 0;
+      flags[y][x] = 0;
+      houses[y][x] = 0;
       cells[y][x] = { items: [BUILTIN_TILE_IDS.grass] };
     }
   }
@@ -73,6 +92,8 @@ function emptyGrid(w: number, h: number): RuntimeMap {
     roofs,
     items: [],
     cells,
+    flags,
+    houses,
     wildSpawns: [],
     spawn: { x: Math.floor(w / 2), y: Math.floor(h / 2), z: 7 },
     tile: 32,
@@ -141,6 +162,11 @@ export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ
       tile.items.map((it) => it.id),
       catalog,
     );
+    runtime.flags[tile.y][tile.x] = tile.flags || 0;
+    runtime.houses[tile.y][tile.x] = tile.houseId || 0;
+    if (tile.spawnMonster || tile.zones?.includes(ZONE_SPAWN)) {
+      runtime.wildSpawns.push({ x: tile.x, y: tile.y });
+    }
   }
 
   const temple = otbm.towns[0];
@@ -155,7 +181,15 @@ export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ
 export function runtimeTileAt(runtime: RuntimeMap, x: number, y: number, z: number): OtbmTile | null {
   if (x < 0 || y < 0 || x >= runtime.w || y >= runtime.h) return null;
   const items = runtime.cells[y][x].items.map((id) => ({ id }));
-  return { x, y, z, flags: 0, items };
+  const houseId = runtime.houses?.[y]?.[x] || undefined;
+  return {
+    x,
+    y,
+    z,
+    flags: runtime.flags?.[y]?.[x] || 0,
+    houseId: houseId || undefined,
+    items,
+  };
 }
 
 export function setRuntimeCell(
@@ -175,12 +209,22 @@ export function runtimeToOtbm(runtime: RuntimeMap): OtbmMap {
     for (let x = 0; x < runtime.w; x++) {
       const ids = runtime.cells[y][x].items.filter((id) => id > 0);
       if (!ids.length) continue;
+      const flags = runtime.flags?.[y]?.[x] || 0;
+      const houseId = runtime.houses?.[y]?.[x] || undefined;
+      const zones: number[] = [];
+      if (flags & TILESTATE_PVPZONE) zones.push(ZONE_PVP);
+      if (flags & TILESTATE_NOPVPZONE) zones.push(ZONE_NOPVP);
+      if (flags & TILESTATE_PROTECTIONZONE) zones.push(ZONE_PROTECTION);
+      if (runtime.wildSpawns?.some((s) => s.x === x && s.y === y)) zones.push(ZONE_SPAWN);
       tiles.set(tileKey(x, y, floorZ), {
         x,
         y,
         z: floorZ,
-        flags: 0,
+        flags,
+        houseId,
         items: ids.map((id) => ({ id })),
+        zones: zones.length ? zones : undefined,
+        spawnMonster: zones.includes(ZONE_SPAWN) ? { radius: 3 } : undefined,
       });
     }
   }

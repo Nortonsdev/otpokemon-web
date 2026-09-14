@@ -10,6 +10,7 @@
     { "source": "/health", "destination": "/api/ws" },
     { "source": "/api/map/json", "destination": "/api/ws?otpMap=json" },
     { "source": "/api/map/reload", "destination": "/api/ws?otpMap=reload" },
+    { "source": "/api/map/", "destination": "/api/ws?otpMap=1" },
     { "source": "/api/map", "destination": "/api/ws?otpMap=1" }
   ],
   "functions": {

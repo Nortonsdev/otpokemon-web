@@ -13,7 +13,7 @@ import {
   applyRubyHealth,
   behind,
 } from "./species.js";
-import { MAP, SPAWN, WILD_GROUPS, currentSpawn, hasRoof, inBounds, tileName, walkable } from "./map.js";
+import { MAP, SPAWN, WILD_GROUPS, currentSpawn, hasRoof, inBounds, isNoPvpZone, isProtectionZone, tileName, walkable } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 
@@ -533,6 +533,16 @@ export class World {
     return false;
   }
 
+  zoneCombatMessage(player, target) {
+    if (isProtectionZone(player.x, player.y) || isProtectionZone(target.x, target.y)) {
+      return "Esta é uma área segura.";
+    }
+    if (target.kind === "player" && (isNoPvpZone(player.x, player.y) || isNoPvpZone(target.x, target.y))) {
+      return "PVP não é permitido aqui.";
+    }
+    return null;
+  }
+
   sendTarget(player, c) {
     const client = this.clientOf(player);
     if (!client) return;
@@ -626,6 +636,11 @@ export class World {
     }
     player.targetId = id;
     this.sendTarget(player, c);
+    const blocked = this.zoneCombatMessage(player, c);
+    if (blocked) {
+      this.sys(player, blocked);
+      return;
+    }
     if (!c.wild || c.dead) return;
     this.useMove(player, 1);
   }
@@ -864,6 +879,11 @@ export class World {
       this.sys(player, "Você não tem um alvo.");
       return;
     }
+    const blocked = this.zoneCombatMessage(player, target);
+    if (blocked) {
+      this.sys(player, blocked);
+      return;
+    }
     if (target.dead) {
       this.sys(player, "Esse Pokémon já foi derrotado.");
       return;
@@ -1095,7 +1115,7 @@ export class World {
     const spec = SPECIES[species];
     if (!spec) return;
     const list = spots || MAP.wildSpawns;
-    const free = list.filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y));
+    const free = list.filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y) && !isProtectionZone(s.x, s.y));
     if (!free.length) return;
     const spot = free[randomInt(0, free.length)];
     const catHp = this.makeMon("caterpie", 2);

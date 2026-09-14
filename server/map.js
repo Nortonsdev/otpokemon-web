@@ -1,5 +1,6 @@
 import { loadActiveMap, reloadMap } from "./mapLoader.ts";
 import { MAP_W, MAP_H, MAP_Z, SPAWN, ITEMS, buildLegacyMap } from "../shared/mapLegacy.ts";
+import { TILESTATE_PROTECTIONZONE, TILESTATE_NOPVPZONE, TILESTATE_PVPZONE } from "../shared/editor/otbm.ts";
 
 export { MAP_W, MAP_H, MAP_Z, SPAWN, ITEMS, buildLegacyMap, reloadMap };
 
@@ -20,6 +21,8 @@ export const MAP = new Proxy(
       if (prop === "roofs") return r.roofs;
       if (prop === "items") return r.items;
       if (prop === "cells") return r.cells;
+      if (prop === "flags") return r.flags;
+      if (prop === "houses") return r.houses;
       if (prop === "wildSpawns") return r.wildSpawns;
       if (prop === "tile") return r.tile;
       if (prop === "spawn") return r.spawn;
@@ -92,4 +95,22 @@ export function tileName(x, y) {
 export function currentSpawn() {
   const r = runtime();
   return r.spawn ?? SPAWN;
+}
+
+export function tileFlags(x, y) {
+  const r = runtime();
+  if (!inBounds(x, y) || !r.flags) return 0;
+  return r.flags[y]?.[x] || 0;
+}
+
+export function isProtectionZone(x, y) {
+  return (tileFlags(x, y) & TILESTATE_PROTECTIONZONE) !== 0;
+}
+
+export function isNoPvpZone(x, y) {
+  return (tileFlags(x, y) & TILESTATE_NOPVPZONE) !== 0;
+}
+
+export function isPvpZone(x, y) {
+  return (tileFlags(x, y) & TILESTATE_PVPZONE) !== 0;
 }

@@ -66,8 +66,87 @@ export const MAP_MAX_HEIGHT = 65000
 export const MAP_MIN_LAYER = 0
 export const MAP_MAX_LAYER = 15
 
-/** Tile flag: Protection Zone */
-export const PZ_FLAG = 0x0001
+/** Remere / TFS tile flags (OTBM_ATTR_TILE_FLAGS). */
+export const TILESTATE_NONE = 0
+export const TILESTATE_PROTECTIONZONE = 0x0001
+export const TILESTATE_NOPVPZONE = 0x0004
+export const TILESTATE_NOLOGOUT = 0x0008
+export const TILESTATE_PVPZONE = 0x0010
+/** @deprecated alias of TILESTATE_PROTECTIONZONE */
+export const PZ_FLAG = TILESTATE_PROTECTIONZONE
+
+const ZONE_FLAG_MASK = TILESTATE_PROTECTIONZONE | TILESTATE_NOPVPZONE | TILESTATE_PVPZONE
+
+/** YATME OTBM_TILE_ZONE ids (also mirrored in TILESTATE flags). */
+export const ZONE_PVP = 1
+export const ZONE_NOPVP = 2
+export const ZONE_PROTECTION = 3
+export const ZONE_SPAWN = 4
+
+export type ZoneKind = "pvp" | "nopvp" | "protection" | "spawn"
+
+export function flagsForZone(kind: ZoneKind | null): number {
+  if (kind === "protection") return TILESTATE_PROTECTIONZONE
+  if (kind === "nopvp") return TILESTATE_NOPVPZONE
+  if (kind === "pvp") return TILESTATE_PVPZONE
+  return 0
+}
+
+export function zoneIdForKind(kind: ZoneKind): number {
+  if (kind === "pvp") return ZONE_PVP
+  if (kind === "nopvp") return ZONE_NOPVP
+  if (kind === "protection") return ZONE_PROTECTION
+  return ZONE_SPAWN
+}
+
+export function zoneKindFromTile(tile: OtbmTile | undefined | null): ZoneKind | null {
+  if (!tile) return null
+  const flags = tile.flags || 0
+  const zones = tile.zones || []
+  if ((flags & TILESTATE_PROTECTIONZONE) || zones.includes(ZONE_PROTECTION)) return "protection"
+  if ((flags & TILESTATE_NOPVPZONE) || zones.includes(ZONE_NOPVP)) return "nopvp"
+  if ((flags & TILESTATE_PVPZONE) || zones.includes(ZONE_PVP)) return "pvp"
+  if (zones.includes(ZONE_SPAWN) || tile.spawnMonster) return "spawn"
+  return null
+}
+
+/** Paint or clear a Remere-compatible zone. Spawn is orthogonal to PVP/PZ flags. */
+export function applyZoneToTile(tile: OtbmTile, kind: ZoneKind | null): void {
+  const keepSpawn = (tile.zones || []).includes(ZONE_SPAWN) || Boolean(tile.spawnMonster)
+  if (kind === "spawn") {
+    tile.spawnMonster = tile.spawnMonster || { radius: 3 }
+    const next = new Set(tile.zones || [])
+    next.add(ZONE_SPAWN)
+    tile.zones = [...next]
+    return
+  }
+  tile.flags = (tile.flags || 0) & ~ZONE_FLAG_MASK
+  const next = new Set((tile.zones || []).filter((id) => id !== ZONE_PVP && id !== ZONE_NOPVP && id !== ZONE_PROTECTION))
+  if (kind) {
+    tile.flags |= flagsForZone(kind)
+    next.add(zoneIdForKind(kind))
+  }
+  if (keepSpawn) next.add(ZONE_SPAWN)
+  tile.zones = next.size ? [...next] : undefined
+}
+
+export function applyHouseToTile(tile: OtbmTile, houseId: number | null): void {
+  if (houseId == null || houseId < 1) delete tile.houseId
+  else tile.houseId = houseId >>> 0
+}
+
+export function tileIsEmpty(tile: OtbmTile): boolean {
+  return (
+    !tile.items.length &&
+    !tile.houseId &&
+    !tile.flags &&
+    !tile.zones?.length &&
+    !tile.spawnMonster &&
+    !tile.monsters?.length &&
+    !tile.npc &&
+    !tile.spawnNpc
+  )
+}
 
 /** Check whether a tile coordinate is within the valid map range. */
 export function tileKey(x: number, y: number, z: number): string {
@@ -577,6 +656,7 @@ function parseTile(
         zones.push(child.readU16())
       }
       tile.zones = zones
+      if (zones.includes(ZONE_SPAWN)) tile.spawnMonster = tile.spawnMonster || { radius: 3 }
     }
   }
 

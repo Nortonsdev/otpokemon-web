@@ -39,7 +39,7 @@ function safeFilename(raw: string) {
 
 export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, pathname: string) {
   try {
-    if (pathname === "/api/map" && req.method === "GET") {
+    if ((pathname === "/api/map" || pathname === "/api/map/") && req.method === "GET") {
       const runtime = loadActiveMap();
       const bytes = await exportOtbmBytes();
       res.writeHead(200, {
@@ -72,13 +72,15 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
               roofs: runtime.roofs,
               items: runtime.items,
               cells: runtime.cells,
+              flags: runtime.flags,
+              houses: runtime.houses,
             }
           : {}),
       });
       return true;
     }
 
-    if (pathname === "/api/map" && req.method === "POST") {
+    if ((pathname === "/api/map" || pathname === "/api/map/") && req.method === "POST") {
       const body = await readBody(req);
       if (!body.length) {
         sendJson(res, 400, { error: "Empty body" });
@@ -115,7 +117,7 @@ export function resolveMapPath(req: IncomingMessage, pathname: string): string {
     String(headers["x-vercel-original-path"] || ""),
   ];
   for (const raw of candidates) {
-    const path = raw.split("?")[0];
+    const path = raw.split("?")[0].replace(/\/+$/, "") || "/";
     if (path === "/api/map" || path.startsWith("/api/map/")) return path;
   }
   try {

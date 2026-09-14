@@ -4,7 +4,18 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { parseOtbm, serializeOtbm, createEmptyMap, tileKey } from "../shared/editor/otbm.ts";
+import {
+  parseOtbm,
+  serializeOtbm,
+  createEmptyMap,
+  tileKey,
+  TILESTATE_PROTECTIONZONE,
+  TILESTATE_PVPZONE,
+  ZONE_PROTECTION,
+  ZONE_PVP,
+  applyHouseToTile,
+  applyZoneToTile,
+} from "../shared/editor/otbm.ts";
 import { otbmMapToRuntime, runtimeToOtbm } from "../shared/editor/mapRuntime.ts";
 import { BUILTIN_TILE_IDS } from "../shared/editor/tileCatalog.ts";
 import { floodFill } from "../shared/editor/brushes.ts";
@@ -34,6 +45,9 @@ map.tiles.get(tileKey(3, 2, 7)).items = [{ id: BUILTIN_TILE_IDS.wall }];
 map.tiles.get(tileKey(4, 2, 7)).items = [{ id: BUILTIN_TILE_IDS.grass }, { id: BUILTIN_TILE_IDS.flower }];
 map.towns = [{ id: 1, name: "Spawn", templeX: 4, templeY: 3, templeZ: 7 }];
 map.waypoints = [{ name: "gate", x: 1, y: 1, z: 7 }];
+applyHouseToTile(map.tiles.get(tileKey(5, 2, 7)), 12);
+applyZoneToTile(map.tiles.get(tileKey(5, 2, 7)), "protection");
+applyZoneToTile(map.tiles.get(tileKey(6, 2, 7)), "pvp");
 
 const bytes = await serializeOtbm(map);
 assert(bytes[4] === 0xfe, "OTBM NODE_START");
@@ -48,6 +62,11 @@ assert(re.tiles.get(tileKey(3, 2, 7)).items[0].id === BUILTIN_TILE_IDS.wall, "wa
 assert(re.tiles.get(tileKey(4, 2, 7)).items.map((i) => i.id).join(",") === `${BUILTIN_TILE_IDS.grass},${BUILTIN_TILE_IDS.flower}`, "stack");
 assert(re.towns[0].name === "Spawn", "town");
 assert(re.waypoints[0].name === "gate", "waypoint");
+assert(re.tiles.get(tileKey(5, 2, 7)).houseId === 12, "HOUSETILE house id");
+assert((re.tiles.get(tileKey(5, 2, 7)).flags & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "PZ flag");
+assert(re.tiles.get(tileKey(5, 2, 7)).zones.includes(ZONE_PROTECTION), "PZ zone id");
+assert((re.tiles.get(tileKey(6, 2, 7)).flags & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "PVP flag");
+assert(re.tiles.get(tileKey(6, 2, 7)).zones.includes(ZONE_PVP), "PVP zone id");
 
 const again = await serializeOtbm(re);
 const re2 = parseOtbm(again);
@@ -60,6 +79,9 @@ assert(runtime.walls[2][3] === 1, "wall flag");
 assert(runtime.items.some((it) => it.kind === "flower" && it.x === 4 && it.y === 2), "flower item");
 assert(runtime.cells[2][2].items[0] === BUILTIN_TILE_IDS.water, "cell water");
 assert(runtime.spawn.x === 4 && runtime.spawn.y === 3, "temple spawn");
+assert(runtime.houses[2][5] === 12, "runtime house");
+assert((runtime.flags[2][5] & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "runtime PZ");
+assert((runtime.flags[2][6] & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "runtime PVP");
 
 const back = runtimeToOtbm(runtime);
 assert(back.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "runtime→otbm water");

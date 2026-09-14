@@ -55,6 +55,8 @@ export function buildLegacyMap(): RuntimeMap {
   const ground: number[][] = [];
   const walls: number[][] = [];
   const roofs: number[][] = [];
+  const flags: number[][] = [];
+  const houses: number[][] = [];
   const cells: Array<Array<{ items: number[] }>> = [];
   const wildSpawns: Array<{ x: number; y: number }> = [];
 
@@ -63,6 +65,8 @@ export function buildLegacyMap(): RuntimeMap {
     ground[y] = [];
     walls[y] = [];
     roofs[y] = [];
+    flags[y] = [];
+    houses[y] = [];
     cells[y] = [];
     for (let x = 0; x < w; x++) {
       const c = row[x];
@@ -78,6 +82,8 @@ export function buildLegacyMap(): RuntimeMap {
       else if (kind === 7) items[0] = BUILTIN_TILE_IDS.cave;
       else if (kind === 1) items[0] = BUILTIN_TILE_IDS.path;
       cells[y][x] = { items };
+      flags[y][x] = 0;
+      houses[y][x] = 0;
 
       if (kind === 2) {
         ground[y][x] = 0;
@@ -121,6 +127,8 @@ export function buildLegacyMap(): RuntimeMap {
     roofs,
     items: ITEMS.map((it) => ({ ...it })),
     cells,
+    flags,
+    houses,
     wildSpawns,
     spawn: SPAWN,
     tile: 32,

@@ -53,5 +53,10 @@ if (viaRewrite.status !== 200 || viaRewrite.body.length !== map.body.length) {
   throw new Error(`rewrite map ${viaRewrite.status} len ${viaRewrite.body.length}`);
 }
 
+const slash = await request("GET", "/api/map/");
+if (slash.status !== 200 || slash.body.length !== map.body.length) {
+  throw new Error(`trailing slash map ${slash.status} len ${slash.body.length}`);
+}
+
 console.log("API BUNDLE OK", { mapBytes: map.body.length, w: map.headers["x-map-width"] });
 process.exit(0);

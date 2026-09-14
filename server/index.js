@@ -10,6 +10,15 @@ const world = new World();
 const server = http.createServer(async (req, res) => {
   const path = (req.url || "/").split("?")[0];
   const mapPath = resolveMapPath(req, path);
+  if (req.method === "OPTIONS" && (mapPath === "/api/map" || mapPath.startsWith("/api/map"))) {
+    res.writeHead(204, {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,POST,OPTIONS",
+      "access-control-allow-headers": "content-type,x-map-filename",
+    });
+    res.end();
+    return;
+  }
   if (await handleMapHttp(req, res, mapPath)) return;
   if (path === "/health" || path === "/ws" || path === "/api/ws") {
     res.writeHead(200, { "content-type": "application/json" });
