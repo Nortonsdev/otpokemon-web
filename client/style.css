@@ -715,6 +715,13 @@ html.mw-ready .miniwindow {
 .mw-tool.mw-lock.lock-on { background-position: -34px 2px !important; }
 .mw-tool.mw-wrench { background-position: -46px 2px !important; }
 .mw-tool.mw-wrench.on { filter: brightness(1.4); }
+.mw-tool.mw-resize {
+  background-image: none !important;
+  color: #c8ccd0;
+  font: 10px/16px Verdana, sans-serif;
+}
+.mw-tool.mw-resize::after { content: "⤢"; }
+.mw-tool.mw-resize.on::after { content: "⤡"; }
 .miniwindow > .win-body {
   padding: 2px;
   border: 4px solid #2a2c2e;
@@ -1131,15 +1138,19 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   overflow: hidden;
 }
 .item-box-grid {
+  --item-row-h: 30px;
   display: grid;
   grid-template-columns: repeat(5, 28px);
   gap: 2px;
   padding: 2px;
-  max-height: 200px;
+  max-height: calc(var(--item-box-rows-compact, 5) * var(--item-row-h));
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: #5a7ab8 #1a2438;
+}
+.item-box-win.item-box-expanded .item-box-grid {
+  max-height: calc(var(--item-box-rows-total, 6) * var(--item-row-h));
 }
 .item-box-grid::-webkit-scrollbar { width: 8px; }
 .item-box-grid::-webkit-scrollbar-track { background: #1a2438; border-radius: 4px; }
@@ -1179,26 +1190,31 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .pokebag-grid .item-box-cell.has-mon { cursor: pointer; }
 .catch-grid .item-box-cell.has-mon { cursor: pointer; }
 .catch-grid .item-box-cell.swap-pending { outline: 2px solid #7dce6a; }
-.catch-slot-actions {
-  grid-column: 1 / -1;
+.catch-swap-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px;
-  padding: 2px 0 4px;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 2px 2px;
+  border-top: 1px solid rgba(90, 120, 170, 0.25);
+  font-size: 8px;
+  color: var(--ot-muted);
 }
-.catch-slot-actions button {
+.catch-swap-bar.hidden { display: none; }
+.catch-swap-bar button {
   margin: 0;
-  padding: 1px 4px;
-  font-size: 7px;
+  padding: 1px 5px;
+  font-size: 8px;
   border: 1px solid var(--ot-border-dim);
   background: rgba(12, 18, 32, 0.95);
   color: var(--ot-muted);
   cursor: pointer;
 }
-.catch-slot-actions button:disabled {
+.catch-swap-bar button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
+.item-box-cell.catch-pick { outline: 2px solid #7dce6a; border-color: #7dce6a; }
 .inv-btn.on { color: var(--ot-accent); border-color: var(--ot-accent); }
 .equip-grid {
   display: grid; grid-template-columns: 34px 34px 34px;

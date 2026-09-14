@@ -29,8 +29,10 @@ import {
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 import { isSafeZone } from "../shared/safeZone.js";
+import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 
-const CATCH_CAP = 30;
+const CATCH_CAP = ITEM_BOX_SLOTS.catch;
+const BAG_SLOT_CAP = ITEM_BOX_SLOTS.bag;
 const CORPSE_LOOT = [
   { item: "pokeball", min: 1, max: 3, weight: 5 },
   { item: "premierball", min: 0, max: 1, weight: 2 },
@@ -43,15 +45,20 @@ function normalizeLootBag(bag) {
   return bag.filter((i) => i && i.item && Number(i.count) > 0);
 }
 
-function addStack(bag, item, count) {
-  if (!count) return bag;
+function lootBagUsedSlots(bag) {
+  return bag.filter((i) => i && Number(i.count) > 0).length;
+}
+
+function addStack(bag, item, count, maxSlots = BAG_SLOT_CAP) {
+  if (!count) return true;
   let row = bag.find((i) => i.item === item);
   if (!row) {
+    if (lootBagUsedSlots(bag) >= maxSlots) return false;
     row = { item, count: 0 };
     bag.push(row);
   }
   row.count += count;
-  return bag;
+  return true;
 }
 
 function takeStack(bag, item, count = 1) {
@@ -585,7 +592,10 @@ export class World {
       roll -= row.weight;
       if (roll <= 0) {
         const count = randomInt(row.min, row.max + 1);
-        if (count > 0) addStack(player.lootBag, row.item, count);
+        if (count > 0 && !addStack(player.lootBag, row.item, count)) {
+          this.sys(player, "Sua Bag está cheia (30 slots).");
+          return;
+        }
         break;
       }
     }

@@ -3,6 +3,11 @@ import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
 import { isSafeZone } from "../../shared/safeZone.js";
+import {
+  ITEM_BOX_COMPACT_ROWS,
+  ITEM_BOX_SLOTS,
+  itemBoxRowCount,
+} from "../../shared/itemBoxCaps.js";
 
 const CATCH_REGISTRY = ["premierball", "pokeball"];
 
@@ -42,7 +47,7 @@ export class Hud {
     this.lootBag = [];
     this.catchBox = [];
     this.mapSpawn = null;
-    this.catchSwapPick = null;
+    this.catchPick = null;
     this.bound = false;
     this.channel = "local";
     this.lines = [];
@@ -101,7 +106,9 @@ export class Hud {
       this.windows.action("npc", "close");
     });
     document.querySelectorAll(".inv-btn[data-inv-win]").forEach((btn) => {
-      btn.addEventListener("click", () => {
+      btn.addEventListener("mousedown", (e) => e.stopPropagation());
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         const id = btn.dataset.invWin;
         if (!id) return;
         this.windows.toggle(id);
@@ -543,6 +550,13 @@ export class Hud {
     }
   }
 
+  layoutItemBoxGrid(grid, winId) {
+    const totalRows = itemBoxRowCount(winId);
+    const compactRows = Math.min(ITEM_BOX_COMPACT_ROWS, totalRows);
+    grid.style.setProperty("--item-box-rows-total", String(totalRows));
+    grid.style.setProperty("--item-box-rows-compact", String(compactRows));
+  }
+
   renderItemWindows() {
     this.renderBagWindow();
     this.renderCoinsWindow();
@@ -553,8 +567,9 @@ export class Hud {
   renderBagWindow() {
     const grid = document.getElementById("bag-grid");
     if (!grid) return;
+    this.layoutItemBoxGrid(grid, "bag");
     grid.innerHTML = "";
-    const cells = Math.max(20, this.lootBag.length + 4);
+    const slots = ITEM_BOX_SLOTS.bag;
     const filled = [];
     for (const entry of this.lootBag) {
       if (!entry?.item || entry.count <= 0) continue;
@@ -564,7 +579,7 @@ export class Hud {
       };
       filled.push({ ...entry, meta });
     }
-    for (let i = 0; i < cells; i++) {
+    for (let i = 0; i < slots; i++) {
       const row = filled[i];
       const cell = document.createElement("div");
       cell.className = "item-box-cell" + (row ? " has-item" : " empty");
@@ -590,21 +605,26 @@ export class Hud {
   renderCoinsWindow() {
     const grid = document.getElementById("coins-grid");
     if (!grid) return;
+    this.layoutItemBoxGrid(grid, "coins");
     grid.innerHTML = "";
+    const slots = ITEM_BOX_SLOTS.coins;
     const gold = Number(this.you?.gold ?? 0);
     const crystal = Math.floor(gold / 10000);
     const platinum = Math.floor((gold % 10000) / 100);
-    const coins = Math.floor(gold % 100);
+    const coin = Math.floor(gold % 100);
     const stacks = [
       { label: "Crystal Coin", count: crystal, icon: "/assets/hud/playerinfo/trophy.png" },
       { label: "Platinum Coin", count: platinum, icon: "/assets/hud/playerinfo/pokeballs.png" },
-      { label: "Gold Coin", count: coins, icon: "/assets/hud/playerinfo/pokeballs.png" },
+      { label: "Gold Coin", count: coin, icon: "/assets/hud/playerinfo/pokeballs.png" },
     ].filter((s) => s.count > 0);
     if (!stacks.length && gold > 0) {
-      stacks.push({ label: "Gold", count: Math.round(gold * 100) / 100, icon: "/assets/hud/playerinfo/pokeballs.png" });
+      stacks.push({
+        label: "Gold",
+        count: Math.round(gold * 100) / 100,
+        icon: "/assets/hud/playerinfo/pokeballs.png",
+      });
     }
-    const cells = Math.max(20, stacks.length + 8);
-    for (let i = 0; i < cells; i++) {
+    for (let i = 0; i < slots; i++) {
       const row = stacks[i];
       const cell = document.createElement("div");
       cell.className = "item-box-cell" + (row ? "" : " empty");
@@ -619,8 +639,10 @@ export class Hud {
   renderPokebagWindow() {
     const grid = document.getElementById("pokebag-grid");
     if (!grid) return;
+    this.layoutItemBoxGrid(grid, "pokebag");
     grid.innerHTML = "";
-    for (let i = 0; i < 6; i++) {
+    const slots = ITEM_BOX_SLOTS.pokebag;
+    for (let i = 0; i < slots; i++) {
       const p = this.party.slots?.[i];
       const cell = document.createElement("div");
       cell.className = "item-box-cell" + (p ? " has-mon" : " empty");
@@ -637,39 +659,71 @@ export class Hud {
     }
   }
 
+  renderCatchSwapBar() {
+    const bar = document.getElementById("catch-swap-bar");
+    if (!bar) return;
+    const safe = this.inSafeZone();
+    const list = this.catchBox || [];
+    const pick = this.catchPick;
+    if (pick == null || !list[pick]) {
+      bar.classList.add("hidden");
+      bar.innerHTML = "";
+      return;
+    }
+    const mon = list[pick];
+    bar.classList.remove("hidden");
+    bar.innerHTML = `<span>Trocar ${mon.name} →</span>`;
+    for (let slot = 0; slot < ITEM_BOX_COLS + 1; slot++) {
+      if (slot >= 6) break;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = String(slot + 1);
+      btn.title = safe ? `Slot ${slot + 1} do time` : "Só em zona segura";
+      btn.disabled = !safe;
+      btn.onclick = () => {
+        this.net.send({ t: "catchSwap", catchIndex: pick, partySlot: slot });
+        this.catchPick = null;
+        this.renderCatchWindow();
+      };
+      bar.appendChild(btn);
+    }
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.textContent = "×";
+    cancel.title = "Cancelar";
+    cancel.onclick = () => {
+      this.catchPick = null;
+      this.renderCatchWindow();
+    };
+    bar.appendChild(cancel);
+  }
+
   renderCatchWindow() {
     const grid = document.getElementById("catch-grid");
     if (!grid) return;
+    this.layoutItemBoxGrid(grid, "catch");
     grid.innerHTML = "";
-    const safe = this.inSafeZone();
+    const slots = ITEM_BOX_SLOTS.catch;
     const list = this.catchBox || [];
-    for (let i = 0; i < list.length; i++) {
+    if (this.catchPick != null && !list[this.catchPick]) this.catchPick = null;
+    for (let i = 0; i < slots; i++) {
       const mon = list[i];
       const cell = document.createElement("div");
-      cell.className = "item-box-cell has-mon";
-      cell.innerHTML = `<img src="${portraitUrl(mon)}" alt="" />`;
-      cell.title = `[${mon.level}] ${mon.name}`;
-      grid.appendChild(cell);
-
-      const actions = document.createElement("div");
-      actions.className = "catch-slot-actions";
-      for (let slot = 0; slot < 6; slot++) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.textContent = String(slot + 1);
-        btn.title = safe ? `Trocar com slot ${slot + 1}` : "Só em zona segura";
-        btn.disabled = !safe;
-        btn.onclick = () => this.net.send({ t: "catchSwap", catchIndex: i, partySlot: slot });
-        actions.appendChild(btn);
+      cell.className =
+        "item-box-cell" +
+        (mon ? " has-mon" : " empty") +
+        (this.catchPick === i ? " catch-pick" : "");
+      if (mon) {
+        cell.innerHTML = `<img src="${portraitUrl(mon)}" alt="" />`;
+        cell.title = `[${mon.level}] ${mon.name} — clique para trocar com o time (zona segura)`;
+        cell.onclick = () => {
+          this.catchPick = this.catchPick === i ? null : i;
+          this.renderCatchWindow();
+        };
       }
-      grid.appendChild(actions);
-    }
-    const pad = Math.max(0, 20 - grid.children.length);
-    for (let j = 0; j < pad; j++) {
-      const cell = document.createElement("div");
-      cell.className = "item-box-cell empty";
       grid.appendChild(cell);
     }
+    this.renderCatchSwapBar();
   }
 
   renderHotbar(out) {

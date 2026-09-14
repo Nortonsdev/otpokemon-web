@@ -1,3 +1,5 @@
+import { ITEM_BOX_IDS } from "../../../shared/itemBoxCaps.js";
+
 const LEGACY_KEY = "otpokemon-hud-v4";
 const POS_PREFIX = "poketibia.win.";
 
@@ -29,10 +31,10 @@ const DEFAULTS = {
   battle: { x: 6, y: 0, open: true, locked: true, min: false, bottom: 118 },
   status: { x: 0, y: 28, open: true, locked: false, min: false, right: 6 },
   inv: { x: 0, y: 168, open: true, locked: false, min: false, right: 6 },
-  bag: { x: 260, y: 72, open: false, locked: false, min: false },
-  coins: { x: 400, y: 72, open: false, locked: false, min: false },
-  pokebag: { x: 540, y: 72, open: false, locked: false, min: false },
-  catch: { x: 680, y: 72, open: false, locked: false, min: false },
+  bag: { x: 260, y: 72, open: false, locked: false, min: false, expanded: false },
+  coins: { x: 400, y: 72, open: false, locked: false, min: false, expanded: false },
+  pokebag: { x: 540, y: 72, open: false, locked: false, min: false, expanded: false },
+  catch: { x: 680, y: 72, open: false, locked: false, min: false, expanded: false },
   npc: { x: 240, y: 200, open: false, locked: false, min: false },
   chat: { open: true, dock: true },
 };
@@ -120,6 +122,9 @@ export class WindowManager {
       const lock = localStorage.getItem(`${POS_PREFIX}${def.id}.lock`);
       if (lock === "0" || lock === "1") w.locked = lock === "1";
       else if (MOBILE_LOCK_DEFAULTS.has(def.id)) w.locked = !!DEFAULTS[def.id].locked;
+      const expanded = localStorage.getItem(`${POS_PREFIX}${def.id}.expanded`);
+      if (expanded === "0" || expanded === "1") w.expanded = expanded === "1";
+      else if (ITEM_BOX_IDS.has(def.id)) w.expanded = !!DEFAULTS[def.id]?.expanded;
     }
   }
 
@@ -168,9 +173,13 @@ export class WindowManager {
     if (!head.querySelector(".win-tools")) {
       const tools = document.createElement("span");
       tools.className = "win-tools";
+      const resizeBtn = ITEM_BOX_IDS.has(def.id)
+        ? `<button type="button" class="mw-tool mw-resize" data-act="resize" title="Expandir lista de slots"></button>`
+        : "";
       tools.innerHTML = `
         ${def.wrench ? `<button type="button" class="mw-tool mw-wrench" data-act="wrench" title="Reordenar party"></button>` : ""}
         <button type="button" class="mw-tool mw-lock" data-act="lock" title="Travar"></button>
+        ${resizeBtn}
         <button type="button" class="mw-tool mw-min" data-act="min" title="Minimizar"></button>
         <button type="button" class="mw-tool mw-close" data-act="close" title="Fechar"></button>
       `;
@@ -205,6 +214,7 @@ export class WindowManager {
     if (act === "lock") w.locked = !w.locked;
     if (act === "min") w.min = !w.min;
     if (act === "close") w.open = false;
+    if (act === "resize") w.expanded = !w.expanded;
     if (act === "wrench") {
       this.reorder = !this.reorder;
       document.body.classList.toggle("pokebar-reorder", this.reorder);
@@ -301,6 +311,7 @@ export class WindowManager {
     el.classList.toggle("win-closed", !w.open);
     el.classList.toggle("win-min", !!w.min);
     el.classList.toggle("win-locked", !!w.locked);
+    el.classList.toggle("item-box-expanded", !!w.expanded);
     if (w.right != null && (w.x === 0 || w.x == null)) {
       el.style.left = "auto";
       el.style.right = `${w.right}px`;
@@ -344,6 +355,13 @@ export class WindowManager {
     }
     const minBtn = el.querySelector('[data-act="min"]');
     if (minBtn) minBtn.title = w.min ? "Restaurar" : "Minimizar";
+    const resizeBtn = el.querySelector('[data-act="resize"]');
+    if (resizeBtn) {
+      resizeBtn.classList.toggle("on", !!w.expanded);
+      resizeBtn.title = w.expanded
+        ? "Compactar (~5 linhas visíveis)"
+        : "Expandir (todos os slots com scroll)";
+    }
     const wrenchBtn = el.querySelector('[data-act="wrench"]');
     if (wrenchBtn) {
       wrenchBtn.classList.toggle("on", this.reorder && id === "pokebar");
@@ -412,6 +430,9 @@ export class WindowManager {
         localStorage.setItem(`${POS_PREFIX}${def.id}.open`, w.open ? "1" : "0");
         localStorage.setItem(`${POS_PREFIX}${def.id}.min`, w.min ? "1" : "0");
         localStorage.setItem(`${POS_PREFIX}${def.id}.lock`, w.locked ? "1" : "0");
+        if (ITEM_BOX_IDS.has(def.id)) {
+          localStorage.setItem(`${POS_PREFIX}${def.id}.expanded`, w.expanded ? "1" : "0");
+        }
       }
     } catch {
       /* ignore */
