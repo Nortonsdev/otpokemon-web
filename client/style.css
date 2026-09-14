@@ -1090,8 +1090,116 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   pointer-events: none;
 }
 
-#hud-inv { top: 168px; right: 6px; width: 118px; }
-#hud-inv .win-body { max-height: calc(100vh - 180px); overflow-y: auto; }
+#hud-inv {
+  width: 128px;
+  z-index: 12;
+}
+#hud-inv .mw-icon {
+  background: url(/assets/hud/playerinfo/backpack.png) no-repeat center !important;
+  background-size: contain !important;
+}
+#hud-inv.miniwindow > .win-body {
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 4px 4px 6px;
+}
+
+.item-box-win {
+  width: 158px;
+  z-index: 14;
+}
+#hud-bag .mw-icon {
+  background: url(/assets/hud/playerinfo/backpack.png) no-repeat center !important;
+  background-size: contain !important;
+}
+#hud-coins .mw-icon {
+  background: url(/assets/hud/playerinfo/pokeballs.png) no-repeat center !important;
+  background-size: contain !important;
+  filter: hue-rotate(180deg) brightness(1.2);
+}
+#hud-pokebag .mw-icon {
+  background: url(/assets/items/pokeball.png) no-repeat center !important;
+  background-size: contain !important;
+}
+#hud-catch .mw-icon {
+  background: url(/assets/items/premierball.png) no-repeat center !important;
+  background-size: contain !important;
+}
+.item-box-win.miniwindow > .win-body {
+  padding: 2px;
+  max-height: min(220px, calc(100vh - 100px));
+  overflow: hidden;
+}
+.item-box-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  gap: 2px;
+  padding: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #5a7ab8 #1a2438;
+}
+.item-box-grid::-webkit-scrollbar { width: 8px; }
+.item-box-grid::-webkit-scrollbar-track { background: #1a2438; border-radius: 4px; }
+.item-box-grid::-webkit-scrollbar-thumb { background: #4a6a98; border-radius: 4px; }
+.item-box-cell {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  background: rgba(8, 14, 28, 0.92);
+  border: 1px solid rgba(90, 120, 170, 0.45);
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+.item-box-cell img {
+  width: 22px;
+  height: 22px;
+  image-rendering: pixelated;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.item-box-cell .bag-count {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 7px;
+  color: #fff;
+  text-shadow: 0 0 2px #000;
+}
+.item-box-cell.use-with { outline: 1px solid #d4a848; border-color: #d4a848; }
+.item-box-cell.empty { opacity: 0.35; }
+.pokebag-grid .item-box-cell,
+.catch-grid .item-box-cell {
+  cursor: default;
+}
+.pokebag-grid .item-box-cell.has-mon { cursor: pointer; }
+.catch-grid .item-box-cell.has-mon { cursor: pointer; }
+.catch-grid .item-box-cell.swap-pending { outline: 2px solid #7dce6a; }
+.catch-slot-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px 0 4px;
+}
+.catch-slot-actions button {
+  margin: 0;
+  padding: 1px 4px;
+  font-size: 7px;
+  border: 1px solid var(--ot-border-dim);
+  background: rgba(12, 18, 32, 0.95);
+  color: var(--ot-muted);
+  cursor: pointer;
+}
+.catch-slot-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.inv-btn.on { color: var(--ot-accent); border-color: var(--ot-accent); }
 .equip-grid {
   display: grid; grid-template-columns: 34px 34px 34px;
   grid-template-areas: ". head ." "neck armor pack" "lhand . rhand" ". legs ." "ring feet .";

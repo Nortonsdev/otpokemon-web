@@ -167,7 +167,7 @@
           </div>
         </aside>
 
-        <aside id="hud-inv" class="ot-window myst-frame" data-win="inv">
+        <aside id="hud-inv" class="ot-window miniwindow inv-window" data-win="inv">
           <header class="win-head"><span class="win-title">Inventário</span></header>
           <div class="win-body">
             <div class="equip-grid">
@@ -182,29 +182,35 @@
               <div class="eq-slot" style="grid-area:feet" title="Feet"></div>
             </div>
             <div class="inv-shortcuts">
-              <button type="button" class="inv-btn on">BAG</button>
-              <button type="button" class="inv-btn">COINS</button>
+              <button type="button" class="inv-btn" data-inv-win="bag">BAG</button>
+              <button type="button" class="inv-btn" data-inv-win="coins">COINS</button>
               <button type="button" class="inv-btn">BADGES</button>
-              <button type="button" class="inv-btn">POKEBAG</button>
-              <button type="button" class="inv-btn">CATCH</button>
+              <button type="button" class="inv-btn" data-inv-win="pokebag">POKEBAG</button>
+              <button type="button" class="inv-btn" data-inv-win="catch">CATCH</button>
               <button type="button" class="inv-btn">ORDER</button>
               <button type="button" class="inv-btn">POKEDEX</button>
             </div>
-            <div id="bolsa" class="bag-grid"></div>
-            <div id="catch-registro" class="catch-registro hidden">
-              <div class="catch-totals">
-                <div class="catch-total ok" title="Total de Pokémon capturados">
-                  <span class="catch-ico">✓</span>
-                  <b id="catch-total-ok">0</b>
-                </div>
-                <div class="catch-total fail" title="Total de bolas usadas (falhas)">
-                  <span class="catch-ico">✕</span>
-                  <b id="catch-total-fail">0</b>
-                </div>
-              </div>
-              <div id="catch-rows" class="catch-rows"></div>
-            </div>
           </div>
+        </aside>
+
+        <aside id="hud-bag" class="ot-window miniwindow item-box-win win-closed" data-win="bag">
+          <header class="win-head"><span class="win-title">Bag</span></header>
+          <div class="win-body"><div id="bag-grid" class="item-box-grid" aria-label="Loot de corpse"></div></div>
+        </aside>
+
+        <aside id="hud-coins" class="ot-window miniwindow item-box-win win-closed" data-win="coins">
+          <header class="win-head"><span class="win-title">Coins</span></header>
+          <div class="win-body"><div id="coins-grid" class="item-box-grid" aria-label="Moedas"></div></div>
+        </aside>
+
+        <aside id="hud-pokebag" class="ot-window miniwindow item-box-win win-closed" data-win="pokebag">
+          <header class="win-head"><span class="win-title">Pokebag</span></header>
+          <div class="win-body"><div id="pokebag-grid" class="item-box-grid pokebag-grid" aria-label="Balls do time"></div></div>
+        </aside>
+
+        <aside id="hud-catch" class="ot-window miniwindow item-box-win win-closed" data-win="catch">
+          <header class="win-head"><span class="win-title">Catch</span></header>
+          <div class="win-body"><div id="catch-grid" class="item-box-grid catch-grid" aria-label="Reserva Catch"></div></div>
         </aside>
 
         <aside id="hud-npc" class="ot-window miniwindow npc-dialog win-closed" data-win="npc">
