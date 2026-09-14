@@ -2,6 +2,7 @@ import { WindowManager } from "./windows.js";
 import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
+import { isSafeZone } from "../../shared/safeZone.js";
 
 const CATCH_REGISTRY = ["premierball", "pokeball"];
 
@@ -38,7 +39,10 @@ export class Hud {
     this.windows = new WindowManager(net);
     this.party = { slots: [], out: null, count: 0 };
     this.you = null;
-    this.bag = [];
+    this.lootBag = [];
+    this.catchBox = [];
+    this.mapSpawn = null;
+    this.catchSwapPick = null;
     this.bound = false;
     this.channel = "local";
     this.lines = [];
@@ -48,7 +52,6 @@ export class Hud {
     this.selectedItem = null;
     this.mapData = null;
     this.minimapZoom = 1;
-    this.invTab = "bag";
     this.catchStats = {
       premierball: { ok: 0, fail: 0 },
       pokeball: { ok: 0, fail: 0 },
@@ -59,6 +62,12 @@ export class Hud {
     if (this.bound) return;
     this.bound = true;
     this.windows.bind();
+    const wm = this.windows;
+    const applyAll = wm.applyAll.bind(wm);
+    wm.applyAll = () => {
+      applyAll();
+      this.syncInvShortcutState();
+    };
     const sendChat = () => {
       const input = document.getElementById("chat-input");
       const text = input.value.trim();
@@ -91,6 +100,14 @@ export class Hud {
     document.getElementById("npc-dialog-ok")?.addEventListener("click", () => {
       this.windows.action("npc", "close");
     });
+    document.querySelectorAll(".inv-btn[data-inv-win]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.invWin;
+        if (!id) return;
+        this.windows.toggle(id);
+        this.syncInvShortcutState();
+      });
+    });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         this.selectItem(null);
@@ -99,26 +116,6 @@ export class Hud {
         document.getElementById("chat-input")?.blur();
       }
     });
-    document.querySelector(".inv-shortcuts")?.addEventListener("click", (e) => {
-      const btn = e.target.closest(".inv-btn");
-      if (!btn) return;
-      const label = (btn.textContent || "").trim().toUpperCase();
-      if (label === "BAG") this.setInvTab("bag");
-      else if (label === "CATCH") this.setInvTab("catch");
-    });
-  }
-
-  setInvTab(tab) {
-    this.invTab = tab === "catch" ? "catch" : "bag";
-    for (const b of document.querySelectorAll(".inv-shortcuts .inv-btn")) {
-      const on =
-        (this.invTab === "bag" && b.textContent.trim().toUpperCase() === "BAG") ||
-        (this.invTab === "catch" && b.textContent.trim().toUpperCase() === "CATCH");
-      b.classList.toggle("on", on);
-    }
-    document.getElementById("bolsa")?.classList.toggle("hidden", this.invTab !== "bag");
-    document.getElementById("catch-registro")?.classList.toggle("hidden", this.invTab !== "catch");
-    if (this.invTab === "catch") this.renderCatchRegistro();
   }
 
   noteCatchAttempt(ballItem, ok) {
@@ -127,35 +124,14 @@ export class Hud {
     if (!this.catchStats[key]) this.catchStats[key] = { ok: 0, fail: 0 };
     if (ok) this.catchStats[key].ok += 1;
     else this.catchStats[key].fail += 1;
-    if (this.invTab === "catch") this.renderCatchRegistro();
-  }
-
-  renderCatchRegistro() {
-    const rowsEl = document.getElementById("catch-rows");
-    if (!rowsEl) return;
-    let okSum = 0;
-    let failSum = 0;
-    rowsEl.innerHTML = "";
-    for (const item of CATCH_REGISTRY) {
-      const stats = this.catchStats[item] || { ok: 0, fail: 0 };
-      okSum += stats.ok;
-      failSum += stats.fail;
-      const el = document.createElement("div");
-      el.className = "catch-row";
-      el.innerHTML = `<img src="${ITEM_META[item]?.icon || ""}" alt="" /><span class="n-ok">${stats.ok}</span><span class="n-fail">${stats.fail}</span>`;
-      rowsEl.appendChild(el);
-    }
-    const okEl = document.getElementById("catch-total-ok");
-    const failEl = document.getElementById("catch-total-fail");
-    if (okEl) okEl.textContent = String(okSum);
-    if (failEl) failEl.textContent = String(failSum);
+    this.renderCatchWindow();
   }
 
   selectItem(item) {
-    if (item && !this.bag.find((i) => i.item === item && i.count > 0)) item = null;
+    if (item && !this.lootBag.find((i) => i.item === item && i.count > 0)) item = null;
     this.selectedItem = item || null;
     document.body.classList.toggle("use-with", !!this.selectedItem);
-    this.renderBags();
+    this.renderItemWindows();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
   }
@@ -203,9 +179,11 @@ export class Hud {
     if (msg.t === "map") {
       this.you = msg.you;
       this.party = msg.party;
-      this.bag = msg.bag || [];
+      this.lootBag = msg.lootBag || msg.bag || [];
+      this.catchBox = msg.catchBox || [];
       this.creatures = new Map((msg.creatures || []).map((c) => [c.id, c]));
       this.mapData = msg.map;
+      this.mapSpawn = msg.map?.spawn || null;
       if (msg.hud) this.windows.merge(msg.hud);
       if (this.bound) this.windows.applyAll();
       this.render();
@@ -213,7 +191,10 @@ export class Hud {
     }
     if (msg.t === "party") {
       this.party = msg.party;
-      this.bag = msg.bag || this.bag;
+      if (msg.lootBag) this.lootBag = msg.lootBag;
+      else if (msg.bag) this.lootBag = msg.bag;
+      if (msg.catchBox) this.catchBox = msg.catchBox;
+      if (msg.gold != null && this.you) this.you.gold = msg.gold;
       this.render();
     }
     if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
@@ -224,6 +205,7 @@ export class Hud {
       this.you.y = msg.y;
       this.you.dir = msg.dir;
       this.drawMinimap();
+      this.renderCatchWindow();
     }
     if (msg.t === "moved") {
       const c = this.creatures.get(msg.id);
@@ -375,7 +357,7 @@ export class Hud {
       stmRow.dataset.tip = tip;
     }
 
-    const balls = this.bag.find((i) => i.item === "pokeball")?.count || 0;
+    const balls = this.lootBag.find((i) => i.item === "pokeball")?.count || 0;
     document.getElementById("hud-balls").textContent = balls;
     const trophies = document.getElementById("hud-trophies");
     if (trophies) trophies.textContent = String(progress.trophies ?? 0);
@@ -405,7 +387,8 @@ export class Hud {
 
     this.renderPokebar();
     this.renderBattle();
-    this.renderBags();
+    this.renderItemWindows();
+    this.syncInvShortcutState();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
     this.renderOrders();
@@ -547,33 +530,144 @@ export class Hud {
     }
   }
 
-  renderBags() {
-    const grid = document.getElementById("bolsa");
+  inSafeZone() {
+    if (!this.you) return false;
+    return isSafeZone(this.you.x, this.you.y, this.mapSpawn);
+  }
+
+  syncInvShortcutState() {
+    for (const btn of document.querySelectorAll(".inv-btn[data-inv-win]")) {
+      const id = btn.dataset.invWin;
+      const open = this.windows.layout[id]?.open && !this.windows.layout[id]?.min;
+      btn.classList.toggle("on", !!open);
+    }
+  }
+
+  renderItemWindows() {
+    this.renderBagWindow();
+    this.renderCoinsWindow();
+    this.renderPokebagWindow();
+    this.renderCatchWindow();
+  }
+
+  renderBagWindow() {
+    const grid = document.getElementById("bag-grid");
     if (!grid) return;
     grid.innerHTML = "";
-    const items = ["small_potion", "great_potion", "premierball", "pokeball"];
-    for (const key of items) {
-      const meta = ITEM_META[key];
-      const entry = this.bag.find((i) => i.item === key);
-      const count = entry?.count || 0;
+    const cells = Math.max(20, this.lootBag.length + 4);
+    const filled = [];
+    for (const entry of this.lootBag) {
+      if (!entry?.item || entry.count <= 0) continue;
+      const meta = ITEM_META[entry.item] || {
+        label: entry.item,
+        icon: "/assets/items/pokeball.png",
+      };
+      filled.push({ ...entry, meta });
+    }
+    for (let i = 0; i < cells; i++) {
+      const row = filled[i];
       const cell = document.createElement("div");
-      cell.className = "bag-cell has-item" + (this.selectedItem === key ? " use-with" : "");
-      cell.innerHTML = `<img src="${meta.icon}" alt="${meta.label}" /><span class="bag-count">${count}</span>`;
-      cell.title = `${meta.label} ×${count}`;
-      if (meta.catch) {
-        cell.oncontextmenu = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!count) return;
-          this.selectItem(this.selectedItem === key ? null : key);
-        };
+      cell.className = "item-box-cell" + (row ? " has-item" : " empty");
+      if (row) {
+        cell.innerHTML = `<img src="${row.meta.icon}" alt="" /><span class="bag-count">${row.count}</span>`;
+        cell.title = `${row.meta.label} ×${row.count}`;
+        if (row.meta.catch) {
+          cell.oncontextmenu = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.selectItem(this.selectedItem === row.item ? null : row.item);
+          };
+        }
+        if (row.meta.heal) {
+          cell.onclick = () => this.net.send({ t: "use", item: row.item });
+        }
+        cell.classList.toggle("use-with", this.selectedItem === row.item);
       }
-      if (meta.heal) {
-        cell.onclick = () => {
-          if (!count) return;
-          this.net.send({ t: "use", item: key });
-        };
+      grid.appendChild(cell);
+    }
+  }
+
+  renderCoinsWindow() {
+    const grid = document.getElementById("coins-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    const gold = Number(this.you?.gold ?? 0);
+    const crystal = Math.floor(gold / 10000);
+    const platinum = Math.floor((gold % 10000) / 100);
+    const coins = Math.floor(gold % 100);
+    const stacks = [
+      { label: "Crystal Coin", count: crystal, icon: "/assets/hud/playerinfo/trophy.png" },
+      { label: "Platinum Coin", count: platinum, icon: "/assets/hud/playerinfo/pokeballs.png" },
+      { label: "Gold Coin", count: coins, icon: "/assets/hud/playerinfo/pokeballs.png" },
+    ].filter((s) => s.count > 0);
+    if (!stacks.length && gold > 0) {
+      stacks.push({ label: "Gold", count: Math.round(gold * 100) / 100, icon: "/assets/hud/playerinfo/pokeballs.png" });
+    }
+    const cells = Math.max(20, stacks.length + 8);
+    for (let i = 0; i < cells; i++) {
+      const row = stacks[i];
+      const cell = document.createElement("div");
+      cell.className = "item-box-cell" + (row ? "" : " empty");
+      if (row) {
+        cell.innerHTML = `<img src="${row.icon}" alt="" /><span class="bag-count">${row.count}</span>`;
+        cell.title = `${row.label} ×${row.count} (${gold.toFixed(2)} gp total)`;
       }
+      grid.appendChild(cell);
+    }
+  }
+
+  renderPokebagWindow() {
+    const grid = document.getElementById("pokebag-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    for (let i = 0; i < 6; i++) {
+      const p = this.party.slots?.[i];
+      const cell = document.createElement("div");
+      cell.className = "item-box-cell" + (p ? " has-mon" : " empty");
+      if (p) {
+        const out = this.party.out === i;
+        const ballIcon = out ? "/assets/items/premierball.png" : "/assets/items/pokeball.png";
+        cell.innerHTML = `<img src="${portraitUrl(p)}" alt="" /><img src="${ballIcon}" alt="" style="width:10px;height:10px;left:70%;top:75%" />`;
+        cell.title = `[${p.level}] ${p.name} · ${out ? "Ball aberta" : "Ball carregada"}`;
+        cell.onclick = () => this.net.send({ t: "pokebar", slot: i });
+      } else {
+        cell.title = `Slot ${i + 1} vazio`;
+      }
+      grid.appendChild(cell);
+    }
+  }
+
+  renderCatchWindow() {
+    const grid = document.getElementById("catch-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    const safe = this.inSafeZone();
+    const list = this.catchBox || [];
+    for (let i = 0; i < list.length; i++) {
+      const mon = list[i];
+      const cell = document.createElement("div");
+      cell.className = "item-box-cell has-mon";
+      cell.innerHTML = `<img src="${portraitUrl(mon)}" alt="" />`;
+      cell.title = `[${mon.level}] ${mon.name}`;
+      grid.appendChild(cell);
+
+      const actions = document.createElement("div");
+      actions.className = "catch-slot-actions";
+      for (let slot = 0; slot < 6; slot++) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = String(slot + 1);
+        btn.title = safe ? `Trocar com slot ${slot + 1}` : "Só em zona segura";
+        btn.disabled = !safe;
+        btn.onclick = () => this.net.send({ t: "catchSwap", catchIndex: i, partySlot: slot });
+        actions.appendChild(btn);
+      }
+      grid.appendChild(actions);
+    }
+    const pad = Math.max(0, 20 - grid.children.length);
+    for (let j = 0; j < pad; j++) {
+      const cell = document.createElement("div");
+      cell.className = "item-box-cell empty";
       grid.appendChild(cell);
     }
   }
@@ -619,7 +713,7 @@ export class Hud {
           btn.innerHTML = `<span class="hot-key">${slot.key}</span>`;
         }
       } else if (slot.item) {
-        const entry = this.bag.find((b) => b.item === slot.item);
+        const entry = this.lootBag.find((b) => b.item === slot.item);
         const count = entry?.count || 0;
         const meta = ITEM_META[slot.item];
         btn.classList.add(count ? "on" : "off");

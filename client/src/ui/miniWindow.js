@@ -7,7 +7,11 @@ export const WINDOW_DEFS = [
   { id: "pokebar", title: "Lista de Pokemon", wrench: true, mini: true, icon: "party.png" },
   { id: "battle", title: "Batalha" },
   { id: "status", title: "Player Info", mini: true, icon: "modulemanager.png" },
-  { id: "inv", title: "Inventário" },
+  { id: "inv", title: "Inventário", mini: true },
+  { id: "bag", title: "Bag", mini: true },
+  { id: "coins", title: "Coins", mini: true },
+  { id: "pokebag", title: "Pokebag", mini: true },
+  { id: "catch", title: "Catch", mini: true },
   { id: "npc", title: "NPC", mini: true, icon: "shop_button.png" },
   { id: "chat", title: "Chat" },
 ];
@@ -24,13 +28,19 @@ const DEFAULTS = {
   pokebar: { x: 6, y: 198, open: true, locked: false, min: false },
   battle: { x: 6, y: 0, open: true, locked: true, min: false, bottom: 118 },
   status: { x: 0, y: 28, open: true, locked: false, min: false, right: 6 },
-  inv: { x: 0, y: 168, open: true, locked: true, min: false, right: 6 },
-  npc: { x: 240, y: 72, open: false, locked: false, min: false },
+  inv: { x: 0, y: 168, open: true, locked: false, min: false, right: 6 },
+  bag: { x: 260, y: 72, open: false, locked: false, min: false },
+  coins: { x: 400, y: 72, open: false, locked: false, min: false },
+  pokebag: { x: 540, y: 72, open: false, locked: false, min: false },
+  catch: { x: 680, y: 72, open: false, locked: false, min: false },
+  npc: { x: 240, y: 200, open: false, locked: false, min: false },
   chat: { open: true, dock: true },
 };
 
 const DOCKED = new Set(["chat"]);
-const MINI_IDS = new Set(["status", "pokebar", "npc"]);
+const MINI_IDS = new Set(["status", "pokebar", "npc", "bag", "coins", "pokebag", "catch"]);
+/** Janelas móveis: se não houver poketibia.win.<id>.lock, usa DEFAULTS (ignora locked legado). */
+const MOBILE_LOCK_DEFAULTS = new Set([...MINI_IDS, "inv"]);
 
 const WINDOWS_SRC = "/assets/ui/tibia/windows.png";
 const CLIP_BG = [0, 127, 182, 182];
@@ -109,7 +119,7 @@ export class WindowManager {
       if (min === "0" || min === "1") w.min = min === "1";
       const lock = localStorage.getItem(`${POS_PREFIX}${def.id}.lock`);
       if (lock === "0" || lock === "1") w.locked = lock === "1";
-      else if (MINI_IDS.has(def.id)) w.locked = !!DEFAULTS[def.id].locked;
+      else if (MOBILE_LOCK_DEFAULTS.has(def.id)) w.locked = !!DEFAULTS[def.id].locked;
     }
   }
 

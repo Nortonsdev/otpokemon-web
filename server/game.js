@@ -28,6 +28,49 @@ import {
 } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
+import { isSafeZone } from "../shared/safeZone.js";
+
+const CATCH_CAP = 30;
+const CORPSE_LOOT = [
+  { item: "pokeball", min: 1, max: 3, weight: 5 },
+  { item: "premierball", min: 0, max: 1, weight: 2 },
+  { item: "small_potion", min: 0, max: 2, weight: 3 },
+  { item: "great_potion", min: 0, max: 1, weight: 1 },
+];
+
+function normalizeLootBag(bag) {
+  if (!Array.isArray(bag)) return [];
+  return bag.filter((i) => i && i.item && Number(i.count) > 0);
+}
+
+function addStack(bag, item, count) {
+  if (!count) return bag;
+  let row = bag.find((i) => i.item === item);
+  if (!row) {
+    row = { item, count: 0 };
+    bag.push(row);
+  }
+  row.count += count;
+  return bag;
+}
+
+function takeStack(bag, item, count = 1) {
+  const row = bag.find((i) => i.item === item);
+  if (!row || row.count < count) return false;
+  row.count -= count;
+  if (row.count <= 0) {
+    const idx = bag.indexOf(row);
+    bag.splice(idx, 1);
+  }
+  return true;
+}
+
+function migrateLootBag(rec) {
+  if (!rec.lootBag?.length && rec.bag?.length) rec.lootBag = rec.bag.map((i) => ({ ...i }));
+  if (!rec.lootBag) rec.lootBag = [];
+  if (!rec.catchBox) rec.catchBox = [];
+  return rec;
+}
 
 let nextId = 1;
 function cid() {
@@ -124,6 +167,7 @@ export class World {
       if (t === "logout") return this.logoutPlayer(client, true);
       if (t === "pokebar") return this.pokebar(player, msg.slot);
       if (t === "partyOrder") return this.partyOrder(player, msg);
+      if (t === "catchSwap") return this.catchSwap(player, msg);
       if (t === "hud") return this.saveHud(player, msg);
       if (t === "catch") return this.catchBall(player);
       if (t === "target") return this.setTarget(player, msg.id);
@@ -190,11 +234,9 @@ export class World {
       dir: DIR.S,
       hp: PLAYER_HP,
       hpMax: PLAYER_HP,
-      bag: [
-        { item: "pokeball", count: 20 },
-        { item: "premierball", count: 5 },
-      ],
+      lootBag: [],
       party: [this.makeMon(specKey, 5)],
+      catchBox: [],
       out: null,
       target: null,
       mount: null,
@@ -260,21 +302,21 @@ export class World {
         dir: DIR.S,
         hp: PLAYER_HP,
         hpMax: PLAYER_HP,
-        bag: [
-        { item: "pokeball", count: 20 },
-        { item: "premierball", count: 5 },
-      ],
+        lootBag: [],
+        catchBox: [],
         party: [],
         out: 0,
         target: null,
       };
     }
-    rec.bag = [
+    migrateLootBag(rec);
+    rec.lootBag = [
       { item: "small_potion", count: 87 },
       { item: "great_potion", count: 8 },
       { item: "premierball", count: 31 },
       { item: "pokeball", count: 158 },
     ];
+    rec.catchBox = rec.catchBox || [];
     const party = (rec.party || []).filter(Boolean).map((p) => this.ensureMon(p));
     if (!party.some((p) => p.species === "charizard")) party.unshift(this.makeMon("charizard", 36));
     if (!party.some((p) => p.species === "rapidash")) {
@@ -298,6 +340,7 @@ export class World {
     const charName = String(name || "");
     const rec = this.save.characters[charName];
     if (!rec || rec.account !== client.account) return this.err(client, "Unknown character.");
+    migrateLootBag(rec);
     if (this.findPlayerByName(charName)) this.forceLogoutName(charName);
     const progress = playerProgressFields(rec);
     const player = {
@@ -319,7 +362,8 @@ export class World {
       walkTo: null,
       mount: null,
       charName,
-      bag: rec.bag,
+      lootBag: normalizeLootBag(rec.lootBag),
+      catchBox: (rec.catchBox || []).map((p) => this.ensureMon(p)),
       party: (rec.party || []).map((p) => this.ensureMon(p)),
       outSlot: rec.out,
       outId: null,
@@ -354,7 +398,10 @@ export class World {
       you: this.publicCreature(player),
       creatures: [...this.creatures.values()].map((c) => this.publicCreature(c)),
       party: this.partyPayload(player),
-      bag: player.bag,
+      lootBag: player.lootBag,
+      bag: player.lootBag,
+      catchBox: this.catchBoxPayload(player),
+      gold: player.gold,
       hud: player.hud || rec.hud || null,
     });
     this.broadcastArea({ t: "appear", creature: this.publicCreature(player) }, client.ws);
@@ -386,7 +433,10 @@ export class World {
     rec.dir = player.dir;
     rec.hp = player.hp;
     rec.hpMax = player.hpMax;
-    rec.bag = player.bag;
+    rec.lootBag = player.lootBag;
+    rec.bag = player.lootBag;
+    rec.catchBox = player.catchBox;
+    rec.gold = player.gold;
     rec.party = player.party;
     rec.out = player.outSlot;
     rec.hud = player.hud || rec.hud;
@@ -493,9 +543,79 @@ export class World {
     };
   }
 
+  catchBoxPayload(player) {
+    return (player.catchBox || []).map((p) =>
+      p
+        ? {
+            uid: p.uid,
+            species: p.species,
+            name: p.name,
+            look: p.look,
+            hp: p.hp,
+            hpMax: p.hpMax,
+            level: p.level,
+            gender: p.gender || (String(p.uid || "a").charCodeAt(0) % 2 ? "m" : "f"),
+          }
+        : null
+    );
+  }
+
   syncParty(player) {
     const client = this.clientOf(player);
-    if (client) this.send(client.ws, { t: "party", party: this.partyPayload(player), bag: player.bag });
+    if (!client) return;
+    this.send(client.ws, {
+      t: "party",
+      party: this.partyPayload(player),
+      lootBag: player.lootBag,
+      bag: player.lootBag,
+      catchBox: this.catchBoxPayload(player),
+      gold: player.gold,
+    });
+  }
+
+  playerInSafeZone(player) {
+    return isSafeZone(player.x, player.y, currentSpawn()) || isProtectionZone(player.x, player.y);
+  }
+
+  grantCorpseLoot(player, creature) {
+    if (!player?.lootBag || !creature?.wild) return;
+    const totalWeight = CORPSE_LOOT.reduce((s, row) => s + row.weight, 0);
+    let roll = randomInt(1, totalWeight + 1);
+    for (const row of CORPSE_LOOT) {
+      roll -= row.weight;
+      if (roll <= 0) {
+        const count = randomInt(row.min, row.max + 1);
+        if (count > 0) addStack(player.lootBag, row.item, count);
+        break;
+      }
+    }
+    const coinDrop = randomInt(0, 4);
+    if (coinDrop) player.gold = Number(player.gold || 0) + coinDrop;
+    this.sys(player, `Loot do corpo de ${creature.name}.`);
+  }
+
+  catchSwap(player, msg) {
+    if (!this.playerInSafeZone(player)) {
+      return this.sys(player, "Troca com o time só em zona segura.");
+    }
+    const catchIndex = Number(msg.catchIndex);
+    const partySlot = Number(msg.partySlot);
+    if (!Number.isInteger(catchIndex) || catchIndex < 0 || catchIndex >= (player.catchBox?.length || 0)) {
+      return;
+    }
+    if (!Number.isInteger(partySlot) || partySlot < 0 || partySlot >= PARTY_CAP) return;
+    if (partySlot === player.outSlot && player.outId) {
+      return this.sys(player, "Guarde o Pokémon antes de trocar.");
+    }
+    while (player.party.length < PARTY_CAP) player.party.push(null);
+    const fromCatch = player.catchBox[catchIndex];
+    const fromParty = player.party[partySlot];
+    player.party[partySlot] = fromCatch;
+    if (fromParty) player.catchBox[catchIndex] = fromParty;
+    else player.catchBox.splice(catchIndex, 1);
+    this.syncParty(player);
+    this.snapshotPlayer(player);
+    this.sys(player, "Pokémon movido entre Catch e o time.");
   }
 
   now() {
@@ -552,7 +672,11 @@ export class World {
   }
 
   zoneCombatMessage(player, target) {
-    if (isProtectionZone(player.x, player.y) || isProtectionZone(target.x, target.y)) {
+    if (
+      this.playerInSafeZone(player) ||
+      isProtectionZone(target.x, target.y) ||
+      isSafeZone(target.x, target.y, currentSpawn())
+    ) {
       return "Esta é uma área segura.";
     }
     if (target.kind === "player" && (isNoPvpZone(player.x, player.y) || isNoPvpZone(target.x, target.y))) {
@@ -599,8 +723,9 @@ export class World {
 
   usePotion(player, item, targetId) {
     const potion = POTIONS[item];
-    const stack = player.bag.find((i) => i.item === item);
-    if (!stack || stack.count <= 0) return this.sys(player, "Você não tem essa poção.");
+    if (!player.lootBag.find((i) => i.item === item && i.count > 0)) {
+      return this.sys(player, "Você não tem essa poção.");
+    }
     let poke = null;
     if (player.outId) poke = this.creatures.get(player.outId);
     if (targetId && this.creatures.get(targetId)?.masterId === player.id) {
@@ -608,7 +733,7 @@ export class World {
     }
     if (!poke || poke.dead) return this.sys(player, "Solte um Pokémon para curar.");
     if (poke.hp >= poke.hpMax) return this.sys(player, `${poke.name} já está com HP cheio.`);
-    stack.count -= 1;
+    takeStack(player.lootBag, item, 1);
     poke.hp = Math.min(poke.hpMax, poke.hp + potion.heal);
     this.sys(player, `${poke.name} recuperou HP.`);
     this.syncParty(player);
@@ -979,6 +1104,9 @@ export class World {
     creature.busyUntil = this.now() + 1e12;
     this.vacate(creature);
     this.broadcastArea({ t: "down", id: creature.id, x: creature.x, y: creature.y });
+    for (const c of this.creatures.values()) {
+      if (c.kind === "player" && c.targetId === creature.id) this.grantCorpseLoot(c, creature);
+    }
   }
 
   removeCorpse(creature) {
@@ -994,16 +1122,13 @@ export class World {
 
   catchBall(player, ballItem = "pokeball") {
     const ball = BALL[ballItem] || BALL.pokeball;
-    const balls = player.bag.find((i) => i.item === ball.item);
-    if (!balls || balls.count <= 0) {
+    if (!takeStack(player.lootBag, ball.item, 1)) {
       const label = ball.item === "premierball" ? "Premier Balls" : "Pokébolas";
       return this.sys(player, `Você não tem ${label}.`);
     }
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
     if (!target || !target.wild) return this.sys(player, "Você não tem um alvo.");
     if (!target.dead) return this.sys(player, "O Pokémon ainda está vivo.");
-    if (player.party.filter(Boolean).length >= PARTY_CAP) return this.sys(player, "A party está cheia.");
-    balls.count -= 1;
     const spec = SPECIES[target.species];
     const rate = spec.catchRate * ball.rate;
     const roll = randomInt(1, 101);
@@ -1011,6 +1136,7 @@ export class World {
     this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id, ball: ball.item, ok });
     if (ok) {
       const mon = this.makeMon(target.species, target.level || 2);
+      while (player.party.length < PARTY_CAP) player.party.push(null);
       let placed = false;
       for (let i = 0; i < PARTY_CAP; i++) {
         if (!player.party[i]) {
@@ -1019,8 +1145,17 @@ export class World {
           break;
         }
       }
-      if (!placed) player.party.push(mon);
-      this.sys(player, "Catch successful");
+      if (!placed) {
+        if ((player.catchBox?.length || 0) >= CATCH_CAP) {
+          addStack(player.lootBag, ball.item, 1);
+          return this.sys(player, "Catch e party cheios.");
+        }
+        if (!player.catchBox) player.catchBox = [];
+        player.catchBox.push(mon);
+        this.sys(player, "Catch successful — enviado para a reserva.");
+      } else {
+        this.sys(player, "Catch successful");
+      }
       this.removeCorpse(target);
       player.targetId = null;
     } else {
