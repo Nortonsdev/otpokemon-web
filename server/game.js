@@ -2,8 +2,10 @@ import { randomInt, randomUUID } from "node:crypto";
 import {
   ATK_MS,
   BALL,
+  ballCatchKey,
   DELTA,
   DIR,
+  isCatchBallItem,
   PARTY_CAP,
   PLAYER_HP,
   POTIONS,
@@ -34,8 +36,9 @@ import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 const CATCH_CAP = ITEM_BOX_SLOTS.catch;
 const BAG_SLOT_CAP = ITEM_BOX_SLOTS.bag;
 const CORPSE_LOOT = [
-  { item: "pokeball", min: 1, max: 3, weight: 5 },
-  { item: "premierball", min: 0, max: 1, weight: 2 },
+  { item: "premierball", min: 0, max: 2, weight: 4 },
+  { item: "ultraball", min: 0, max: 1, weight: 2 },
+  { item: "masterball", min: 0, max: 1, weight: 1 },
   { item: "small_potion", min: 0, max: 2, weight: 3 },
   { item: "great_potion", min: 0, max: 1, weight: 1 },
 ];
@@ -321,7 +324,8 @@ export class World {
       { item: "small_potion", count: 87 },
       { item: "great_potion", count: 8 },
       { item: "premierball", count: 31 },
-      { item: "pokeball", count: 158 },
+      { item: "ultraball", count: 24 },
+      { item: "masterball", count: 8 },
     ];
     rec.catchBox = rec.catchBox || [];
     const party = (rec.party || []).filter(Boolean).map((p) => this.ensureMon(p));
@@ -722,7 +726,7 @@ export class World {
 
   use(player, msg) {
     const item = String(msg?.item || "");
-    if (item === "pokeball" || item === "premierball") {
+    if (isCatchBallItem(item)) {
       if (msg.id != null) {
         const id = Number(msg.id);
         const c = this.creatures.get(id);
@@ -1135,10 +1139,15 @@ export class World {
     this.ensureWild();
   }
 
-  catchBall(player, ballItem = "pokeball") {
-    const ball = BALL[ballItem] || BALL.pokeball;
+  catchBall(player, ballItem = "premierball") {
+    const ball = BALL[ballItem] || BALL.premierball;
     if (!takeStack(player.lootBag, ball.item, 1)) {
-      const label = ball.item === "premierball" ? "Premier Balls" : "Pokébolas";
+      const labels = {
+        premierball: "Premier Balls",
+        ultraball: "Ultra Balls",
+        masterball: "Master Balls",
+      };
+      const label = labels[ball.item] || "bolas de captura";
       return this.sys(player, `Você não tem ${label}.`);
     }
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
@@ -1148,7 +1157,13 @@ export class World {
     const rate = spec.catchRate * ball.rate;
     const roll = randomInt(1, 101);
     const ok = ball.guaranteed === true || roll <= rate;
-    this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id, ball: ball.item, ok });
+    this.broadcastArea({
+      t: "catchAttempt",
+      from: player.id,
+      to: target.id,
+      ball: ballCatchKey(ball.item),
+      ok,
+    });
     if (ok) {
       const mon = this.makeMon(target.species, target.level || 2);
       while (player.party.length < PARTY_CAP) player.party.push(null);

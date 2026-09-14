@@ -8,7 +8,7 @@ import {
 } from "../../shared/editor/tileCatalog.ts";
 
 const PREVIEW_MAP = buildLegacyMap();
-import { LOOK_NAME, STEP_MS } from "../../server/species.js";
+import { CATCH_BALL_ITEMS, LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchAudio } from "./catchSfx.js";
 
@@ -1100,7 +1100,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const item = this.hud?.selectedItem;
-    if (item === "pokeball" || item === "premierball") {
+    if (CATCH_BALL_ITEMS.includes(item)) {
       if (who && this.isValidTarget(who) && who.wild) {
         this.net.send({ t: "use", item, id: who.id });
         if (who.dead) this.hud.selectItem(null);
@@ -1193,7 +1193,7 @@ export class GameScene extends Phaser.Scene {
     if (this.keys.C && Phaser.Input.Keyboard.JustDown(this.keys.C)) {
       if (this.targetId == null) return;
       const sel = this.hud?.selectedItem;
-      const ball = sel === "premierball" || sel === "pokeball" ? sel : "pokeball";
+      const ball = CATCH_BALL_ITEMS.includes(sel) ? sel : "premierball";
       this.net.send({ t: "use", item: ball, id: this.targetId });
     }
   }

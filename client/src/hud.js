@@ -1,5 +1,5 @@
 import { WindowManager } from "./windows.js";
-import { SPECIES } from "../../server/species.js";
+import { CATCH_BALL_ITEMS, SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
 import { isCombatSafeZone } from "../../shared/safeZone.js";
@@ -9,19 +9,29 @@ import {
   itemBoxRowCount,
 } from "../../shared/itemBoxCaps.js";
 
-const CATCH_REGISTRY = ["premierball", "pokeball"];
+const CATCH_REGISTRY = CATCH_BALL_ITEMS;
 
 const ITEM_META = {
-  pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true, atlasRow: 1 },
-  premierball: { label: "Premier Ball", icon: "/assets/items/premierball.png", catch: true, atlasRow: 0 },
+  premierball: { label: "Premier Ball", icon: "/assets/items/premierball.png", catch: true },
+  ultraball: { label: "Ultra Ball", icon: "/assets/items/ultraball.png", catch: true },
+  masterball: { label: "Master Ball", icon: "/assets/items/masterball.png", catch: true },
   small_potion: { label: "Small Potion", icon: "/assets/items/small_potion.png", heal: true },
   great_potion: { label: "Great Potion", icon: "/assets/items/great_potion.png", heal: true },
 };
 
-function itemIconHtml(icon, count) {
+function itemIconHtml(icon, count, opts = {}) {
   const n = Math.max(0, Number(count) || 0);
-  const stack = n > 0 ? `<span class="item-stack">${n}</span>` : "";
+  const showStack = opts.alwaysStack || n > 0;
+  const stack = showStack ? `<span class="item-stack">${n}</span>` : "";
   return `<img class="item-sprite" src="${icon}" alt="" />${stack}`;
+}
+
+function lootCount(bag, item) {
+  return Math.max(0, Number(bag.find((i) => i.item === item)?.count) || 0);
+}
+
+function totalCatchBalls(bag) {
+  return CATCH_REGISTRY.reduce((sum, item) => sum + lootCount(bag, item), 0);
 }
 
 const VIP_DEMO = [
@@ -63,10 +73,7 @@ export class Hud {
     this.selectedItem = null;
     this.mapData = null;
     this.minimapZoom = 1;
-    this.catchStats = {
-      premierball: { ok: 0, fail: 0 },
-      pokeball: { ok: 0, fail: 0 },
-    };
+    this.catchStats = Object.fromEntries(CATCH_REGISTRY.map((k) => [k, { ok: 0, fail: 0 }]));
   }
 
   bindGame() {
@@ -132,8 +139,11 @@ export class Hud {
   }
 
   noteCatchAttempt(ballItem, ok) {
-    const key = ballItem === "premierball" ? "premierball" : ballItem === "pokeball" ? "pokeball" : null;
-    if (!key) return;
+    let key = String(ballItem || "");
+    if (key === "premier") key = "premierball";
+    if (key === "ultra") key = "ultraball";
+    if (key === "master") key = "masterball";
+    if (!CATCH_REGISTRY.includes(key)) return;
     if (!this.catchStats[key]) this.catchStats[key] = { ok: 0, fail: 0 };
     if (ok) this.catchStats[key].ok += 1;
     else this.catchStats[key].fail += 1;
@@ -370,8 +380,7 @@ export class Hud {
       stmRow.dataset.tip = tip;
     }
 
-    const balls = this.lootBag.find((i) => i.item === "pokeball")?.count || 0;
-    document.getElementById("hud-balls").textContent = balls;
+    document.getElementById("hud-balls").textContent = String(totalCatchBalls(this.lootBag));
     const trophies = document.getElementById("hud-trophies");
     if (trophies) trophies.textContent = String(progress.trophies ?? 0);
     const cap = document.getElementById("hud-cap");
@@ -579,23 +588,34 @@ export class Hud {
     this.layoutItemBoxGrid(grid, "bag");
     grid.innerHTML = "";
     const slots = ITEM_BOX_SLOTS.bag;
-    const filled = [];
+    const ballRows = CATCH_REGISTRY.map((item) => ({
+      item,
+      count: lootCount(this.lootBag, item),
+      meta: ITEM_META[item],
+    }));
+    const otherRows = [];
     for (const entry of this.lootBag) {
       if (!entry?.item || entry.count <= 0) continue;
-      const meta = ITEM_META[entry.item] || {
-        label: entry.item,
-        icon: "/assets/items/pokeball.png",
-      };
-      filled.push({ ...entry, meta });
+      if (CATCH_REGISTRY.includes(entry.item)) continue;
+      otherRows.push({
+        item: entry.item,
+        count: entry.count,
+        meta: ITEM_META[entry.item] || {
+          label: entry.item,
+          icon: "/assets/items/small_potion.png",
+        },
+      });
     }
+    const filled = [...ballRows, ...otherRows];
     for (let i = 0; i < slots; i++) {
       const row = filled[i];
       const cell = document.createElement("div");
       cell.className = "item-box-cell" + (row ? " has-item" : " empty");
       if (row) {
-        cell.innerHTML = itemIconHtml(row.meta.icon, row.count);
+        const catchBall = !!row.meta.catch;
+        cell.innerHTML = itemIconHtml(row.meta.icon, row.count, { alwaysStack: catchBall });
         cell.title = `${row.meta.label} ×${row.count}`;
-        if (row.meta.catch) {
+        if (catchBall && row.count > 0) {
           cell.oncontextmenu = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -606,6 +626,7 @@ export class Hud {
           cell.onclick = () => this.net.send({ t: "use", item: row.item });
         }
         cell.classList.toggle("use-with", this.selectedItem === row.item);
+        if (catchBall && row.count <= 0) cell.classList.add("empty");
       }
       grid.appendChild(cell);
     }
@@ -657,7 +678,7 @@ export class Hud {
       cell.className = "item-box-cell" + (p ? " has-mon" : " empty");
       if (p) {
         const out = this.party.out === i;
-        const ballIcon = out ? "/assets/items/premierball.png" : "/assets/items/pokeball.png";
+        const ballIcon = out ? "/assets/items/premierball.png" : "/assets/items/ultraball.png";
         cell.innerHTML = `<img src="${portraitUrl(p)}" alt="" /><img src="${ballIcon}" alt="" style="width:10px;height:10px;left:70%;top:75%" />`;
         cell.title = `[${p.level}] ${p.name} · ${out ? "Ball aberta" : "Ball carregada"}`;
         cell.onclick = () => this.net.send({ t: "pokebar", slot: i });
@@ -751,8 +772,9 @@ export class Hud {
       { key: "R", move: 8 },
       { key: "A", move: 9 },
       { key: "S", move: 10 },
-      { key: "ball", item: "pokeball" },
       { key: "P", item: "premierball" },
+      { key: "U", item: "ultraball" },
+      { key: "M", item: "masterball" },
       { key: "pot", item: "small_potion" },
     ];
     const row1 = document.createElement("div");
@@ -782,10 +804,14 @@ export class Hud {
         btn.classList.add(count ? "on" : "off");
         btn.classList.toggle("use-with", this.selectedItem === slot.item);
         const keyHint = slot.key && slot.key.length === 1 ? `<span class="hot-key">${slot.key}</span>` : "";
-        btn.innerHTML = `${itemIconHtml(meta.icon, count)}${keyHint}`;
+        btn.innerHTML = `${itemIconHtml(meta.icon, count, { alwaysStack: true })}${keyHint}`;
         if (meta.catch) {
           btn.oncontextmenu = (e) => {
             e.preventDefault();
+            if (!count) return;
+            this.selectItem(this.selectedItem === slot.item ? null : slot.item);
+          };
+          btn.onclick = () => {
             if (!count) return;
             this.selectItem(this.selectedItem === slot.item ? null : slot.item);
           };

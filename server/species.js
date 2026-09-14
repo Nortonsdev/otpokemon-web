@@ -109,10 +109,23 @@ export function speciesKeyByLook(look) {
 export const STARTERS = ["bulbasaur", "charmander", "squirtle"];
 
 /** OTP2072026 — Premierball client id 3030, ballsusage id 2 */
+export const CATCH_BALL_ITEMS = ["premierball", "ultraball", "masterball"];
+
 export const BALL = {
-  pokeball: { item: "pokeball", rate: 1 },
-  premierball: { item: "premierball", rate: 1, guaranteed: true, clientId: 3030 },
+  premierball: { item: "premierball", rate: 1, guaranteed: true, clientId: 3030, catchKey: "premier" },
+  ultraball: { item: "ultraball", rate: 1, guaranteed: true, catchKey: "ultra" },
+  masterball: { item: "masterball", rate: 1, guaranteed: true, catchKey: "master" },
 };
+
+export function ballCatchKey(itemOrKey) {
+  const s = String(itemOrKey || "");
+  if (s === "premier" || s === "ultra" || s === "master") return s;
+  return BALL[s]?.catchKey || "premier";
+}
+
+export function isCatchBallItem(item) {
+  return CATCH_BALL_ITEMS.includes(String(item || ""));
+}
 
 export const POTIONS = {
   small_potion: { heal: 35 },
