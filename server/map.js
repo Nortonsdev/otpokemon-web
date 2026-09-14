@@ -55,6 +55,7 @@ export function meadowWildSpots() {
   return r.wildSpawns?.length ? r.wildSpawns : [{ x: cx, y: cy }];
 }
 
+/** Meadow wild looktypes — sprites: tools/extract_otp207_sprites.py (MEADOW_WILD_SPECIES). */
 const MEADOW_WILD_SPECIES = [
   "bulbasaur",
   "ivysaur",

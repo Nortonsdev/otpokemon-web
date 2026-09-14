@@ -1,41 +1,43 @@
 #!/usr/bin/env python3
-"""Export Pokémon outfits from OTP2072026 Object Builder pack (Tibia.dat + Tibia.spr).
+"""Export meadow + Charizard sprites from OTP2072026 (pixel art OTP desktop).
 
-The encrypted otp.dat/otp-*.spr in data/assets/ are not readable offline; the zip
-includes decrypted Tibia.dat/Tibia.spr under objectbuilder/ for editors.
+Download OTP2072026.zip (MediaFire) once; inside the zip:
+  - data/assets/otp.dat + otp-*.spr — encrypted at rest (OT client only).
+  - objectbuilder/Tibia.dat + Tibia.spr — same outfits, decrypted for editors.
 
-Look IDs match modules/game_pokemon/pokemondata.lua (field looktype).
+This tool reads objectbuilder/ + looktypes from modules/game_pokemon/pokemondata.lua.
+Output: client/public/assets/pokemon/{species}/sheet.png (+ idle/walk/corpse/portrait).
+
+Keep MEADOW_WILD_SPECIES in sync with server/map.js.
 """
 
 from __future__ import annotations
 
 import mmap
 import re
+import subprocess
 import sys
+import zipfile
 from pathlib import Path
 
-# Reuse OT extended DAT/SPR parsing and compositing from Ruby exporter.
-from extract_ruby_sprites import (
-    ThingType,
-    compose_frame,
-    corpse_from,
-    decode_sprite,
-    export_item,
-    parse_dat,
-)
+from extract_ruby_sprites import ThingType, compose_frame, corpse_from, parse_dat
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_PACK = Path("/tmp/otp2072026/OTP2072026/objectbuilder")
 DEFAULT_OUT = ROOT / "client/public/assets/pokemon"
+CACHE_DIR = Path("/tmp/otp2072026")
+ZIP_PATH = CACHE_DIR / "OTP2072026.zip"
+PACK_ROOT = CACHE_DIR / "OTP2072026"
+DEFAULT_PACK = PACK_ROOT / "objectbuilder"
+POKEMONDATA = PACK_ROOT / "modules/game_pokemon/pokemondata.lua"
+MEDIAFIRE_PAGE = "https://www.mediafire.com/file/kfbi8exxzcddd2s/OTP2072026.zip/file"
 
-# Milestone species (server/species.js + meadow wilds)
-SPECIES_NAMES = [
+# Exact meadow wilds (server/map.js MEADOW_WILD_SPECIES)
+MEADOW_WILD_SPECIES = [
     "bulbasaur",
     "ivysaur",
     "venusaur",
     "charmander",
     "charmeleon",
-    "charizard",
     "squirtle",
     "wartortle",
     "blastoise",
@@ -52,7 +54,49 @@ SPECIES_NAMES = [
     "rapidash",
 ]
 
-POKEMONDATA = Path("/tmp/otp2072026/OTP2072026/modules/game_pokemon/pokemondata.lua")
+# Party default + NPC Dono / decor (not a meadow wild)
+MEADOW_EXTRA_SPECIES = ["charizard"]
+
+SPECIES_NAMES = [*MEADOW_WILD_SPECIES, *MEADOW_EXTRA_SPECIES]
+
+
+def mediafire_direct_url(page_url: str) -> str:
+    html = subprocess.check_output(
+        ["curl", "-sL", page_url, "-A", "Mozilla/5.0"],
+        text=True,
+    )
+    m = re.search(r'https://download[^"\']+', html)
+    if not m:
+        raise RuntimeError("MediaFire direct download URL not found")
+    return m.group(0)
+
+
+def ensure_pack() -> Path:
+    dat = DEFAULT_PACK / "Tibia.dat"
+    spr = DEFAULT_PACK / "Tibia.spr"
+    if dat.is_file() and spr.is_file() and POKEMONDATA.is_file():
+        return DEFAULT_PACK
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    if not ZIP_PATH.is_file() or ZIP_PATH.stat().st_size < 10_000_000:
+        url = mediafire_direct_url(MEDIAFIRE_PAGE)
+        print("GET", url)
+        subprocess.check_call(
+            ["curl", "-L", "--fail", "-A", "Mozilla/5.0", "-o", str(ZIP_PATH), url],
+        )
+
+    with zipfile.ZipFile(ZIP_PATH) as zf:
+        for name in zf.namelist():
+            if name.startswith("OTP2072026/objectbuilder/") or name.startswith(
+                "OTP2072026/modules/game_pokemon/pokemondata.lua"
+            ):
+                zf.extract(name, CACHE_DIR)
+
+    if not dat.is_file() or not spr.is_file():
+        raise RuntimeError(f"Missing {dat} or {spr} after zip extract")
+    if not POKEMONDATA.is_file():
+        raise RuntimeError(f"Missing {POKEMONDATA} after zip extract")
+    return DEFAULT_PACK
 
 
 def load_look_ids(data_path: Path, names: list[str]) -> dict[int, str]:
@@ -67,7 +111,6 @@ def load_look_ids(data_path: Path, names: list[str]) -> dict[int, str]:
 
 
 def sheet_walk_phases(phases: int) -> tuple[int, int, int]:
-    """Return idle phase and two walk phases for a 4×3 OTP-style sheet."""
     if phases >= 6:
         return 0, 1, 5
     if phases >= 3:
@@ -106,28 +149,33 @@ def export_creature(
                     portrait.thumbnail((32, 32), Image.Resampling.NEAREST)
                 portrait.save(look_dir / "portrait.png")
                 legacy = out_dir / f"{name}_portrait.png"
-                if legacy.parent.exists():
-                    portrait.save(legacy)
+                portrait.save(legacy)
     sheet.save(look_dir / "sheet.png")
-    legacy_sheet = out_dir / f"{name}_sheet.png"
-    if legacy_sheet.parent.exists():
-        sheet.save(legacy_sheet)
+    sheet.save(out_dir / f"{name}_sheet.png")
     south = compose_frame(group, mm, 2, idle_phase)
-    if south.width > 32 or south.height > 32:
-        corpse_src = south
-    else:
-        corpse_src = south
     corpse = corpse_from(
-        corpse_src if corpse_src.height <= 64 else corpse_src.resize((32, 32), Image.Resampling.NEAREST)
+        south if south.height <= 64 else south.resize((32, 32), Image.Resampling.NEAREST)
     )
     corpse.save(look_dir / "corpse.png")
-    print(f"exported {name} look={thing.thing_id} {fw}x{fh} phases={group.phases} -> {look_dir}")
+    print(f"exported {name} look={thing.thing_id} {fw}x{fh} phases={group.phases}")
+
+
+def verify_outputs(out_dir: Path, names: list[str]) -> None:
+    missing: list[str] = []
+    for name in names:
+        base = out_dir / name
+        for fname in ("sheet.png", "corpse.png", "portrait.png"):
+            if not (base / fname).is_file():
+                missing.append(f"{name}/{fname}")
+    if missing:
+        raise RuntimeError("incomplete export:\n  " + "\n  ".join(missing))
 
 
 def main() -> int:
-    pack = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PACK
+    pack = Path(sys.argv[1]) if len(sys.argv) > 1 else ensure_pack()
     out_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_OUT
     pdata = Path(sys.argv[3]) if len(sys.argv) > 3 else POKEMONDATA
+
     dat = pack / "Tibia.dat"
     spr = pack / "Tibia.spr"
     if not dat.is_file() or not spr.is_file():
@@ -137,6 +185,7 @@ def main() -> int:
         print("Missing pokemondata.lua at", pdata, file=sys.stderr)
         return 1
 
+    print("meadow wilds:", len(MEADOW_WILD_SPECIES), "+ extra:", MEADOW_EXTRA_SPECIES)
     looks = load_look_ids(pdata, SPECIES_NAMES)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -160,7 +209,8 @@ def main() -> int:
         finally:
             mm.close()
 
-    print("done", len(looks), "species ->", out_dir)
+    verify_outputs(out_dir, SPECIES_NAMES)
+    print("done", len(SPECIES_NAMES), "species ->", out_dir)
     return 0
 
 
