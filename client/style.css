@@ -1115,6 +1115,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .inv-btn.on { color: var(--ot-accent); border-color: var(--ot-accent); }
 .inv-btn:hover { filter: brightness(1.2); }
 .bag-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 0 6px 8px; }
+.bag-grid.hidden { display: none; }
 .bag-cell, .eq-slot {
   position: relative;
 }
@@ -1133,6 +1134,30 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   position: absolute; right: 2px; bottom: 0; font-size: 8px; color: #fff;
   text-shadow: 0 0 3px #000, 0 1px 2px #000;
 }
+.catch-registro { padding: 0 6px 8px; }
+.catch-registro.hidden { display: none; }
+.catch-totals {
+  display: flex; gap: 4px; margin-bottom: 4px;
+}
+.catch-total {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px;
+  font-size: 9px; font-weight: 700; padding: 3px 2px; border-radius: 4px;
+  border: 1px solid var(--ot-border-dim); background: rgba(8, 12, 22, 0.9);
+}
+.catch-total.ok { color: #6fdc8c; border-color: #2a6b3f; }
+.catch-total.fail { color: #ff8a8a; border-color: #6b2a2a; }
+.catch-ico { font-size: 8px; opacity: 0.9; }
+.catch-rows { display: flex; flex-direction: column; gap: 2px; }
+.catch-row {
+  display: grid; grid-template-columns: 22px 1fr 1fr; gap: 2px; align-items: center;
+  padding: 2px 3px; border-radius: 4px; background: rgba(8, 12, 22, 0.85);
+  border: 1px solid var(--ot-border-dim); font-size: 8px;
+}
+.catch-row img {
+  width: 18px; height: 18px; image-rendering: pixelated;
+}
+.catch-row .n-ok { color: #6fdc8c; text-align: center; font-weight: 700; }
+.catch-row .n-fail { color: #ff8a8a; text-align: center; font-weight: 700; }
 
 /* ── HOTBAR (two circular rows) ── */
 .hotdock {

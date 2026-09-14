@@ -3,9 +3,11 @@ import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
 
+const CATCH_REGISTRY = ["premierball", "pokeball"];
+
 const ITEM_META = {
-  pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true },
-  premierball: { label: "Premier Ball", icon: "/assets/items/premierball.png", catch: true },
+  pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true, atlasRow: 1 },
+  premierball: { label: "Premier Ball", icon: "/assets/items/premierball.png", catch: true, atlasRow: 0 },
   small_potion: { label: "Small Potion", icon: "/assets/items/small_potion.png", heal: true },
   great_potion: { label: "Great Potion", icon: "/assets/items/great_potion.png", heal: true },
 };
@@ -46,6 +48,11 @@ export class Hud {
     this.selectedItem = null;
     this.mapData = null;
     this.minimapZoom = 1;
+    this.invTab = "bag";
+    this.catchStats = {
+      premierball: { ok: 0, fail: 0 },
+      pokeball: { ok: 0, fail: 0 },
+    };
   }
 
   bindGame() {
@@ -92,6 +99,56 @@ export class Hud {
         document.getElementById("chat-input")?.blur();
       }
     });
+    document.querySelector(".inv-shortcuts")?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".inv-btn");
+      if (!btn) return;
+      const label = (btn.textContent || "").trim().toUpperCase();
+      if (label === "BAG") this.setInvTab("bag");
+      else if (label === "CATCH") this.setInvTab("catch");
+    });
+  }
+
+  setInvTab(tab) {
+    this.invTab = tab === "catch" ? "catch" : "bag";
+    for (const b of document.querySelectorAll(".inv-shortcuts .inv-btn")) {
+      const on =
+        (this.invTab === "bag" && b.textContent.trim().toUpperCase() === "BAG") ||
+        (this.invTab === "catch" && b.textContent.trim().toUpperCase() === "CATCH");
+      b.classList.toggle("on", on);
+    }
+    document.getElementById("bolsa")?.classList.toggle("hidden", this.invTab !== "bag");
+    document.getElementById("catch-registro")?.classList.toggle("hidden", this.invTab !== "catch");
+    if (this.invTab === "catch") this.renderCatchRegistro();
+  }
+
+  noteCatchAttempt(ballItem, ok) {
+    const key = ballItem === "premierball" ? "premierball" : ballItem === "pokeball" ? "pokeball" : null;
+    if (!key) return;
+    if (!this.catchStats[key]) this.catchStats[key] = { ok: 0, fail: 0 };
+    if (ok) this.catchStats[key].ok += 1;
+    else this.catchStats[key].fail += 1;
+    if (this.invTab === "catch") this.renderCatchRegistro();
+  }
+
+  renderCatchRegistro() {
+    const rowsEl = document.getElementById("catch-rows");
+    if (!rowsEl) return;
+    let okSum = 0;
+    let failSum = 0;
+    rowsEl.innerHTML = "";
+    for (const item of CATCH_REGISTRY) {
+      const stats = this.catchStats[item] || { ok: 0, fail: 0 };
+      okSum += stats.ok;
+      failSum += stats.fail;
+      const el = document.createElement("div");
+      el.className = "catch-row";
+      el.innerHTML = `<img src="${ITEM_META[item]?.icon || ""}" alt="" /><span class="n-ok">${stats.ok}</span><span class="n-fail">${stats.fail}</span>`;
+      rowsEl.appendChild(el);
+    }
+    const okEl = document.getElementById("catch-total-ok");
+    const failEl = document.getElementById("catch-total-fail");
+    if (okEl) okEl.textContent = String(okSum);
+    if (failEl) failEl.textContent = String(failSum);
   }
 
   selectItem(item) {
@@ -216,6 +273,7 @@ export class Hud {
       if (msg.id == null) this.setTarget(null);
       else this.setTarget({ id: msg.id, name: msg.name, plate: msg.plate });
     }
+    if (msg.t === "catchAttempt") this.noteCatchAttempt(msg.ball, msg.ok);
     if (msg.t === "outfit" && msg.creature) {
       if (this.you && msg.creature.id === this.you.id) this.you = { ...this.you, ...msg.creature };
       this.creatures.set(msg.creature.id, msg.creature);
@@ -537,6 +595,7 @@ export class Hud {
       { key: "A", move: 9 },
       { key: "S", move: 10 },
       { key: "ball", item: "pokeball" },
+      { key: "P", item: "premierball" },
       { key: "pot", item: "small_potion" },
     ];
     const row1 = document.createElement("div");
@@ -565,7 +624,8 @@ export class Hud {
         const meta = ITEM_META[slot.item];
         btn.classList.add(count ? "on" : "off");
         btn.classList.toggle("use-with", this.selectedItem === slot.item);
-        btn.innerHTML = `<img src="${meta.icon}" alt="" /><span class="hot-count">${count || ""}</span>`;
+        const keyHint = slot.key && slot.key.length === 1 ? `<span class="hot-key">${slot.key}</span>` : "";
+        btn.innerHTML = `<img src="${meta.icon}" alt="" />${keyHint}<span class="hot-count">${count || ""}</span>`;
         if (meta.catch) {
           btn.oncontextmenu = (e) => {
             e.preventDefault();

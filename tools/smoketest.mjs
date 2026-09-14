@@ -1,8 +1,10 @@
 import WebSocket from "ws";
-import { getMaxHealth } from "../server/species.js";
+import { BALL, getMaxHealth } from "../server/species.js";
 import { hpColorRgb, hpPercent } from "../client/src/hpColor.js";
 import { playerProgressFields, staminaClock } from "../server/otpProgress.js";
 
+if (!BALL.premierball?.guaranteed) throw new Error("Premier Ball must have guaranteed catch");
+if (BALL.premierball.clientId !== 3030) throw new Error("Premier Ball client id must be 3030");
 if (getMaxHealth({ hp: 39 }, 5) !== 18) throw new Error("Charmander lv5 max HP");
 if (getMaxHealth({ hp: 45 }, 2) !== 13) throw new Error("Caterpie lv2 max HP");
 
@@ -116,12 +118,23 @@ if (wild.hpMax !== 13) {
   throw new Error(`wild hpMax ${wild.hpMax} (Caterpie lv2 without IVs should be 13)`);
 }
 if (!String(wild.plate || "").startsWith("Caterpie [2]")) throw new Error(`wild plate ${wild.plate}`);
-const wildZard = map1.creatures.find((c) => c.wild && (c.species === "charizard" || c.look === 6));
+const wildSpecies = new Set(
+  map1.creatures.filter((c) => c.wild && !c.dead).map((c) => c.species || c.look)
+);
+if (wildSpecies.size < 12) {
+  throw new Error(`expected diverse wilds in meadow, got ${wildSpecies.size} species`);
+}
 const wildDash = map1.creatures.find((c) => c.wild && (c.species === "rapidash" || c.look === 78));
-if (!wildZard) throw new Error("no wild Charizard on map");
 if (!wildDash) throw new Error("no wild Rapidash on map");
-if (wildZard.hpMax !== wild.hpMax) throw new Error(`wild Charizard hpMax ${wildZard.hpMax} != Caterpie`);
 if (wildDash.hpMax !== wild.hpMax) throw new Error(`wild Rapidash hpMax ${wildDash.hpMax} != Caterpie`);
+const dono = map1.creatures.find((c) => c.kind === "npc" && c.name === "Dono");
+if (!dono || dono.look !== 6) throw new Error("Dono Charizard decor missing");
+if (!map1.creatures.some((c) => c.kind === "npc" && c.name === "Salamence Toy")) {
+  throw new Error("Salamence Toy NPC missing");
+}
+if (!map1.creatures.some((c) => c.kind === "npc" && c.name === "Shuckle Game")) {
+  throw new Error("Shuckle Game NPC missing");
+}
 
 const npcs = (map1.creatures || []).filter((c) => c.kind === "npc");
 if (npcs.length < 2) throw new Error(`expected NPCs on map, got ${npcs.length}`);

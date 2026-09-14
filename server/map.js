@@ -33,27 +33,56 @@ export const MAP = new Proxy(
   },
 );
 
-export const WILD_GROUPS = [
-  { species: "caterpie", want: 3, spots: "wild" },
-  {
-    species: "charizard",
-    want: 3,
-    spots: [
-      { x: 8, y: 11 },
-      { x: 16, y: 8 },
-      { x: 4, y: 3 },
-    ],
-  },
-  {
-    species: "rapidash",
-    want: 3,
-    spots: [
-      { x: 6, y: 18 },
-      { x: 22, y: 11 },
-      { x: 27, y: 4 },
-    ],
-  },
+/** Grass/path ring around temple spawn — wild meadow (excludes fixed NPC tiles). */
+const MEADOW_NPC_AVOID = new Set(["10,10", "20,10", "8,4", "11,12", "14,13", "17,12"]);
+
+export function meadowWildSpots() {
+  const r = runtime();
+  const cx = r.spawn?.x ?? SPAWN.x;
+  const cy = r.spawn?.y ?? SPAWN.y;
+  const spots = [];
+  for (let y = 0; y < r.h; y++) {
+    for (let x = 0; x < r.w; x++) {
+      if (!walkable(x, y)) continue;
+      const tn = tileName(x, y);
+      if (tn !== "grass" && tn !== "path") continue;
+      if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) > 8) continue;
+      if (MEADOW_NPC_AVOID.has(`${x},${y}`)) continue;
+      spots.push({ x, y });
+    }
+  }
+  if (spots.length) return spots;
+  return r.wildSpawns?.length ? r.wildSpawns : [{ x: cx, y: cy }];
+}
+
+const MEADOW_WILD_SPECIES = [
+  "bulbasaur",
+  "ivysaur",
+  "venusaur",
+  "charmander",
+  "charmeleon",
+  "squirtle",
+  "wartortle",
+  "blastoise",
+  "caterpie",
+  "metapod",
+  "butterfree",
+  "weedle",
+  "kakuna",
+  "beedrill",
+  "pidgey",
+  "pidgeotto",
+  "pidgeot",
+  "raticate",
+  "rapidash",
 ];
+
+/** One living wild per milestone species in the meadow (~19 distinct looks). */
+export const WILD_GROUPS = MEADOW_WILD_SPECIES.map((species) => ({
+  species,
+  want: 1,
+  spots: "meadow",
+}));
 
 export function inBounds(x, y) {
   const r = runtime();

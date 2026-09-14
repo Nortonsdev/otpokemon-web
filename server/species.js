@@ -108,9 +108,10 @@ export function speciesKeyByLook(look) {
 
 export const STARTERS = ["bulbasaur", "charmander", "squirtle"];
 
+/** OTP2072026 — Premierball client id 3030, ballsusage id 2 */
 export const BALL = {
   pokeball: { item: "pokeball", rate: 1 },
-  premierball: { item: "premierball", rate: 1.15 },
+  premierball: { item: "premierball", rate: 1, guaranteed: true, clientId: 3030 },
 };
 
 export const POTIONS = {
