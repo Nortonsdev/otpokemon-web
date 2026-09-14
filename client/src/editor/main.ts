@@ -1,19 +1,28 @@
 import "./editor.css";
-import { parseOtbm, serializeOtbm, createEmptyMap, tileKey, type OtbmMap, type OtbmTown, type OtbmWaypoint } from "../../../shared/editor/otbm.ts";
+import {
+  parseOtbm,
+  serializeOtbm,
+  createEmptyMap,
+  tileKey,
+  cloneOtbmMap,
+  type OtbmMap,
+} from "../../../shared/editor/otbm.ts";
 import { WaypointManager } from "../../../shared/editor/WaypointManager.ts";
 import { parsePositionString } from "../../../shared/editor/position.ts";
+import { loadClassicClient, type ClassicCatalog } from "../../../shared/editor/classicClient.ts";
+import { otbmMapToRuntime, setRuntimeCell, type RuntimeMap } from "../../../shared/editor/mapRuntime.ts";
 import {
-  loadClassicClient,
-  itemPreviewCanvas,
   BUILTIN_TILE_IDS,
+  BUILTIN_PALETTE_IDS,
   CUSTOM_ID_START,
-  type ClassicCatalog,
-} from "../../../shared/editor/classicClient.ts";
-import { otbmMapToRuntime, runtimeToOtbm, setRuntimeCell, type RuntimeMap } from "../../../shared/editor/mapRuntime.ts";
+  TILE_SIZE,
+} from "../../../shared/editor/tileCatalog.ts";
+import { floodFill, forEachRectTile, type Rect } from "../../../shared/editor/brushes.ts";
+import { loadBuiltinPreviews, previewForId, rememberPreview } from "./previews.ts";
+import { drawEditorMap, drawMinimap, screenToTile } from "./renderer.ts";
+import { renderPalette } from "./palette.ts";
 
-type Tool = "brush" | "erase" | "pan" | "waypoint" | "town";
-
-const TILE = 32;
+type Tool = "brush" | "erase" | "fill" | "select" | "pan" | "waypoint" | "town";
 
 class EditorApp {
   root: HTMLElement;
@@ -23,7 +32,7 @@ class EditorApp {
   mmCtx: CanvasRenderingContext2D;
   catalog: ClassicCatalog | null = null;
   customSprites = new Map<number, HTMLCanvasElement>();
-  paletteIds: number[] = Object.values(BUILTIN_TILE_IDS);
+  paletteIds: number[] = [...BUILTIN_PALETTE_IDS];
   selectedId = BUILTIN_TILE_IDS.grass;
   tool: Tool = "brush";
   floor = 7;
@@ -37,9 +46,13 @@ class EditorApp {
   waypointMgr = new WaypointManager([]);
   painting = false;
   panning = false;
+  spacePan = false;
   strokeUndo = false;
   lastX = 0;
   lastY = 0;
+  selection: Rect | null = null;
+  selecting = false;
+  paletteFilter = "";
   statusEl!: HTMLElement;
   posEl!: HTMLElement;
 
@@ -52,23 +65,18 @@ class EditorApp {
     this.minimap = document.getElementById("minimap") as HTMLCanvasElement;
     this.mmCtx = this.minimap.getContext("2d")!;
     this.bindCanvas();
-    this.newMap(32, 23, 7);
+    this.bindKeys();
+    this.newMap(32, 23, 7, false);
     window.addEventListener("resize", () => this.resize());
     this.resize();
-  }
-
-  cloneMap(m: OtbmMap): OtbmMap {
-    return {
-      ...m,
-      tiles: new Map(m.tiles),
-      towns: m.towns.map((t) => ({ ...t })),
-      waypoints: m.waypoints.map((w) => ({ ...w })),
-      rawDescriptions: [...m.rawDescriptions],
-    };
+    loadBuiltinPreviews().then(() => {
+      this.refreshPalette();
+      this.draw();
+    });
   }
 
   pushUndo() {
-    this.undo.push(this.cloneMap(this.map));
+    this.undo.push(cloneOtbmMap(this.map));
     if (this.undo.length > 40) this.undo.shift();
     this.redo = [];
   }
@@ -76,23 +84,21 @@ class EditorApp {
   applyMap(m: OtbmMap) {
     this.map = m;
     this.waypointMgr = new WaypointManager(m.waypoints);
-    this.runtime = otbmMapToRuntime(m, this.catalog ?? undefined);
+    this.runtime = otbmMapToRuntime(m, this.catalog ?? undefined, this.floor);
     this.draw();
     this.updateMinimap();
     this.setStatus();
   }
 
   tileItems(x: number, y: number): number[] {
-    const key = tileKey(x, y, this.floor);
-    const t = this.map.tiles.get(key);
+    const t = this.map.tiles.get(tileKey(x, y, this.floor));
     return t?.items.map((i) => i.id) ?? [];
   }
 
   setTileItems(x: number, y: number, items: number[]) {
     const key = tileKey(x, y, this.floor);
-    if (!items.length) {
-      this.map.tiles.delete(key);
-    } else {
+    if (!items.length) this.map.tiles.delete(key);
+    else {
       this.map.tiles.set(key, {
         x,
         y,
@@ -101,38 +107,42 @@ class EditorApp {
         items: items.map((id) => ({ id })),
       });
     }
-    setRuntimeCell(this.runtime, x, y, items.length ? items : [BUILTIN_TILE_IDS.grass]);
+    if (this.floor === this.runtime.z) {
+      setRuntimeCell(this.runtime, x, y, items.length ? items : [BUILTIN_TILE_IDS.grass], this.catalog ?? undefined);
+    }
   }
 
   buildUi() {
     this.root.innerHTML = `
       <header class="editor-top">
         <div class="menu-group">
-          <button data-act="new">Novo</button>
-          <button data-act="open">Abrir OTBM</button>
-          <button data-act="save">Salvar OTBM</button>
-          <button data-act="apply">Aplicar no jogo</button>
+          <button data-act="new" title="Novo mapa">Novo</button>
+          <button data-act="open" title="Abrir .otbm (RME / YATME)">Abrir OTBM</button>
+          <button data-act="save" title="Baixar .otbm">Salvar OTBM</button>
+          <button data-act="apply" title="POST /api/map → world.otbm">Aplicar no jogo</button>
         </div>
         <div class="menu-group">
-          <button data-tool="brush" class="active">Brush</button>
-          <button data-tool="erase">Apagar</button>
-          <button data-tool="pan">Pan</button>
+          <button data-tool="brush" class="active" title="Pincel (B)">Brush</button>
+          <button data-tool="erase" title="Apagar (E)">Apagar</button>
+          <button data-tool="fill" title="Preencher (F)">Preencher</button>
+          <button data-tool="select" title="Selecionar (M)">Selecionar</button>
+          <button data-tool="pan" title="Mover (H / espaço)">Pan</button>
           <button data-tool="waypoint">Waypoint</button>
           <button data-tool="town">Templo</button>
         </div>
         <div class="menu-group">
-          <button data-act="undo">Desfazer</button>
-          <button data-act="redo">Refazer</button>
+          <button data-act="undo" title="Ctrl+Z">Desfazer</button>
+          <button data-act="redo" title="Ctrl+Y">Refazer</button>
           <button data-act="goto">Ir para…</button>
           <button data-act="towns">Cidades</button>
           <button data-act="wps">Waypoints</button>
         </div>
         <div class="menu-group">
-          <label>Tibia.dat <input type="file" id="file-dat" accept=".dat" hidden /></label>
+          <input type="file" id="file-dat" accept=".dat" hidden />
           <button data-act="pick-dat">DAT</button>
-          <label>Tibia.spr <input type="file" id="file-spr" accept=".spr" hidden /></label>
+          <input type="file" id="file-spr" accept=".spr" hidden />
           <button data-act="pick-spr">SPR</button>
-          <label>items.xml <input type="file" id="file-xml" accept=".xml" hidden /></label>
+          <input type="file" id="file-xml" accept=".xml" hidden />
           <button data-act="pick-xml">XML</button>
           <button data-act="png">+ PNG</button>
         </div>
@@ -154,13 +164,16 @@ class EditorApp {
           </div>
           <h3>Minimapa</h3>
           <div class="minimap"><canvas id="minimap" width="200" height="120"></canvas></div>
-          <p class="muted" style="font-size:12px;color:var(--muted)">Scroll = zoom · Botão do meio / Pan = mover · Waypoint/Templo: clique no mapa</p>
+          <p class="muted" style="font-size:12px;color:var(--muted)">
+            Scroll = zoom · Espaço/meio = pan · Preencher = flood fill · Selecionar + Delete = apagar retângulo · Ctrl+S salva OTBM
+          </p>
         </aside>
       </div>
       <footer class="editor-status">
         <span id="st-pos">POS: —</span>
         <span id="st-zoom">ZOOM: 1.00x</span>
         <span id="st-tiles">TILES: 0</span>
+        <span id="st-tool">FERRAMENTA: brush</span>
         <span id="st-msg"></span>
       </footer>
     `;
@@ -168,18 +181,14 @@ class EditorApp {
     this.posEl = document.getElementById("st-pos")!;
 
     this.root.querySelectorAll("[data-tool]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        this.tool = (btn as HTMLElement).dataset.tool as Tool;
-        this.root.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-      });
+      btn.addEventListener("click", () => this.setTool((btn as HTMLElement).dataset.tool as Tool));
     });
 
     const acts: Record<string, () => void> = {
       new: () => this.promptNewMap(),
       open: () => this.openOtbm(),
-      save: () => this.saveOtbm(),
-      apply: () => this.applyToGame(),
+      save: () => void this.saveOtbm(),
+      apply: () => void this.applyToGame(),
       undo: () => this.doUndo(),
       redo: () => this.doRedo(),
       goto: () => this.promptGoto(),
@@ -204,8 +213,9 @@ class EditorApp {
         .filter((e) => e.spriteIds.length && (e.isGround || e.id < 2000))
         .slice(0, 200)
         .map((e) => e.id);
-      this.paletteIds = [...new Set([...Object.values(BUILTIN_TILE_IDS), ...fromCat])];
-      this.renderPalette();
+      this.paletteIds = [...new Set([...BUILTIN_PALETTE_IDS, ...fromCat, ...this.customSprites.keys()])];
+      this.refreshPalette();
+      this.draw();
       this.msg("Assets carregados (DAT+SPR clássicos).");
     };
     (document.getElementById("file-dat") as HTMLInputElement).onchange = async (e) => {
@@ -225,11 +235,21 @@ class EditorApp {
     };
 
     document.getElementById("palette-search")!.addEventListener("input", (e) => {
-      this.renderPalette((e.target as HTMLInputElement).value);
+      this.paletteFilter = (e.target as HTMLInputElement).value;
+      this.refreshPalette();
     });
 
     document.getElementById("floor-up")!.addEventListener("click", () => this.setFloor(this.floor + 1));
     document.getElementById("floor-down")!.addEventListener("click", () => this.setFloor(this.floor - 1));
+  }
+
+  setTool(tool: Tool) {
+    this.tool = tool;
+    this.root.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("active"));
+    this.root.querySelector(`[data-tool="${tool}"]`)?.classList.add("active");
+    const label = document.getElementById("st-tool");
+    if (label) label.textContent = `FERRAMENTA: ${tool}`;
+    this.canvas.style.cursor = tool === "pan" ? "grab" : tool === "select" ? "cell" : "crosshair";
   }
 
   msg(t: string) {
@@ -239,19 +259,22 @@ class EditorApp {
   setFloor(z: number) {
     this.floor = Math.max(0, Math.min(15, z));
     document.getElementById("floor-label")!.textContent = String(this.floor);
+    this.runtime = otbmMapToRuntime(this.map, this.catalog ?? undefined, this.floor);
     this.draw();
+    this.updateMinimap();
   }
 
-  newMap(w: number, h: number, z: number) {
-    this.pushUndo();
+  newMap(w: number, h: number, z: number, recordUndo = true) {
+    if (recordUndo) this.pushUndo();
     const m = createEmptyMap();
     m.width = w;
     m.height = h;
+    m.rawDescriptions = ["Saved with YATME"];
+    m.description = "Saved with YATME";
     m.tiles.clear();
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const key = tileKey(x, y, z);
-        m.tiles.set(key, {
+        m.tiles.set(tileKey(x, y, z), {
           x,
           y,
           z,
@@ -260,20 +283,23 @@ class EditorApp {
         });
       }
     }
-    m.towns = [
-      { id: 1, name: "Spawn", templeX: Math.floor(w / 2), templeY: Math.floor(h / 2), templeZ: z },
-    ];
+    m.towns = [{ id: 1, name: "Spawn", templeX: Math.floor(w / 2), templeY: Math.floor(h / 2), templeZ: z }];
     m.waypoints = [];
+    this.selection = null;
     this.floor = z;
-    this.setFloor(z);
+    document.getElementById("floor-label")!.textContent = String(z);
+    this.panX = (w * TILE_SIZE) / 2;
+    this.panY = (h * TILE_SIZE) / 2;
     this.applyMap(m);
+    this.msg(`Novo mapa ${w}×${h} z=${z}`);
   }
 
   promptNewMap() {
-    const w = Number(prompt("Largura (sqm)", "32") || "32");
-    const h = Number(prompt("Altura (sqm)", "23") || "23");
-    const z = Number(prompt("Andar Z", "7") || "7");
-    this.newMap(w, h, z);
+    const w = Number(prompt("Largura (sqm)", String(this.runtime.w)) || this.runtime.w);
+    const h = Number(prompt("Altura (sqm)", String(this.runtime.h)) || this.runtime.h);
+    const z = Number(prompt("Andar Z", String(this.floor)) || this.floor);
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1) return;
+    this.newMap(Math.min(256, Math.floor(w)), Math.min(256, Math.floor(h)), Math.max(0, Math.min(15, Math.floor(z))));
   }
 
   async openOtbm() {
@@ -283,16 +309,22 @@ class EditorApp {
     input.onchange = async () => {
       const f = input.files?.[0];
       if (!f) return;
-      this.pushUndo();
-      const m = parseOtbm(new Uint8Array(await f.arrayBuffer()));
-      this.applyMap(m);
-      this.msg(`Mapa aberto: ${f.name}`);
+      try {
+        const m = parseOtbm(new Uint8Array(await f.arrayBuffer()));
+        this.pushUndo();
+        this.selection = null;
+        if (m.towns[0]) this.floor = m.towns[0].templeZ;
+        this.applyMap(m);
+        this.centerOn(m.towns[0]?.templeX ?? 0, m.towns[0]?.templeY ?? 0);
+        this.msg(`Mapa aberto: ${f.name} (${m.tiles.size} tiles)`);
+      } catch (err) {
+        this.msg(`Falha ao abrir OTBM: ${err instanceof Error ? err.message : err}`);
+      }
     };
     input.click();
   }
 
   async saveOtbm() {
-    this.map.towns = this.map.towns ?? [];
     this.map.waypoints = this.waypointMgr.getAll();
     const bytes = await serializeOtbm(this.map);
     const blob = new Blob([bytes], { type: "application/octet-stream" });
@@ -300,38 +332,46 @@ class EditorApp {
     a.href = URL.createObjectURL(blob);
     a.download = "map.otbm";
     a.click();
-    this.msg("OTBM exportado.");
+    URL.revokeObjectURL(a.href);
+    this.msg("OTBM exportado (assinatura: Saved with YATME).");
   }
 
   async applyToGame() {
     this.map.waypoints = this.waypointMgr.getAll();
     const bytes = await serializeOtbm(this.map);
-    const res = await fetch("/api/map", {
-      method: "POST",
-      headers: { "content-type": "application/octet-stream", "x-map-filename": "world.otbm" },
-      body: bytes,
-    });
-    if (!res.ok) {
-      this.msg("Falha ao aplicar mapa no servidor.");
-      return;
+    try {
+      const res = await fetch("/api/map", {
+        method: "POST",
+        headers: { "content-type": "application/octet-stream", "x-map-filename": "world.otbm" },
+        body: bytes,
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        this.msg(`Falha ao aplicar mapa (${res.status}): ${text.slice(0, 180)}`);
+        return;
+      }
+      this.msg("Mapa aplicado — entre no jogo (ou reentre) para ver o mundo idêntico.");
+    } catch (err) {
+      this.msg(`Falha de rede ao aplicar: ${err instanceof Error ? err.message : err}`);
     }
-    this.msg("Mapa aplicado — entre no jogo para ver.");
   }
 
   doUndo() {
     if (!this.undo.length) return;
-    this.redo.push(this.cloneMap(this.map));
+    this.redo.push(cloneOtbmMap(this.map));
     this.applyMap(this.undo.pop()!);
+    this.msg("Desfeito.");
   }
 
   doRedo() {
     if (!this.redo.length) return;
-    this.undo.push(this.cloneMap(this.map));
+    this.undo.push(cloneOtbmMap(this.map));
     this.applyMap(this.redo.pop()!);
+    this.msg("Refeito.");
   }
 
   promptGoto() {
-    const raw = prompt("Posição (x, y, z) ou {x=…, y=…, z=…}", `${this.panX}, ${this.panY}, ${this.floor}`);
+    const raw = prompt("Posição (x, y, z) ou {x=…, y=…, z=…}", `${Math.floor(this.panX / TILE_SIZE)}, ${Math.floor(this.panY / TILE_SIZE)}, ${this.floor}`);
     const pos = raw ? parsePositionString(raw) : null;
     if (!pos) return;
     this.centerOn(Number(pos.x), Number(pos.y));
@@ -526,97 +566,115 @@ class EditorApp {
       img.src = URL.createObjectURL(f);
       await img.decode();
       const c = document.createElement("canvas");
-      c.width = TILE;
-      c.height = TILE;
-      const cx = c.getContext("2d")!;
-      cx.drawImage(img, 0, 0, TILE, TILE);
+      c.width = TILE_SIZE;
+      c.height = TILE_SIZE;
+      c.getContext("2d")!.drawImage(img, 0, 0, TILE_SIZE, TILE_SIZE);
       this.customSprites.set(id, c);
+      rememberPreview(id, c);
       this.paletteIds.push(id);
       this.selectedId = id;
-      this.renderPalette();
+      this.refreshPalette();
       this.msg(`PNG adicionado à paleta (#${id}).`);
     };
     input.click();
   }
 
-  previewFor(id: number): HTMLCanvasElement | null {
-    if (this.customSprites.has(id)) return this.customSprites.get(id)!;
-    if (this.catalog) {
-      const c = itemPreviewCanvas(this.catalog, id);
-      if (c) return c;
-    }
-    const builtin = Object.entries(BUILTIN_TILE_IDS).find(([, v]) => v === id)?.[0];
-    if (builtin) {
-      const c = document.createElement("canvas");
-      c.width = TILE;
-      c.height = TILE;
-      const ctx = c.getContext("2d")!;
-      const img = new Image();
-      img.src = `/assets/tiles/${builtin === "wood" ? "wood" : builtin}.png`;
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, TILE, TILE);
-        this.draw();
-      };
-      return c;
-    }
-    return null;
-  }
-
-  renderPalette(filter = "") {
-    const grid = document.getElementById("palette")!;
-    grid.innerHTML = "";
-    const q = filter.toLowerCase();
-    const ids = this.paletteIds.filter((id) => {
-      if (!q) return true;
-      const name = this.catalog?.items.get(id)?.name ?? String(id);
-      return String(id).includes(q) || name.toLowerCase().includes(q);
-    });
-    document.getElementById("brush-count")!.textContent = String(ids.length);
-    for (const id of ids) {
-      const div = document.createElement("div");
-      div.className = "palette-item" + (id === this.selectedId ? " selected" : "");
-      const cv = this.previewFor(id) ?? document.createElement("canvas");
-      cv.width = TILE;
-      cv.height = TILE;
-      div.appendChild(cv);
-      const label = this.catalog?.items.get(id)?.name ?? `#${id}`;
-      div.innerHTML += `<span>${label}</span>`;
-      div.onclick = () => {
+  refreshPalette() {
+    renderPalette({
+      ids: this.paletteIds,
+      selectedId: this.selectedId,
+      catalog: this.catalog,
+      customSprites: this.customSprites,
+      filter: this.paletteFilter,
+      onPick: (id) => {
         this.selectedId = id;
-        this.renderPalette(filter);
-      };
-      grid.appendChild(div);
-    }
+        this.refreshPalette();
+      },
+    });
   }
 
   centerOn(tx: number, ty: number) {
-    this.panX = tx * TILE;
-    this.panY = ty * TILE;
+    this.panX = tx * TILE_SIZE + TILE_SIZE / 2;
+    this.panY = ty * TILE_SIZE + TILE_SIZE / 2;
     this.draw();
   }
 
-  screenToTile(clientX: number, clientY: number) {
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = (clientX - rect.left) * (this.canvas.width / rect.width);
-    const sy = (clientY - rect.top) * (this.canvas.height / rect.height);
-    const wx = (sx - this.canvas.width / 2) / this.zoom + this.panX;
-    const wy = (sy - this.canvas.height / 2) / this.zoom + this.panY;
-    return { x: Math.floor(wx / TILE), y: Math.floor(wy / TILE), sx, sy };
+  bindKeys() {
+    window.addEventListener("keydown", (e) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.code === "Space") {
+        this.spacePan = true;
+        this.canvas.style.cursor = "grab";
+        e.preventDefault();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) this.doRedo();
+        else this.doUndo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        this.doRedo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void this.saveOtbm();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        this.openOtbm();
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (this.selection) {
+          e.preventDefault();
+          this.eraseSelection();
+        }
+      }
+      if (e.key === "Escape") this.selection = null;
+      if (!e.ctrlKey && !e.metaKey) {
+        if (e.key === "b" || e.key === "B") this.setTool("brush");
+        if (e.key === "e" || e.key === "E") this.setTool("erase");
+        if (e.key === "f" || e.key === "F") this.setTool("fill");
+        if (e.key === "m" || e.key === "M") this.setTool("select");
+        if (e.key === "h" || e.key === "H") this.setTool("pan");
+        if (e.key === "+" || e.key === "=") this.setZoom(this.zoom * 1.1);
+        if (e.key === "-" || e.key === "_") this.setZoom(this.zoom * 0.9);
+      }
+    });
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "Space") {
+        this.spacePan = false;
+        this.canvas.style.cursor = this.tool === "pan" ? "grab" : "crosshair";
+      }
+    });
+  }
+
+  setZoom(z: number) {
+    this.zoom = Math.max(0.25, Math.min(4, z));
+    document.getElementById("st-zoom")!.textContent = `ZOOM: ${this.zoom.toFixed(2)}x`;
+    this.draw();
   }
 
   bindCanvas() {
     this.canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
-      const f = e.deltaY < 0 ? 1.1 : 0.9;
-      this.zoom = Math.max(0.25, Math.min(4, this.zoom * f));
-      document.getElementById("st-zoom")!.textContent = `ZOOM: ${this.zoom.toFixed(2)}x`;
-      this.draw();
+      this.setZoom(this.zoom * (e.deltaY < 0 ? 1.1 : 0.9));
     });
+    this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     this.canvas.addEventListener("mousedown", (e) => {
-      if (this.tool === "pan" || e.button === 1) {
+      if (this.tool === "pan" || this.spacePan || e.button === 1 || e.button === 2) {
         this.panning = true;
         this.lastX = e.clientX;
         this.lastY = e.clientY;
+        this.canvas.style.cursor = "grabbing";
+        return;
+      }
+      const t = screenToTile(this.canvas, e.clientX, e.clientY, this.zoom, this.panX, this.panY);
+      if (this.tool === "select") {
+        this.selecting = true;
+        this.selection = { x0: t.x, y0: t.y, x1: t.x, y1: t.y };
+        this.draw();
         return;
       }
       this.strokeUndo = false;
@@ -624,7 +682,7 @@ class EditorApp {
       this.paintAt(e.clientX, e.clientY);
     });
     window.addEventListener("mousemove", (e) => {
-      const t = this.screenToTile(e.clientX, e.clientY);
+      const t = screenToTile(this.canvas, e.clientX, e.clientY, this.zoom, this.panX, this.panY);
       this.posEl.textContent = `POS: ${t.x}, ${t.y}, ${this.floor}`;
       if (this.panning) {
         const dx = e.clientX - this.lastX;
@@ -636,16 +694,49 @@ class EditorApp {
         this.draw();
         return;
       }
+      if (this.selecting && this.selection) {
+        this.selection = { ...this.selection, x1: t.x, y1: t.y };
+        this.draw();
+        return;
+      }
       if (this.painting) this.paintAt(e.clientX, e.clientY);
     });
     window.addEventListener("mouseup", () => {
       this.painting = false;
       this.panning = false;
+      this.selecting = false;
+      this.canvas.style.cursor = this.tool === "pan" || this.spacePan ? "grab" : this.tool === "select" ? "cell" : "crosshair";
+    });
+    this.minimap.addEventListener("click", (e) => {
+      const rect = this.minimap.getBoundingClientRect();
+      const x = Math.floor(((e.clientX - rect.left) / rect.width) * this.runtime.w);
+      const y = Math.floor(((e.clientY - rect.top) / rect.height) * this.runtime.h);
+      this.centerOn(x, y);
     });
   }
 
+  eraseSelection(recordUndo = true) {
+    if (!this.selection) return;
+    if (recordUndo) this.pushUndo();
+    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => this.setTileItems(x, y, []));
+    this.draw();
+    this.updateMinimap();
+    this.setStatus();
+    this.msg("Seleção apagada.");
+  }
+
+  fillSelection(recordUndo = true) {
+    if (!this.selection) return;
+    if (recordUndo) this.pushUndo();
+    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => this.setTileItems(x, y, [this.selectedId]));
+    this.draw();
+    this.updateMinimap();
+    this.setStatus();
+    this.msg("Seleção preenchida.");
+  }
+
   paintAt(clientX: number, clientY: number) {
-    const { x, y } = this.screenToTile(clientX, clientY);
+    const { x, y } = screenToTile(this.canvas, clientX, clientY, this.zoom, this.panX, this.panY);
     if (x < 0 || y < 0 || x >= this.runtime.w || y >= this.runtime.h) return;
     if (!this.strokeUndo && this.tool !== "pan") {
       this.pushUndo();
@@ -674,9 +765,32 @@ class EditorApp {
       this.draw();
       return;
     }
+    if (this.tool === "fill") {
+      if (this.selection) this.fillSelection(false);
+      else {
+        floodFill(this.map, x, y, this.floor, this.runtime.w, this.runtime.h, (tx, ty) => {
+          this.setTileItems(tx, ty, [this.selectedId]);
+        });
+        this.draw();
+        this.updateMinimap();
+        this.setStatus();
+      }
+      this.painting = false;
+      return;
+    }
     if (this.tool === "brush") {
+      if (this.selection) {
+        this.fillSelection(false);
+        this.painting = false;
+        return;
+      }
       this.setTileItems(x, y, [this.selectedId]);
     } else if (this.tool === "erase") {
+      if (this.selection) {
+        this.eraseSelection(false);
+        this.painting = false;
+        return;
+      }
       this.setTileItems(x, y, []);
     }
     this.draw();
@@ -685,60 +799,23 @@ class EditorApp {
   }
 
   draw() {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-    this.ctx.fillStyle = "#0a0c10";
-    this.ctx.fillRect(0, 0, w, h);
-    this.ctx.save();
-    this.ctx.translate(w / 2, h / 2);
-    this.ctx.scale(this.zoom, this.zoom);
-    this.ctx.translate(-this.panX, -this.panY);
-
-    for (let y = 0; y < this.runtime.h; y++) {
-      for (let x = 0; x < this.runtime.w; x++) {
-        const items = this.tileItems(x, y);
-        const top = items[items.length - 1] ?? BUILTIN_TILE_IDS.grass;
-        const cv = this.previewFor(top);
-        const px = x * TILE;
-        const py = y * TILE;
-        if (cv) this.ctx.drawImage(cv, px, py);
-        else {
-          this.ctx.fillStyle = "#2d5a27";
-          this.ctx.fillRect(px, py, TILE, TILE);
-        }
-        this.ctx.strokeStyle = "rgba(255,255,255,0.04)";
-        this.ctx.strokeRect(px, py, TILE, TILE);
-      }
-    }
-
-    for (const wp of this.waypointMgr.getByFloor(this.floor)) {
-      this.ctx.fillStyle = "#ffcc00";
-      this.ctx.fillRect(wp.x * TILE + 12, wp.y * TILE + 12, 8, 8);
-    }
-    for (const town of this.map.towns) {
-      if (town.templeZ !== this.floor) continue;
-      this.ctx.strokeStyle = "#3d8bfd";
-      this.ctx.lineWidth = 2;
-      this.ctx.strokeRect(town.templeX * TILE, town.templeY * TILE, TILE, TILE);
-    }
-
-    this.ctx.restore();
+    drawEditorMap({
+      ctx: this.ctx,
+      canvas: this.canvas,
+      map: this.map,
+      runtime: this.runtime,
+      floor: this.floor,
+      zoom: this.zoom,
+      panX: this.panX,
+      panY: this.panY,
+      catalog: this.catalog,
+      customSprites: this.customSprites,
+      selection: this.selection,
+    });
   }
 
   updateMinimap() {
-    const mw = this.minimap.width;
-    const mh = this.minimap.height;
-    this.mmCtx.fillStyle = "#111";
-    this.mmCtx.fillRect(0, 0, mw, mh);
-    const sx = mw / this.runtime.w;
-    const sy = mh / this.runtime.h;
-    for (let y = 0; y < this.runtime.h; y++) {
-      for (let x = 0; x < this.runtime.w; x++) {
-        const g = this.runtime.ground[y][x];
-        this.mmCtx.fillStyle = ["#2d5a27", "#8b7355", "#888", "#6b4423", "#2266aa", "#444"][g] || "#2d5a27";
-        this.mmCtx.fillRect(x * sx, y * sy, Math.max(1, sx), Math.max(1, sy));
-      }
-    }
+    drawMinimap(this.mmCtx, this.runtime);
   }
 
   setStatus() {
@@ -755,16 +832,20 @@ class EditorApp {
   async loadFromServer() {
     try {
       const res = await fetch("/api/map");
-      if (!res.ok) return;
+      if (!res.ok) {
+        this.msg(`Servidor sem OTBM ativo (${res.status}) — mapa novo local.`);
+        return;
+      }
       const buf = await res.arrayBuffer();
+      if (!buf.byteLength) return;
       this.applyMap(parseOtbm(new Uint8Array(buf)));
       this.msg("Mapa atual do jogo carregado.");
     } catch {
-      /* offline */
+      this.msg("Editor offline do /api/map — pintando localmente.");
     }
   }
 }
 
 const app = new EditorApp(document.getElementById("app")!);
-app.renderPalette();
+app.refreshPalette();
 app.loadFromServer();

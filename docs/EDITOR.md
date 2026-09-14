@@ -15,29 +15,53 @@ OTBM → Tibia.dat → sprite IDs → Tibia.spr → canvas → OTBM → /api/map
          (+ items.xml nomes)
 ```
 
-Código OTBM (árvore binária, towns, waypoints): `shared/editor/otbm.ts` (derivado do YATME).
+Código OTBM (árvore binária, towns, waypoints): `shared/editor/otbm.ts` (derivado do YATME). Assinatura gravada: **`Saved with YATME`**.
 
 ## Abrir o editor
 
 - Dev: [http://localhost:5173/editor.html](http://localhost:5173/editor.html)
 - Produção: `/editor` ou `/editor.html`
 
-## Fluxo capt / RME
+## Remere's Map Editor ↔ este editor ↔ o jogo
 
-1. **RME desktop**: use o mesmo `Tibia.spr` + `Tibia.dat` (+ `items.otb` se o RME pedir). Edite `.otbm` e coloque em `server/data/world.otbm` ou use **Aplicar no jogo** no editor web.
-2. **Editor web**: carregue DAT/SPR (upload local — não commitar no git), pinte, salve OTBM, **Aplicar no jogo**.
-3. **Jogo**: ao fazer login/enter, o servidor envia o mapa ativo (OTBM convertido para ground/walls/roofs + `cells` com item IDs).
+O ficheiro `.otbm` é o **mesmo** formato binário (árvore `0xFE`/`0xFF`/`0xFD`) usado pelo Remere's Map Editor. Não há conversão intermédia.
+
+1. **Mesma versão de cliente** — RME, o editor web e o `items.otb` do servidor OT têm de apontar para o **mesmo** `Tibia.dat` + `Tibia.spr` (e o `items.otb` gerado para essa versão). IDs de item no OTBM são índices desse DAT, não nomes.
+2. **RME → web** — File → Save Map no Remere, depois **Abrir OTBM** no browser. Towns, waypoints, tile areas e stacks de items são lidos.
+3. **Web → RME** — **Salvar OTBM** descarrega `map.otbm`. Abre no Remere com o mesmo DAT/SPR. A descrição do mapa inclui `Saved with YATME`.
+4. **Web → jogo** — **Aplicar no jogo** faz `POST /api/map` com `Content-Type: application/octet-stream` e cabeçalho `x-map-filename: world.otbm`. O servidor grava `world.otbm`, converte tiles para o runtime Phaser `{w,h,z,ground,walls,roofs,items,cells}` e o cliente desenha os mesmos `/assets/tiles/*.png` (ou sprites do DAT se carregados).
+5. **RME → jogo (sem browser)** — copie o `.otbm` para `server/data/world.otbm` (local) e reinicie o servidor. Em Vercel o mapa ativo vive em `/tmp` na instância Fluid que também serve o WebSocket — use **Aplicar no jogo** para a mesma instância.
+6. **Não commitar packs** — `.dat`, `.spr` e `items.otb` estão no `.gitignore`. O repo só traz PNGs Huntera já extraídos (`grass`, `path`, `water`, `wall`, …). Carregue DAT/SPR/XML no editor se quiser a paleta completa.
+
+Versões típicas: OTBM v4 (MAP_OTBM_5), `majorItems`/`minorItems` 4 (como o RME). Mapas v0 precisam da callback de count (DAT) para stackables.
+
+O jogo é **um andar jogável**: o templo da primeira cidade (ou o Z com mais tiles) vira o floor Phaser. Os outros andares ficam no OTBM e podem ser editados (controlo Z) mas não são enviados como camadas extra.
 
 ## Ferramentas
 
-- Novo mapa (tamanho + andar Z)
-- Abrir / salvar OTBM (compatível RME/YATME subset)
-- Brush / apagar / pan / zoom
-- Waypoints e cidades/templos (modais estilo YATME)
-- Ir para posição (`x, y, z` ou `{x=…, y=…, z=…}`)
-- PNG avulso na paleta (IDs ≥ 100000)
-- Desfazer / refazer
+| Ferramenta | Atalho | Comportamento |
+|------------|--------|----------------|
+| Novo / Abrir / Salvar / Aplicar | Ctrl+O / Ctrl+S | OTBM download e `POST /api/map` |
+| Brush / Apagar / Preencher / Selecionar / Pan | B E F M H, espaço | Pintar, flood fill 4-conectado, retângulo, pan |
+| Desfazer / Refazer | Ctrl+Z / Ctrl+Y | Histórico profundo do mapa |
+| Ir para… | | `x, y, z` ou `{x=…, y=…, z=…}` |
+| Cidades / Waypoints | | Modais estilo YATME; clique no mapa com as tools Templo/Waypoint |
+| DAT / SPR / XML / +PNG | | Paleta clássica; PNG avulso recebe IDs ≥ 100000 |
+| Andares | ▲ ▼ | Z 0–15 |
+| Zoom | scroll, `+` / `-` | 0.25×–4× |
+
+## Módulos
+
+| Peça | Ficheiro |
+|------|----------|
+| OTBM IO | `shared/editor/otbm.ts` |
+| Modelo runtime | `shared/editor/mapRuntime.ts`, `shared/editor/tileCatalog.ts` |
+| Brushes (fill/select) | `shared/editor/brushes.ts` |
+| Renderer | `client/src/editor/renderer.ts` |
+| Paleta | `client/src/editor/palette.ts`, `previews.ts` |
+| App | `client/src/editor/main.ts` |
+| API | `server/mapHttp.ts`, `server/mapLoader.ts` (Vercel: rewrite `/api/map` → `/api/ws`) |
 
 ## Arquivos grandes
 
-`.spr` / `.dat` ficam fora do git (`.gitignore`). Use pasta local ou assets do cliente Tibia/Huntera.
+`.spr` / `.dat` / `items.otb` ficam fora do git (`.gitignore`). Use pasta local ou assets do cliente Tibia/Huntera — **não** scrapear packs com copyright para o repositório.

@@ -6,7 +6,7 @@ import { otbmMapToRuntime, runtimeToOtbm, type RuntimeMap } from "../shared/edit
 import { buildLegacyMap } from "../shared/mapLegacy.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.VERCEL ? "/tmp/otpokemon" : path.join(__dirname, "data");
+const DATA_DIR = process.env.MAP_DATA_DIR || (process.env.VERCEL ? "/tmp/otpokemon" : path.join(__dirname, "data"));
 const MAP_PATH = path.join(DATA_DIR, "world.otbm");
 const META_PATH = path.join(DATA_DIR, "world-meta.json");
 
@@ -62,6 +62,7 @@ export function reloadMap(): RuntimeMap {
 }
 
 export async function saveOtbmBuffer(buffer: Uint8Array, filename = "world.otbm") {
+  parseOtbm(buffer);
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const target = path.join(DATA_DIR, path.basename(filename));
   fs.writeFileSync(target, buffer);

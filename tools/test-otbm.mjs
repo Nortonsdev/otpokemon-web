@@ -1,0 +1,94 @@
+/**
+ * OTBM round-trip + runtime conversion tests (no live server required).
+ */
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { parseOtbm, serializeOtbm, createEmptyMap, tileKey } from "../shared/editor/otbm.ts";
+import { otbmMapToRuntime, runtimeToOtbm } from "../shared/editor/mapRuntime.ts";
+import { BUILTIN_TILE_IDS } from "../shared/editor/tileCatalog.ts";
+import { floodFill } from "../shared/editor/brushes.ts";
+import { buildLegacyMap } from "../shared/mapLegacy.ts";
+
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
+
+const map = createEmptyMap();
+map.width = 8;
+map.height = 6;
+map.rawDescriptions = ["hello"];
+for (let y = 0; y < 6; y++) {
+  for (let x = 0; x < 8; x++) {
+    map.tiles.set(tileKey(x, y, 7), {
+      x,
+      y,
+      z: 7,
+      flags: 0,
+      items: [{ id: BUILTIN_TILE_IDS.grass }],
+    });
+  }
+}
+map.tiles.get(tileKey(2, 2, 7)).items = [{ id: BUILTIN_TILE_IDS.water }];
+map.tiles.get(tileKey(3, 2, 7)).items = [{ id: BUILTIN_TILE_IDS.wall }];
+map.tiles.get(tileKey(4, 2, 7)).items = [{ id: BUILTIN_TILE_IDS.grass }, { id: BUILTIN_TILE_IDS.flower }];
+map.towns = [{ id: 1, name: "Spawn", templeX: 4, templeY: 3, templeZ: 7 }];
+map.waypoints = [{ name: "gate", x: 1, y: 1, z: 7 }];
+
+const bytes = await serializeOtbm(map);
+assert(bytes[4] === 0xfe, "OTBM NODE_START");
+const text = new TextDecoder().decode(bytes);
+assert(text.includes("Saved with YATME"), "YATME signature in OTBM");
+
+const re = parseOtbm(bytes);
+assert(re.width === 8 && re.height === 6, "size roundtrip");
+assert(re.tiles.size === map.tiles.size, `tile count ${re.tiles.size}`);
+assert(re.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "water tile");
+assert(re.tiles.get(tileKey(3, 2, 7)).items[0].id === BUILTIN_TILE_IDS.wall, "wall tile");
+assert(re.tiles.get(tileKey(4, 2, 7)).items.map((i) => i.id).join(",") === `${BUILTIN_TILE_IDS.grass},${BUILTIN_TILE_IDS.flower}`, "stack");
+assert(re.towns[0].name === "Spawn", "town");
+assert(re.waypoints[0].name === "gate", "waypoint");
+
+const again = await serializeOtbm(re);
+const re2 = parseOtbm(again);
+assert(re2.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "second roundtrip");
+
+const runtime = otbmMapToRuntime(re);
+assert(runtime.w === 8 && runtime.h === 6 && runtime.z === 7, "runtime size");
+assert(runtime.ground[2][2] === 4, `water ground ${runtime.ground[2][2]}`);
+assert(runtime.walls[2][3] === 1, "wall flag");
+assert(runtime.items.some((it) => it.kind === "flower" && it.x === 4 && it.y === 2), "flower item");
+assert(runtime.cells[2][2].items[0] === BUILTIN_TILE_IDS.water, "cell water");
+assert(runtime.spawn.x === 4 && runtime.spawn.y === 3, "temple spawn");
+
+const back = runtimeToOtbm(runtime);
+assert(back.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "runtime→otbm water");
+
+let filled = 0;
+floodFill(map, 0, 0, 7, 8, 6, (x, y) => {
+  map.tiles.set(tileKey(x, y, 7), { x, y, z: 7, flags: 0, items: [{ id: BUILTIN_TILE_IDS.path }] });
+  filled++;
+});
+assert(filled > 10, `flood fill ${filled}`);
+assert(map.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "fill did not eat water");
+
+const legacy = buildLegacyMap();
+const legacyOtbm = runtimeToOtbm(legacy);
+const legacyBytes = await serializeOtbm(legacyOtbm);
+const legacyParsed = parseOtbm(legacyBytes);
+const legacyRt = otbmMapToRuntime(legacyParsed);
+assert(legacyRt.w === legacy.w && legacyRt.h === legacy.h, "legacy size");
+assert(legacyRt.walls[0][0] === 1, "legacy border wall");
+
+const tmp = mkdtempSync(path.join(os.tmpdir(), "otp-map-"));
+process.env.MAP_DATA_DIR = tmp;
+const { saveOtbmBuffer, loadActiveMap, exportOtbmBytes } = await import("../server/mapLoader.ts");
+const saved = await saveOtbmBuffer(bytes, "world.otbm");
+assert(saved.ground[2][2] === 4, "loader water");
+const active = loadActiveMap();
+assert(active.w === 8, "active cache");
+const exported = await exportOtbmBytes();
+assert(parseOtbm(exported).tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "export");
+rmSync(tmp, { recursive: true, force: true });
+
+console.log("OTBM OK", { tiles: re.tiles.size, bytes: bytes.length, fill: filled });

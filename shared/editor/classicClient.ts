@@ -5,7 +5,9 @@
  * Adapted from YATME PROJECT.md data pipeline; replaces appearances.dat / catalog-content.
  */
 
-export const TILE_SIZE = 32;
+export { TILE_SIZE, BUILTIN_TILE_IDS, CUSTOM_ID_START } from "./tileCatalog.ts";
+export type { BuiltinTileName } from "./tileCatalog.ts";
+import { TILE_SIZE } from "./tileCatalog.ts";
 
 export interface ClassicItemDef {
   id: number;
@@ -279,19 +281,3 @@ export function itemPreviewCanvas(catalog: ClassicCatalog, itemId: number): HTML
   return spriteToCanvas(catalog.sprites, def.spriteIds[0], catalog.tileSize);
 }
 
-/** Built-in Huntera tile ids (fallback before DAT load). */
-export const BUILTIN_TILE_IDS: Record<string, number> = {
-  grass: 106,
-  path: 351,
-  wall: 2200,
-  roof: 1088,
-  flower: 102,
-  rose: 3658,
-  gold: 3031,
-  stone: 26121,
-  water: 4597,
-  wood: 42337,
-  cave: 44092,
-};
-
-export const CUSTOM_ID_START = 100000;

@@ -1,4 +1,5 @@
 import type { RuntimeMap } from "../shared/editor/mapRuntime.ts";
+import { BUILTIN_TILE_IDS } from "../shared/editor/tileCatalog.ts";
 
 export const MAP_W = 32;
 export const MAP_H = 23;
@@ -66,16 +67,16 @@ export function buildLegacyMap(): RuntimeMap {
     for (let x = 0; x < w; x++) {
       const c = row[x];
       const kind = CH[c] ?? 0;
-      const items = [106];
+      const items = [BUILTIN_TILE_IDS.grass];
       if (kind === 2 || kind === 3) {
-        items.push(2200);
+        items.push(BUILTIN_TILE_IDS.wall);
       } else if (kind === 4) {
-        items[0] = 42337;
-        items.push(1088);
-      } else if (kind === 5) items[0] = 26121;
-      else if (kind === 6) items[0] = 4597;
-      else if (kind === 7) items[0] = 44092;
-      else if (kind === 1) items[0] = 351;
+        items[0] = BUILTIN_TILE_IDS.wood;
+        items.push(BUILTIN_TILE_IDS.roof);
+      } else if (kind === 5) items[0] = BUILTIN_TILE_IDS.stone;
+      else if (kind === 6) items[0] = BUILTIN_TILE_IDS.water;
+      else if (kind === 7) items[0] = BUILTIN_TILE_IDS.cave;
+      else if (kind === 1) items[0] = BUILTIN_TILE_IDS.path;
       cells[y][x] = { items };
 
       if (kind === 2) {

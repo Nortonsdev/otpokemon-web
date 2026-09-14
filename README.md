@@ -28,15 +28,28 @@ The account screens sit on the live top-down map, Huntera-style (`#111` chrome, 
 
 Layers: ground, item (flowers / gold), creature, wall, roof (roof dims when you walk under). O editor de mapas fica em **`/editor.html`** (tela de login tem o link).
 
-## Editor de mapas (OTBM + spr/dat clássicos)
+## Editor de mapas (OTBM + Remere)
 
-Fluxo estilo [YATME](https://github.com/knobik/yatme) / RME, com **Tibia.spr + Tibia.dat** do capt (não protobuf 15):
+O mapa canónico é **sempre** um `.otbm` (formato de árvore binária do [Remere's Map Editor](https://github.com/hampusborgos/rme) / [YATME](https://github.com/knobik/yatme)). O editor em `/editor.html` lê e grava esse ficheiro; o servidor converte tiles para o payload Phaser.
 
-1. **RME desktop** — mesmos `spr/dat`, edite `.otbm`, copie para `server/data/world.otbm` ou use o editor web.
-2. **Editor web** — [http://localhost:5173/editor.html](http://localhost:5173/editor.html): carregue DAT/SPR (upload local), pinte, salve OTBM, **Aplicar no jogo** (`POST /api/map`).
-3. **Jogo** — ao entrar no mundo, o servidor envia o mapa ativo (ground/walls + item IDs).
+### Remere ↔ OTPokemon
 
-Detalhes: [docs/EDITOR.md](docs/EDITOR.md).
+Use **a mesma versão** de `Tibia.dat` + `Tibia.spr` (e o `items.otb` gerado para ela) no Remere desktop e, se quiser a paleta completa, no upload DAT/SPR do editor web. Os IDs no OTBM são os IDs desse DAT — misturar versões troca sprites e flags.
+
+| Direção | Como |
+|---------|------|
+| Remere → editor web | Save `.otbm` no RME → **Abrir OTBM** |
+| Editor web → Remere | **Salvar OTBM** (`map.otbm`, descrição `Saved with YATME`) → abrir no RME com o mesmo DAT/SPR |
+| Editor web → jogo | **Aplicar no jogo** = `POST /api/map` com `x-map-filename: world.otbm` |
+| Remere → jogo (local) | Copiar para `server/data/world.otbm` e reiniciar `npm start` |
+
+Sem DAT/SPR o editor pinta com os PNGs em `client/public/assets/tiles/` (grass `106`, path `351`, water `4597`, wall `2200`, … — ver `shared/editor/tileCatalog.ts`). Esses IDs coincidem com o extract Huntera já no repo; **não** commite packs Tibia/Huntera.
+
+Happy path: **Novo → pintar (brush/fill) → Salvar OTBM → Abrir o mesmo ficheiro (mapa idêntico) → Aplicar no jogo → login demo/demo e entrar** — o mundo Phaser usa os mesmos tiles.
+
+Atalhos: `B` brush, `E` apagar, `F` preencher, `M` selecionar, `H`/espaço pan, `Ctrl+Z`/`Y` undo/redo, `Ctrl+S` salvar, `Ctrl+O` abrir.
+
+Detalhes, versões OTBM e módulos: [docs/EDITOR.md](docs/EDITOR.md).
 
 ## Protocol
 
@@ -70,7 +83,7 @@ This is a Vite static client plus a Node WebSocket world on Vercel Fluid Compute
 npx vercel --prod
 ```
 
-Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` already rewrites `/ws` → `/api/ws`.
+Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` already rewrites `/ws` → `/api/ws` and `/api/map` → the **same** function (so Aplicar no jogo e o mundo Phaser partilham o `world.otbm` em memória nessa instância). `npm run build` gera `server-bundle/` com esbuild — as Functions da Vercel não importam TypeScript em runtime.
 
 Limits of this host: the world is in-memory on one Function instance. Connections drop at the plan `maxDuration` (Hobby default 300s; anonymous/temp deploys cap at 60s) and the client reconnects. A reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
 
@@ -81,6 +94,8 @@ Default account after a cold start: **demo** / **demo**.
 ## Layout
 
 - `server/` authoritative world, JSON persist in `server/data/save.json` (or `/tmp/otpokemon` on Vercel)
+- `shared/editor/` OTBM IO, tile catalog, runtime conversion, brushes
+- `client/src/editor/` canvas renderer, palette, YATME-style UI
 - `client/` Vite + Phaser 3 (ground, item, creature, wall, roof layers; top-down sqm camera)
 - `client/public/assets/` committed PNG sheets, Huntera frames, and HUD
-- `api/ws.js` Vercel Function that exports the game HTTP + WebSocket server
+- `api/ws.js` Vercel Function (bundled JS) that serves WebSocket **and** `/api/map`

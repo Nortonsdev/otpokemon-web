@@ -168,6 +168,29 @@ export function applyItemProperties(item: OtbmItem, props: Partial<OtbmItem>): O
   return deepCloneItem({ ...item, ...props } as OtbmItem)
 }
 
+export function cloneOtbmMap(map: OtbmMap): OtbmMap {
+  const tiles = new Map<string, OtbmTile>()
+  for (const [key, tile] of map.tiles) {
+    tiles.set(key, {
+      ...tile,
+      items: tile.items.map(deepCloneItem),
+      zones: tile.zones ? [...tile.zones] : undefined,
+      monsters: tile.monsters?.map((m) => ({ ...m })),
+      npc: tile.npc ? { ...tile.npc } : undefined,
+      spawnMonster: tile.spawnMonster ? { ...tile.spawnMonster } : undefined,
+      spawnNpc: tile.spawnNpc ? { ...tile.spawnNpc } : undefined,
+    })
+  }
+  return {
+    ...map,
+    tiles,
+    towns: map.towns.map((t) => ({ ...t })),
+    waypoints: map.waypoints.map((w) => ({ ...w })),
+    rawDescriptions: [...map.rawDescriptions],
+    _areaSequence: map._areaSequence?.map((a) => ({ ...a, tileKeys: [...a.tileKeys] })),
+  }
+}
+
 export function deepCloneItem(item: OtbmItem): OtbmItem {
   const clone: OtbmItem = { id: item.id }
   if (item.count != null) clone.count = item.count

@@ -1,5 +1,11 @@
 import Phaser from "phaser";
 import { buildLegacyMap, SPAWN } from "../../shared/mapLegacy.ts";
+import {
+  groundTextureName,
+  isGroundTexture,
+  itemKindForId,
+  textureNameForItemId,
+} from "../../shared/editor/tileCatalog.ts";
 
 const PREVIEW_MAP = buildLegacyMap();
 import { LOOK_NAME, STEP_MS } from "../../server/species.js";
@@ -52,12 +58,7 @@ function isTyping() {
 }
 
 function groundTexture(cell) {
-  if (cell === 1) return "path";
-  if (cell === 2) return "stone";
-  if (cell === 3) return "wood";
-  if (cell === 4) return "water";
-  if (cell === 5) return "cave";
-  return "grass";
+  return groundTextureName(cell);
 }
 
 function texTint(name) {
@@ -111,6 +112,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image("water", "/assets/tiles/water.png");
     this.load.image("wood", "/assets/tiles/wood.png");
     this.load.image("cave", "/assets/tiles/cave.png");
+    this.load.image("marble", "/assets/tiles/marble.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
     for (const name of Object.values(LOOK_NAME)) {
       const fw = monFrame(name);
@@ -340,6 +342,7 @@ export class GameScene extends Phaser.Scene {
       walls: PREVIEW_MAP.walls,
       roofs: PREVIEW_MAP.roofs,
       items: PREVIEW_MAP.items,
+      cells: PREVIEW_MAP.cells,
     };
     this.drawMap();
     this.cameras.main.stopFollow();
@@ -370,31 +373,81 @@ export class GameScene extends Phaser.Scene {
   }
 
   drawMap() {
-    const { w, h, ground, walls, roofs, items } = this.mapData;
+    const { w, h, ground, walls, roofs, items, cells } = this.mapData;
+    const useCells = Array.isArray(cells) && cells.length === h;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const g = this.add.image(x * TILE, y * TILE, groundTexture(ground[y][x])).setOrigin(0, 0);
-        g.setDepth(y);
-        this.groundLayer.add(g);
-        if (walls[y][x]) {
-          const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
-          wall.setDepth(y * 10 + 5);
-          this.addActor(wall);
+        const stack = useCells ? cells[y]?.[x]?.items : null;
+        let drewGround = false;
+        if (stack?.length) {
+          for (const id of stack) {
+            const tex = textureNameForItemId(id);
+            if (!tex || !this.textureLooksValid(tex)) continue;
+            if (tex === "wall") {
+              const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
+              wall.setDepth(y * 10 + 5);
+              this.addActor(wall);
+              continue;
+            }
+            if (tex === "roof") {
+              const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
+              roof.setDepth(y * 10 + 8);
+              roof.tileX = x;
+              roof.tileY = y;
+              this.addActor(roof);
+              this.roofSprites.push(roof);
+              continue;
+            }
+            const spr = this.add.image(x * TILE, y * TILE, tex).setOrigin(0, 0);
+            spr.setDepth(y);
+            if (!drewGround && isGroundTexture(tex)) {
+              this.groundLayer.add(spr);
+              drewGround = true;
+            } else {
+              spr.setDepth(y * 10 + 2);
+              this.addActor(spr);
+            }
+          }
         }
-        if (roofs[y][x]) {
-          const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
-          roof.setDepth(y * 10 + 8);
-          roof.tileX = x;
-          roof.tileY = y;
-          this.addActor(roof);
-          this.roofSprites.push(roof);
+        if (!drewGround) {
+          const g = this.add.image(x * TILE, y * TILE, groundTexture(ground[y][x])).setOrigin(0, 0);
+          g.setDepth(y);
+          this.groundLayer.add(g);
+        }
+        if (!stack?.length) {
+          if (walls[y][x]) {
+            const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
+            wall.setDepth(y * 10 + 5);
+            this.addActor(wall);
+          }
+          if (roofs[y][x]) {
+            const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
+            roof.setDepth(y * 10 + 8);
+            roof.tileX = x;
+            roof.tileY = y;
+            this.addActor(roof);
+            this.roofSprites.push(roof);
+          }
         }
       }
     }
-    for (const it of items || []) {
-      const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
-      spr.setDepth(it.y * 10 + 2);
-      this.addActor(spr);
+    if (!useCells) {
+      for (const it of items || []) {
+        const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
+        spr.setDepth(it.y * 10 + 2);
+        this.addActor(spr);
+      }
+    } else {
+      for (const it of items || []) {
+        const stack = cells[it.y]?.[it.x]?.items || [];
+        const already = it.itemId
+          ? stack.includes(it.itemId)
+          : stack.some((id) => itemKindForId(id) === it.kind);
+        if (already) continue;
+        const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
+        spr.setDepth(it.y * 10 + 2);
+        this.addActor(spr);
+      }
     }
   }
 

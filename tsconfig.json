@@ -9,5 +9,10 @@
     "allowImportingTsExtensions": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]
   },
-  "include": ["client/src/editor/**/*", "shared/editor/**/*", "server/**/*.ts"]
+  "include": [
+    "client/src/editor/**/*",
+    "shared/editor/**/*",
+    "shared/mapLegacy.ts",
+    "server/**/*.ts"
+  ]
 }
