@@ -11,6 +11,7 @@ const PREVIEW_MAP = buildLegacyMap();
 import { CATCH_BALL_ITEMS, LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchAudio } from "./catchSfx.js";
+import { catchFxUrls, runCatchPipeline } from "./catchAnim.js";
 
 const TILE = 32;
 /** OTP2072026 looktypes that use 2×2 (64×64) sheets in objectbuilder/Tibia.dat */
@@ -156,8 +157,14 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
     this.load.image("attacked", "/assets/fx/attacked.png");
-    this.load.image("ball-pokeball", "/assets/items/pokeball.png");
     this.load.image("ball-premierball", "/assets/items/premierball.png");
+    this.load.image("ball-ultraball", "/assets/items/ultraball.png");
+    this.load.image("ball-masterball", "/assets/items/masterball.png");
+    for (const [key, url] of Object.entries(catchFxUrls())) {
+      const small = key.includes("hit") || key.includes("throw");
+      const size = small ? 32 : 64;
+      this.load.spritesheet(key, url, { frameWidth: size, frameHeight: size });
+    }
     this.load.audio("catching", "/assets/sfx/catching.ogg");
     this.load.audio("catch_fail", "/assets/sfx/catch_fail.ogg");
     this.load.audio("catch_sucess", "/assets/sfx/catch_sucess.ogg");
@@ -805,8 +812,6 @@ export class GameScene extends Phaser.Scene {
     const fromSt = this.state.get(msg.from);
     const toSt = this.state.get(msg.to);
     if (!fromSt || !toSt) return;
-    const ballKey = msg.ball === "premierball" ? "ball-premierball" : "ball-pokeball";
-    const tex = this.textures.exists(ballKey) ? ballKey : "ball-pokeball";
     const from = this.displayTile(fromSt);
     const to = this.displayTile(toSt);
     const sx = from.x * TILE + TILE / 2;
@@ -814,75 +819,17 @@ export class GameScene extends Phaser.Scene {
     const tx = to.x * TILE + TILE / 2;
     const ty = to.y * TILE + TILE / 2;
     const depth = Math.round(to.y) * 10 + 20;
-    const ball = this.add.image(sx, sy, tex).setDepth(depth);
-    ball.setDisplaySize(18, 18);
-    this.addActor(ball);
     playCatchAudio(this, "throw");
-    const premier = msg.ball === "premierball";
-    this.tweens.add({
-      targets: ball,
-      x: tx,
-      y: ty - 6,
-      duration: 280,
-      ease: "Quad.easeOut",
-      onComplete: () => {
-        const shakes = premier ? 6 : 4;
-        for (let i = 0; i < shakes; i++) {
-          this.time.delayedCall(i * 90, () => {
-            ball.x = tx + (i % 2 ? 3 : -3);
-            ball.angle = i % 2 ? 8 : -8;
-            this.spawnCatchSpark(tx, ty, premier);
-          });
-        }
-        this.time.delayedCall(shakes * 90 + 120, () => {
-          playCatchAudio(this, msg.ok ? "success" : "fail");
-          this.tweens.add({
-            targets: ball,
-            scaleX: 0.2,
-            scaleY: 0.2,
-            alpha: 0,
-            duration: 160,
-            onComplete: () => ball.destroy(),
-          });
-          if (msg.ok) {
-            const corpse = this.sprites.get(msg.to);
-            if (corpse) {
-              this.tweens.add({
-                targets: corpse,
-                alpha: 0,
-                scaleX: 0.6,
-                scaleY: 0.6,
-                duration: 220,
-                onComplete: () => {
-                  corpse.setAlpha(1);
-                  corpse.setScale(1);
-                },
-              });
-            }
-          }
-        });
-      },
-    });
-  }
-
-  spawnCatchSpark(x, y, premier) {
-    const g = this.add.graphics();
-    g.setDepth(Math.round(y / TILE) * 10 + 21);
-    this.addActor(g);
-    const c1 = premier ? 0xffffff : 0xffe8a0;
-    const c2 = premier ? 0xe03030 : 0xff4040;
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI * 2 * i) / 6;
-      const r = 4 + (i % 2);
-      g.fillStyle(i % 2 ? c1 : c2, 0.85);
-      g.fillCircle(x + Math.cos(a) * r, y + Math.sin(a) * r, 2);
-    }
-    this.tweens.add({
-      targets: g,
-      alpha: 0,
-      duration: 140,
-      onComplete: () => g.destroy(),
-    });
+    runCatchPipeline(
+      this,
+      msg,
+      { sx, sy, tx, ty, depth },
+      this.sprites.get(msg.to),
+      {
+        uiScale: () => this.uiScale(),
+        playAudio: (phase) => playCatchAudio(this, phase),
+      }
+    );
   }
 
   setTarget(id) {
