@@ -503,7 +503,7 @@ export class Hud {
 
         const name = document.createElement("div");
         name.className = "poke-name";
-        name.textContent = `[${p.level}] ${p.name}`;
+        name.textContent = `${p.shiny ? "★ " : ""}[${p.level}] ${p.name}`;
         row.appendChild(name);
 
         const hp = document.createElement("div");

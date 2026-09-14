@@ -55,7 +55,10 @@ export function meadowWildSpots() {
   return r.wildSpawns?.length ? r.wildSpawns : [{ x: cx, y: cy }];
 }
 
-/** Meadow wild looktypes — sprites: tools/extract_otp207_sprites.py (MEADOW_WILD_SPECIES). */
+/**
+ * Meadow wilds — só Kanto #1–151 (nomes oficiais via shared/kantoDex.js + server/species.js).
+ * Manter em sync com tools/extract_otp207_sprites.py MEADOW_WILD_SPECIES.
+ */
 const MEADOW_WILD_SPECIES = [
   "bulbasaur",
   "ivysaur",

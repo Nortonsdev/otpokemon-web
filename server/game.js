@@ -8,6 +8,7 @@ import {
   PARTY_CAP,
   PLAYER_HP,
   POTIONS,
+  PLAYABLE_KANTO_SLUGS,
   SPECIES,
   STARTERS,
   STEP_MS,
@@ -31,6 +32,11 @@ import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 import { isSafeZone, isCombatSafeZone } from "../shared/safeZone.js";
 import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
+import {
+  isKantoSlug,
+  officialSpeciesName,
+  SHINY_RATE,
+} from "../shared/kantoDex.js";
 
 const CATCH_CAP = ITEM_BOX_SLOTS.catch;
 const BAG_SLOT_CAP = ITEM_BOX_SLOTS.bag;
@@ -240,7 +246,9 @@ export class World {
       return this.err(client, "Name already taken.");
     }
     const specKey = String(starter || "").toLowerCase();
-    if (!STARTERS.includes(specKey)) return this.err(client, "Choose Bulbasaur, Charmander or Squirtle.");
+    if (!STARTERS.includes(specKey) || !PLAYABLE_KANTO_SLUGS.includes(specKey)) {
+      return this.err(client, "Choose Bulbasaur, Charmander or Squirtle.");
+    }
     const spec = SPECIES[specKey];
     const record = {
       name: charName,
@@ -276,12 +284,17 @@ export class World {
   }
 
   makeMon(species, level = 5, opts = {}) {
-    const spec = SPECIES[species];
+    const key = String(species || "").toLowerCase();
+    if (!isKantoSlug(key) || !SPECIES[key]) {
+      throw new Error(`Only Kanto #1–151 playable species are allowed (${species})`);
+    }
+    const spec = SPECIES[key];
     const mon = {
       uid: opts.uid || randomUUID(),
-      species,
+      species: key,
       name: spec.name,
       look: spec.look,
+      shiny: !!opts.shiny,
       gender: opts.gender || (randomInt(0, 2) ? "m" : "f"),
       level,
       baseHp: spec.baseStats.hp,
@@ -298,7 +311,8 @@ export class World {
     const spec = SPECIES[mon.species];
     if (!spec) return mon;
     mon.look = spec.look;
-    mon.name = spec.name;
+    mon.name = officialSpeciesName(mon.species, false) || spec.name;
+    mon.shiny = !!mon.shiny;
     mon.baseStats = { ...spec.baseStats };
     mon.baseHp = spec.baseStats.hp;
     delete mon.ivs;
@@ -496,17 +510,24 @@ export class World {
     this.flush();
   }
 
+  pokemonLabel(c) {
+    const base = officialSpeciesName(c.species, false) || c.name || "Pokémon";
+    return c.shiny ? `Shiny ${base}` : base;
+  }
+
   publicCreature(c) {
+    const label = c.kind === "player" || c.kind === "npc" ? c.name : this.pokemonLabel(c);
     const base = {
       id: c.id,
       kind: c.kind,
-      name: c.name,
+      name: label,
       x: c.x,
       y: c.y,
       z: c.z,
       dir: c.dir,
       look: c.look,
       species: c.species || null,
+      shiny: !!c.shiny,
       hp: c.hp,
       hpMax: c.hpMax,
       level: c.level || (c.kind === "player" ? 1 : 5),
@@ -518,7 +539,7 @@ export class World {
           ? `${c.name} (!)`
           : c.kind === "player"
             ? c.name
-            : `${c.name} [${c.level || 5}]`,
+            : `${label} [${c.level || 5}]`,
       dead: !!c.dead,
       mount: c.mount
         ? { ability: c.mount.ability, species: c.mount.species, look: c.mount.look }
@@ -542,11 +563,12 @@ export class World {
               slot: i,
               uid: p.uid,
               species: p.species,
-              name: p.name,
+              name: this.pokemonLabel(p),
               look: p.look,
               hp: p.hp,
               hpMax: p.hpMax,
               level: p.level,
+              shiny: !!p.shiny,
               gender: p.gender || (String(p.uid || "a").charCodeAt(0) % 2 ? "m" : "f"),
               ball: i === player.outSlot ? "discharged" : p.ball || "charged",
             }
@@ -922,6 +944,7 @@ export class World {
       kind: "pokemon",
       name: mon.name,
       species: mon.species,
+      shiny: !!mon.shiny,
       look: mon.look,
       x: pos.x,
       y: pos.y,
@@ -1203,7 +1226,7 @@ export class World {
     const ok = ball.guaranteed === true || roll <= rate;
     this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id, ball: ball.item, ok });
     if (ok) {
-      const mon = this.makeMon(target.species, target.level || 2);
+      const mon = this.makeMon(target.species, target.level || 2, { shiny: !!target.shiny });
       while (player.party.length < PARTY_CAP) player.party.push(null);
       let placed = false;
       for (let i = 0; i < PARTY_CAP; i++) {
@@ -1344,29 +1367,32 @@ export class World {
   }
 
   spawnWild(species = "caterpie", spots = MAP.wildSpawns) {
-    const spec = SPECIES[species];
-    if (!spec) return;
+    const key = String(species || "").toLowerCase();
+    if (!isKantoSlug(key) || !SPECIES[key]) return;
+    const spec = SPECIES[key];
     const list = spots || MAP.wildSpawns;
     const free = list.filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y) && !isProtectionZone(s.x, s.y));
     if (!free.length) return;
     const spot = free[randomInt(0, free.length)];
-    const catHp = this.makeMon("caterpie", 2);
+    const shiny = randomInt(1, SHINY_RATE + 1) === 1;
+    const sample = this.makeMon(key, 2, { shiny });
     const wild = {
       id: cid(),
       kind: "wild",
       wild: true,
-      species,
-      name: spec.name,
+      species: key,
+      name: sample.name,
+      shiny,
       look: spec.look,
       x: spot.x,
       y: spot.y,
       z: MAP.z,
       dir: DIR.S,
-      hp: catHp.hp,
-      hpMax: catHp.hpMax,
+      hp: sample.hp,
+      hpMax: sample.hpMax,
       level: 2,
-      baseHp: SPECIES.caterpie.baseStats.hp,
-      baseStats: { ...SPECIES.caterpie.baseStats },
+      baseHp: spec.baseStats.hp,
+      baseStats: { ...spec.baseStats },
       busyUntil: 0,
     };
     this.creatures.set(wild.id, wild);

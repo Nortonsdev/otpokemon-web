@@ -541,6 +541,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setDisplaySize(size, size);
       sprite.setTint(texTint(want));
     }
+    if (c.shiny && !c.dead) sprite.setTint(0xffe066);
     const plateY = want === "human" || size === 64 ? pos.y + 4 : pos.y - 2;
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
@@ -736,7 +737,8 @@ export class GameScene extends Phaser.Scene {
       sprite.setOrigin(0, 0);
       sprite.setAngle(0);
       sprite.clearTint();
-      if (placeholder) sprite.setTint(texTint(this.textureFor(st)));
+      if (st.shiny) sprite.setTint(0xffe066);
+      else if (placeholder) sprite.setTint(texTint(this.textureFor(st)));
       let px = pos.x;
       let py = pos.y;
       if (ability === "fly") {
