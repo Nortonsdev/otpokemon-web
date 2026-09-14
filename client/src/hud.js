@@ -18,6 +18,12 @@ const ITEM_META = {
   great_potion: { label: "Great Potion", icon: "/assets/items/great_potion.png", heal: true },
 };
 
+function itemIconHtml(icon, count) {
+  const n = Math.max(0, Number(count) || 0);
+  const stack = n > 0 ? `<span class="item-stack">${n}</span>` : "";
+  return `<img class="item-sprite" src="${icon}" alt="" />${stack}`;
+}
+
 const VIP_DEMO = [
   { name: "Yuutu", online: true },
   { name: "Frajola Roncaria", online: false },
@@ -587,7 +593,7 @@ export class Hud {
       const cell = document.createElement("div");
       cell.className = "item-box-cell" + (row ? " has-item" : " empty");
       if (row) {
-        cell.innerHTML = `<img src="${row.meta.icon}" alt="" /><span class="bag-count">${row.count}</span>`;
+        cell.innerHTML = itemIconHtml(row.meta.icon, row.count);
         cell.title = `${row.meta.label} ×${row.count}`;
         if (row.meta.catch) {
           cell.oncontextmenu = (e) => {
@@ -776,7 +782,7 @@ export class Hud {
         btn.classList.add(count ? "on" : "off");
         btn.classList.toggle("use-with", this.selectedItem === slot.item);
         const keyHint = slot.key && slot.key.length === 1 ? `<span class="hot-key">${slot.key}</span>` : "";
-        btn.innerHTML = `<img src="${meta.icon}" alt="" />${keyHint}<span class="hot-count">${count || ""}</span>`;
+        btn.innerHTML = `${itemIconHtml(meta.icon, count)}${keyHint}`;
         if (meta.catch) {
           btn.oncontextmenu = (e) => {
             e.preventDefault();
