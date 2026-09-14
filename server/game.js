@@ -13,7 +13,17 @@ import {
   applyRubyHealth,
   behind,
 } from "./species.js";
-import { MAP, SPAWN, WILD_GROUPS, currentSpawn, hasRoof, inBounds, tileName, walkable } from "./map.js";
+import {
+  MAP,
+  SPAWN,
+  WILD_GROUPS,
+  currentSpawn,
+  hasRoof,
+  inBounds,
+  meadowWildSpots,
+  tileName,
+  walkable,
+} from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 
@@ -1048,10 +1058,10 @@ export class World {
       y,
       z: MAP.z,
       dir: DIR.S,
-      look: 128,
+      look: def.look ?? 128,
       hp: 150,
       hpMax: 150,
-      level: 1,
+      level: def.level ?? 1,
       canTarget: false,
       wild: false,
       busyUntil: 0,
@@ -1065,6 +1075,9 @@ export class World {
       { name: "Enfermeira Joy", x: 10, y: 10 },
       { name: "Oficial Jenny", x: 20, y: 10 },
       { name: "Professor Carvalho", x: 8, y: 4 },
+      { name: "Dono", x: 14, y: 13, look: SPECIES.charizard.look, level: 36 },
+      { name: "Salamence Toy", x: 11, y: 12, look: SPECIES.charizard.look },
+      { name: "Shuckle Game", x: 17, y: 12, look: SPECIES.squirtle.look },
     ]) {
       this.spawnNpc(def);
     }
@@ -1079,6 +1092,7 @@ export class World {
 
   wildSpots(group) {
     if (group.spots === "wild") return MAP.wildSpawns;
+    if (group.spots === "meadow") return meadowWildSpots();
     return group.spots || MAP.wildSpawns;
   }
 

@@ -454,6 +454,9 @@ export class GameScene extends Phaser.Scene {
   textureFor(c) {
     if (c.kind === "player" || c.kind === "npc") {
       if (c.mount?.look != null) return LOOK_NAME[c.mount.look] || "charizard";
+      if (c.kind === "npc" && c.look != null && c.look !== 128) {
+        return LOOK_NAME[c.look] || "caterpie";
+      }
       return "human";
     }
     return LOOK_NAME[c.look] || "caterpie";
