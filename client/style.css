@@ -1326,11 +1326,93 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 .catch-row .n-ok { color: #6fdc8c; text-align: center; font-weight: 700; }
 .catch-row .n-fail { color: #ff8a8a; text-align: center; font-weight: 700; }
 
-/* ── HOTBAR (two circular rows) ── */
+/* ── HOTBAR (legacy tool rows — oculto até toolbar OTP) ── */
 .hotdock {
   pointer-events: none; position: absolute;
   left: 50%; bottom: 118px; transform: translateX(-50%);
   z-index: 7;
+}
+.hotdock.hidden { display: none !important; }
+
+/* ── BARRA DE ATAQUES OTP (acima do chat) ── */
+.hud-bottom-stack {
+  pointer-events: none;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(880px, calc(100vw - 240px));
+}
+.attack-bar {
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 2px 4px 0;
+}
+.attack-bar.hidden { display: none !important; }
+.attack-slot {
+  pointer-events: auto;
+  position: relative;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--myst-action-slot) no-repeat center;
+  background-size: 44px 44px;
+  display: grid;
+  place-items: center;
+  cursor: default;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.55);
+}
+.attack-slot img {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+  border-radius: 50%;
+}
+.attack-slot.on {
+  filter: brightness(1.1);
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--otp-gold-label);
+}
+.attack-slot.on:hover { filter: brightness(1.22); }
+.attack-slot.off {
+  opacity: 0.38;
+  filter: grayscale(0.4);
+  box-shadow: 0 0 0 1px rgba(106, 140, 196, 0.35);
+}
+.attack-key {
+  position: absolute;
+  top: 0;
+  left: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 2px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #2a5088 0%, #142a4a 100%);
+  border: 1px solid #5a8cc8;
+  color: #f0f6ff;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 12px;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+.attack-cd {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(rgba(0, 0, 0, 0.55) calc(var(--cd) * 360deg), transparent 0);
 }
 .poke-active-status {
   display: flex;
@@ -1412,9 +1494,9 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 
 /* ── CHAT DOCK ── */
 .chat-dock {
-  pointer-events: auto; position: absolute;
-  left: 50%; bottom: 0; transform: translateX(-50%);
-  width: min(880px, calc(100vw - 240px)); z-index: 9;
+  pointer-events: auto;
+  position: relative;
+  width: 100%;
   background: linear-gradient(180deg, rgba(10, 16, 28, 0.48) 0%, rgba(10, 16, 28, 0.82) 100%);
   border: 1px solid var(--ot-border-dim); border-bottom: 0;
   border-radius: 5px 5px 0 0; backdrop-filter: blur(2px);
@@ -1451,5 +1533,5 @@ body.in-game #world-scrim { display: none; }
 
 @media (max-width: 900px) {
   #hud-pokeinfo { width: 228px; }
-  .chat-dock { width: calc(100vw - 12px); }
+  .hud-bottom-stack { width: calc(100vw - 12px); }
 }
