@@ -149,10 +149,11 @@ function rememberAccount() {
   session.pass = document.getElementById("pass").value;
 }
 
-document.getElementById("btn-login").onclick = () => {
+document.getElementById("account-form").addEventListener("submit", (e) => {
+  e.preventDefault();
   rememberAccount();
   net.send({ t: "login", user: session.user, pass: session.pass });
-};
+});
 document.getElementById("btn-register").onclick = () => {
   rememberAccount();
   net.send({ t: "register", user: session.user, pass: session.pass });

@@ -4,6 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OTPokemon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -11,33 +14,50 @@
     <div id="game" class="pre-game-hidden"></div>
     <div id="world-scrim"></div>
     <div id="ui">
-      <section id="screen-login" class="panel account-card center">
+      <section id="screen-login" class="panel glass-card account-card">
         <div class="brand">
           <span class="gem" aria-hidden="true"></span>
           <h1>OTPokemon</h1>
+          <p class="muted">Entre para jogar</p>
         </div>
-        <p class="muted">Crie sua conta</p>
-        <label>Conta <input id="user" value="demo" autocomplete="username" /></label>
-        <label>Senha <input id="pass" type="password" value="demo" autocomplete="current-password" /></label>
-        <div class="row">
-          <button id="btn-login">Login</button>
-          <button id="btn-register" class="ghost">Criar conta</button>
-        </div>
-        <p id="login-msg" class="msg"></p>
+        <form id="account-form" class="account-form" autocomplete="on">
+          <div class="field">
+            <label for="user">Conta</label>
+            <input id="user" name="username" value="demo" autocomplete="username" spellcheck="false" />
+          </div>
+          <div class="field">
+            <label for="pass">Senha</label>
+            <input id="pass" name="password" type="password" value="demo" autocomplete="current-password" />
+          </div>
+          <div class="account-actions">
+            <button type="submit" id="btn-login">Login</button>
+            <button type="button" id="btn-register" class="ghost">Criar conta</button>
+          </div>
+        </form>
+        <p id="login-msg" class="msg" role="status"></p>
         <p class="hint">Login padrão <code>demo/demo</code> · <a href="/editor.html">Editor de mapas</a></p>
       </section>
 
-      <section id="screen-chars" class="panel character-card center hidden">
+      <section id="screen-chars" class="panel glass-card character-card hidden">
+        <div class="brand">
+          <span class="gem" aria-hidden="true"></span>
+          <h1>OTPokemon</h1>
+          <p class="muted">Escolha ou crie um personagem</p>
+        </div>
         <h2>Personagens</h2>
         <ul id="char-list"></ul>
         <hr />
         <h3>Criar personagem</h3>
-        <label>Nome <input id="char-name" maxlength="19" /></label>
-        <p>Inicial</p>
+        <div class="field">
+          <label for="char-name">Nome</label>
+          <input id="char-name" maxlength="19" autocomplete="nickname" />
+        </div>
+        <p class="field-label">Inicial</p>
         <div id="starters" class="starters"></div>
-        <button id="btn-create">Criar personagem</button>
-        <p id="char-msg" class="msg"></p>
+        <button type="button" id="btn-create" class="btn-full">Criar personagem</button>
+        <p id="char-msg" class="msg" role="status"></p>
       </section>
+
 
       <section id="screen-game" class="hidden">
         <header id="hud-top">

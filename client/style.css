@@ -67,6 +67,278 @@ html, body {
 .center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .hidden { display: none !important; }
 
+body:not(.in-game) #world-scrim {
+  background: radial-gradient(
+    ellipse 78% 68% at 50% 48%,
+    rgba(8, 6, 20, 0.12) 0%,
+    rgba(8, 6, 20, 0.18) 38%,
+    rgba(6, 4, 16, 0.58) 100%
+  );
+}
+
+.glass-card {
+  --glass-ink: #f4f1ff;
+  --glass-muted: #b9b3d6;
+  --glass-line: rgba(255, 255, 255, 0.16);
+  --glass-accent: #a78bfa;
+  --glass-accent-2: #38bdf8;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  width: min(380px, calc(100vw - 32px));
+  max-height: calc(100vh - 28px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 28px 28px 22px;
+  color: var(--glass-ink);
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 42%, rgba(18, 10, 36, 0.28)),
+    rgba(12, 8, 28, 0.42);
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+  border: 1px solid var(--glass-line);
+  border-radius: 22px;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.12) inset,
+    0 18px 50px rgba(8, 4, 24, 0.45),
+    0 0 80px rgba(124, 58, 237, 0.22);
+}
+.glass-card:after {
+  display: none;
+}
+.glass-card::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 80% at 50% -10%, rgba(167, 139, 250, 0.28), transparent 55%);
+  z-index: 0;
+}
+.glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+.glass-card .brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0 22px;
+  text-align: center;
+  overflow: visible;
+}
+.glass-card .brand h1 {
+  margin: 10px 0 0;
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 0 24px rgba(167, 139, 250, 0.55);
+}
+.glass-card .gem {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(circle at 32% 28%, #f3e8ff, #a78bfa 42%, #6d28d9 70%, #2e1065);
+  box-shadow: 0 0 18px rgba(167, 139, 250, 0.85), 0 0 2px #fff inset;
+  animation: gemPulse 3.2s ease-in-out infinite;
+}
+@keyframes gemPulse {
+  0%, 100% { box-shadow: 0 0 14px rgba(167, 139, 250, 0.55), 0 0 2px #fff inset; }
+  50% { box-shadow: 0 0 26px rgba(56, 189, 248, 0.7), 0 0 2px #fff inset; }
+}
+.glass-card .muted {
+  margin: 8px 0 0;
+  color: var(--glass-muted);
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+.glass-card .account-form,
+.glass-card .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.glass-card .account-form {
+  gap: 14px;
+}
+.glass-card .field {
+  margin: 0;
+  text-align: left;
+}
+.glass-card label,
+.glass-card .field-label {
+  display: block;
+  margin: 0;
+  color: #ddd6fe;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.glass-card input {
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  color: #fff;
+  font: 500 15px/1.3 Outfit, "Segoe UI", system-ui, sans-serif;
+  background: rgba(8, 6, 20, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+.glass-card input:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.glass-card input:focus {
+  border-color: rgba(167, 139, 250, 0.7);
+  background: rgba(16, 10, 36, 0.55);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.glass-card .account-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 4px;
+}
+.glass-card button {
+  margin: 0;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-image: none;
+  border-radius: 12px;
+  color: #fff;
+  font: 600 0.92rem/1 Outfit, "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1 55%, #38bdf8);
+  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.35);
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+}
+.glass-card button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+.glass-card button:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+.glass-card button.ghost {
+  color: #e9e4ff;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: none;
+}
+.glass-card button.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.glass-card .btn-full {
+  width: 100%;
+  margin-top: 14px;
+}
+.glass-card .msg {
+  min-height: 1.15em;
+  margin: 12px 0 0;
+  text-align: center;
+  color: #fbbf24;
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+.glass-card .hint {
+  margin: 12px 0 0;
+  text-align: center;
+  color: #9b93c2;
+  font-size: 0.78rem;
+}
+.glass-card .hint a {
+  color: #c4b5fd;
+  text-decoration: none;
+  font-weight: 600;
+}
+.glass-card .hint a:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+.glass-card .hint code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #f5f3ff;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.78em;
+}
+.glass-card h2,
+.glass-card h3 {
+  margin: 0 0 10px;
+  text-align: center;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+.glass-card h2 { font-size: 0.95rem; color: #ede9fe; }
+.glass-card h3 { margin-top: 4px; font-size: 0.8rem; color: #ddd6fe; text-transform: uppercase; letter-spacing: 0.12em; }
+.glass-card hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 16px 0;
+}
+.glass-card #char-list {
+  margin: 0 0 4px;
+}
+.glass-card #char-list li { margin: 0 0 8px; }
+.glass-card #char-list button {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: none;
+}
+.glass-card .starters {
+  gap: 8px;
+}
+.glass-card .starter {
+  flex: 1;
+  padding: 8px 6px 6px;
+  background: rgba(8, 6, 20, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-image: none;
+  border-radius: 12px;
+  color: #e9e4ff;
+  font-size: 0.72rem;
+}
+.glass-card .starter.selected {
+  border-image: none;
+  border-color: rgba(167, 139, 250, 0.85);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+  background: rgba(88, 50, 180, 0.28);
+}
+.glass-card .starter img { width: 56px; height: 56px; }
+
+@media (max-width: 520px) {
+  .glass-card {
+    width: min(100% - 20px, 380px);
+    padding: 22px 18px 18px;
+    border-radius: 18px;
+  }
+  .glass-card .account-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
 .brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
 .brand h1 {
   margin: 6px 0 0; font-size: 1.6rem; letter-spacing: 0.12em; text-transform: uppercase;
