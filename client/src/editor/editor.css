@@ -281,6 +281,10 @@ body,
 
 .tool-btn.zone-safe { color: var(--ed-safe); }
 .tool-btn.zone-safe.active { background: rgba(46, 196, 102, 0.22); color: #9dffc2; }
+.tool-btn.zone-pvp { color: var(--ed-danger); }
+.tool-btn.zone-pvp.active { background: rgba(214, 64, 64, 0.22); color: #ffb3b3; }
+.tool-btn.zone-nopvp { color: var(--ed-nopvp); }
+.tool-btn.zone-nopvp.active { background: rgba(232, 180, 48, 0.22); color: #ffe08a; }
 
 .guest-link {
   position: absolute;

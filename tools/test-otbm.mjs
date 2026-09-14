@@ -11,8 +11,10 @@ import {
   tileKey,
   TILESTATE_PROTECTIONZONE,
   TILESTATE_PVPZONE,
+  TILESTATE_NOPVPZONE,
   ZONE_PROTECTION,
   ZONE_PVP,
+  ZONE_NOPVP,
   applyHouseToTile,
   applyZoneToTile,
 } from "../shared/editor/otbm.ts";
@@ -48,6 +50,9 @@ map.waypoints = [{ name: "gate", x: 1, y: 1, z: 7 }];
 applyHouseToTile(map.tiles.get(tileKey(5, 2, 7)), 12);
 applyZoneToTile(map.tiles.get(tileKey(5, 2, 7)), "protection");
 applyZoneToTile(map.tiles.get(tileKey(6, 2, 7)), "pvp");
+applyZoneToTile(map.tiles.get(tileKey(7, 2, 7)), "nopvp");
+applyHouseToTile(map.tiles.get(tileKey(4, 3, 7)), 3);
+applyHouseToTile(map.tiles.get(tileKey(5, 3, 7)), 3);
 
 const bytes = await serializeOtbm(map);
 assert(bytes[4] === 0xfe, "OTBM NODE_START");
@@ -67,6 +72,10 @@ assert((re.tiles.get(tileKey(5, 2, 7)).flags & TILESTATE_PROTECTIONZONE) === TIL
 assert(re.tiles.get(tileKey(5, 2, 7)).zones.includes(ZONE_PROTECTION), "PZ zone id");
 assert((re.tiles.get(tileKey(6, 2, 7)).flags & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "PVP flag");
 assert(re.tiles.get(tileKey(6, 2, 7)).zones.includes(ZONE_PVP), "PVP zone id");
+assert((re.tiles.get(tileKey(7, 2, 7)).flags & TILESTATE_NOPVPZONE) === TILESTATE_NOPVPZONE, "NOPVP flag");
+assert(re.tiles.get(tileKey(7, 2, 7)).zones.includes(ZONE_NOPVP), "NOPVP zone id");
+assert(re.tiles.get(tileKey(4, 3, 7)).houseId === 3, "house area 4,3");
+assert(re.tiles.get(tileKey(5, 3, 7)).houseId === 3, "house area 5,3");
 
 const again = await serializeOtbm(re);
 const re2 = parseOtbm(again);
@@ -80,8 +89,10 @@ assert(runtime.items.some((it) => it.kind === "flower" && it.x === 4 && it.y ===
 assert(runtime.cells[2][2].items[0] === BUILTIN_TILE_IDS.water, "cell water");
 assert(runtime.spawn.x === 4 && runtime.spawn.y === 3, "temple spawn");
 assert(runtime.houses[2][5] === 12, "runtime house");
+assert(runtime.houses[3][4] === 3 && runtime.houses[3][5] === 3, "runtime house area");
 assert((runtime.flags[2][5] & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "runtime PZ");
 assert((runtime.flags[2][6] & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "runtime PVP");
+assert((runtime.flags[2][7] & TILESTATE_NOPVPZONE) === TILESTATE_NOPVPZONE, "runtime NOPVP");
 
 const back = runtimeToOtbm(runtime);
 assert(back.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "runtime→otbm water");

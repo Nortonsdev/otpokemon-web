@@ -11,7 +11,6 @@ import {
   ZONE_SPAWN,
   type OtbmMap,
   type OtbmTile,
-  type ZoneKind,
 } from "../../../shared/editor/otbm.ts";
 import { WaypointManager } from "../../../shared/editor/WaypointManager.ts";
 import { parsePositionString } from "../../../shared/editor/position.ts";
@@ -26,7 +25,7 @@ import {
 } from "../../../shared/editor/tileCatalog.ts";
 import { floodFill, forEachRectTile, type Rect } from "../../../shared/editor/brushes.ts";
 import { loadBuiltinPreviews, rememberPreview } from "./previews.ts";
-import { drawEditorMap, drawMinimap, screenToTile } from "./renderer.ts";
+import { drawEditorMap, drawMinimap, screenToTile, tileOverlayHint } from "./renderer.ts";
 import { renderPalette } from "./palette.ts";
 
 type Tool =
@@ -44,8 +43,17 @@ type Tool =
   | "nopvp"
   | "protection";
 
+type MetaStamp = "house" | "spawn" | "pvp" | "nopvp" | "protection";
+const META_TOOLS: MetaStamp[] = ["house", "spawn", "pvp", "nopvp", "protection"];
+function isMetaStamp(t: string | null | undefined): t is MetaStamp {
+  return META_TOOLS.includes(t as MetaStamp);
+}
+
 const ICONS: Record<string, string> = {
   select: `<rect x="3" y="3" width="10" height="10" stroke-dasharray="2 2"/>`,
+  pan: `<path d="M8 1v14M1 8h14M3.5 3.5L8 1l4.5 2.5M3.5 12.5L8 15l4.5-2.5"/>`,
+  zoomIn: `<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2L14 14M7 5v4M5 7h4"/>`,
+  zoomOut: `<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2L14 14M5 7h4"/>`,
   brush: `<path d="M3 13l3-1 7-7a1.5 1.5 0 0 0-2-2L4 10l-1 3z"/><path d="M9 5l2 2"/>`,
   erase: `<path d="M4 9l5-5 4 4-5 5H4z"/><path d="M3 13h10"/>`,
   fill: `<path d="M3 9l5-6 5 6v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 4c1.2 1 2 2.4 2 4"/>`,
@@ -80,6 +88,7 @@ class EditorApp {
   paletteIds: number[] = [...BUILTIN_PALETTE_IDS];
   selectedId = BUILTIN_TILE_IDS.grass;
   tool: Tool = "brush";
+  stamp: MetaStamp | "item" = "item";
   floor = 7;
   zoom = 1;
   panX = 0;
@@ -177,6 +186,29 @@ class EditorApp {
     return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
   }
 
+  effectiveMeta(): MetaStamp | null {
+    if (isMetaStamp(this.tool)) return this.tool;
+    if (isMetaStamp(this.stamp)) return this.stamp;
+    return null;
+  }
+
+  highlightTools() {
+    this.root.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("active"));
+    this.root.querySelector(`[data-tool="${this.tool}"]`)?.classList.add("active");
+    if (this.stamp !== "item" && this.stamp !== this.tool) {
+      this.root.querySelector(`[data-tool="${this.stamp}"]`)?.classList.add("active");
+    }
+  }
+
+  applyMetaToSelection(kind: MetaStamp, clear = false) {
+    if (!this.selection) return;
+    this.pushUndo();
+    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => this.paintMetaAt(x, y, clear, kind));
+    this.draw();
+    this.updateMinimap();
+    this.setStatus();
+  }
+
   buildUi() {
     this.root.innerHTML = `
       <div class="editor-stage">
@@ -238,6 +270,7 @@ class EditorApp {
           </nav>
           <div class="tools">
             <button class="tool-btn" data-tool="select" title="Selecionar (M)">${icon("select")}</button>
+            <button class="tool-btn" data-tool="pan" title="Mover mapa (Espaço)">${icon("pan")}</button>
             <button class="tool-btn active" data-tool="brush" title="Pincel (B)">${icon("brush")}</button>
             <button class="tool-btn" data-tool="erase" title="Apagar (E)">${icon("erase")}</button>
             <button class="tool-btn" data-tool="fill" title="Preencher (F)">${icon("fill")}</button>
@@ -255,6 +288,8 @@ class EditorApp {
           <div class="tools">
             <button class="tool-btn" data-act="undo" title="Desfazer">${icon("undo")}</button>
             <button class="tool-btn" data-act="redo" title="Refazer">${icon("redo")}</button>
+            <button class="tool-btn" data-act="zoom-out" title="Zoom −">${icon("zoomOut")}</button>
+            <button class="tool-btn" data-act="zoom-in" title="Zoom +">${icon("zoomIn")}</button>
           </div>
         </header>
 
@@ -305,6 +340,8 @@ class EditorApp {
       "toggle-grid": () => this.toggleGrid(),
       "toggle-zones": () => this.toggleZones(),
       "toggle-houses": () => this.toggleHouses(),
+      "zoom-in": () => this.setZoom(this.zoom * 1.1),
+      "zoom-out": () => this.setZoom(this.zoom * 0.9),
     };
     this.root.querySelectorAll("[data-act]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -407,10 +444,16 @@ class EditorApp {
   }
 
   setTool(tool: Tool) {
+    if (isMetaStamp(tool)) this.stamp = tool;
     this.tool = tool;
-    this.root.querySelectorAll("[data-tool]").forEach((b) => b.classList.remove("active"));
-    this.root.querySelector(`[data-tool="${tool}"]`)?.classList.add("active");
+    this.highlightTools();
     this.canvas.style.cursor = tool === "pan" ? "grab" : tool === "select" || tool === "rect" ? "cell" : "crosshair";
+    if (isMetaStamp(tool) && this.selection) {
+      this.applyMetaToSelection(tool, false);
+      this.selection = null;
+      const label = tool === "protection" ? "SAFE" : tool === "house" ? `HOUSETILE ${this.currentHouseId()}` : tool;
+      this.msg(`Área: ${label}`);
+    }
   }
 
   msg(t: string) {
@@ -763,6 +806,9 @@ class EditorApp {
       tab: this.paletteTab,
       onPick: (id) => {
         this.selectedId = id;
+        this.stamp = "item";
+        if (isMetaStamp(this.tool)) this.setTool("brush");
+        else this.highlightTools();
         this.refreshPalette();
       },
     });
@@ -820,6 +866,7 @@ class EditorApp {
         if (e.key === "s" || e.key === "S") this.setTool("protection");
         if (e.key === "p" || e.key === "P") this.setTool("pvp");
         if (e.key === "n" || e.key === "N") this.setTool("nopvp");
+        if (e.key === "g" || e.key === "G") this.toggleGrid();
         if (e.key === "+" || e.key === "=") this.setZoom(this.zoom * 1.1);
         if (e.key === "-" || e.key === "_") this.setZoom(this.zoom * 0.9);
       }
@@ -868,6 +915,8 @@ class EditorApp {
     window.addEventListener("mousemove", (e) => {
       const t = screenToTile(this.canvas, e.clientX, e.clientY, this.zoom, this.panX, this.panY);
       this.posEl.textContent = `POS ${t.x}, ${t.y}, ${this.floor}`;
+      const hint = tileOverlayHint(this.map.tiles.get(tileKey(t.x, t.y, this.floor)));
+      if (hint) this.posEl.textContent += ` · ${hint}`;
       if (this.panning) {
         const dx = e.clientX - this.lastX;
         const dy = e.clientY - this.lastY;
@@ -909,37 +958,46 @@ class EditorApp {
   eraseSelection(recordUndo = true) {
     if (!this.selection) return;
     if (recordUndo) this.pushUndo();
-    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => this.setTileItems(x, y, []));
+    const meta = this.effectiveMeta();
+    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => {
+      if (meta) this.paintMetaAt(x, y, true, meta);
+      else this.setTileItems(x, y, []);
+    });
     this.draw();
     this.updateMinimap();
     this.setStatus();
-    this.msg("Seleção apagada.");
+    this.msg(meta ? "Zona/casa apagada na seleção." : "Seleção apagada.");
   }
 
   fillSelection(recordUndo = true) {
     if (!this.selection) return;
     if (recordUndo) this.pushUndo();
-    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => this.setTileItems(x, y, [this.selectedId]));
+    const meta = this.effectiveMeta();
+    forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (x, y) => {
+      if (meta) this.paintMetaAt(x, y, false, meta);
+      else this.setTileItems(x, y, [this.selectedId]);
+    });
     this.draw();
     this.updateMinimap();
     this.setStatus();
-    this.msg("Seleção preenchida.");
+    this.msg(meta ? `Área ${meta === "protection" ? "SAFE" : meta}.` : "Seleção preenchida.");
   }
 
-  paintMetaAt(x: number, y: number, clear: boolean) {
+  paintMetaAt(x: number, y: number, clear: boolean, kind: MetaStamp | null = this.effectiveMeta()) {
+    if (!kind) return;
     const t = this.ensureTile(x, y);
-    if (this.tool === "house") {
+    if (kind === "house") {
       applyHouseToTile(t, clear ? null : this.currentHouseId());
       this.msg(clear ? "House removida." : `HOUSETILE house ${this.currentHouseId()}`);
-    } else if (this.tool === "spawn") {
+    } else if (kind === "spawn") {
       if (clear) {
         delete t.spawnMonster;
         t.zones = t.zones?.filter((id) => id !== ZONE_SPAWN);
         if (!t.zones?.length) delete t.zones;
       } else applyZoneToTile(t, "spawn");
-    } else if (this.tool === "pvp" || this.tool === "nopvp" || this.tool === "protection") {
-      applyZoneToTile(t, clear ? null : (this.tool as ZoneKind));
-      const label = this.tool === "protection" ? "SAFE" : this.tool === "nopvp" ? "non-PVP" : "PVP";
+    } else {
+      applyZoneToTile(t, clear ? null : kind);
+      const label = kind === "protection" ? "SAFE" : kind === "nopvp" ? "non-PVP" : "PVP";
       this.msg(clear ? `${label} removida.` : `${label} (OTBM flag)`);
     }
     this.pruneTile(t);
@@ -976,11 +1034,12 @@ class EditorApp {
       this.draw();
       return;
     }
-    if (this.tool === "house" || this.tool === "spawn" || this.tool === "pvp" || this.tool === "nopvp" || this.tool === "protection") {
+    const meta = this.effectiveMeta();
+    if (meta && this.tool !== "fill" && this.tool !== "erase" && this.tool !== "rect" && this.tool !== "select") {
       if (this.selection) {
-        forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (tx, ty) => this.paintMetaAt(tx, ty, clear));
+        forEachRectTile(this.selection, this.runtime.w, this.runtime.h, (tx, ty) => this.paintMetaAt(tx, ty, clear, meta));
         this.painting = false;
-      } else this.paintMetaAt(x, y, clear);
+      } else this.paintMetaAt(x, y, clear, meta);
       this.draw();
       this.updateMinimap();
       this.setStatus();
@@ -990,7 +1049,8 @@ class EditorApp {
       if (this.selection) this.fillSelection(false);
       else {
         floodFill(this.map, x, y, this.floor, this.runtime.w, this.runtime.h, (tx, ty) => {
-          this.setTileItems(tx, ty, [this.selectedId]);
+          if (meta) this.paintMetaAt(tx, ty, clear, meta);
+          else this.setTileItems(tx, ty, [this.selectedId]);
         });
         this.draw();
         this.updateMinimap();
@@ -1005,14 +1065,16 @@ class EditorApp {
         this.painting = false;
         return;
       }
-      this.setTileItems(x, y, [this.selectedId]);
+      if (meta) this.paintMetaAt(x, y, clear, meta);
+      else this.setTileItems(x, y, [this.selectedId]);
     } else if (this.tool === "erase") {
       if (this.selection) {
         this.eraseSelection(false);
         this.painting = false;
         return;
       }
-      this.setTileItems(x, y, []);
+      if (meta) this.paintMetaAt(x, y, true, meta);
+      else this.setTileItems(x, y, []);
     }
     this.draw();
     this.updateMinimap();

@@ -5,12 +5,13 @@ process.env.VERCEL = "1";
 
 const { server } = await import("../api/_lib/server.bundle.js");
 
-function request(method, url, headers = {}) {
+function request(method, url, headers = {}, body) {
   return new Promise((resolve, reject) => {
     const req = {
       method,
       url,
       headers,
+      body,
       readableEnded: true,
       on() {
         return req;
@@ -61,6 +62,16 @@ if (slash.status !== 200 || slash.body.length !== map.body.length) {
 const viaHeader = await request("GET", "/api/ws", { "x-forwarded-uri": "/api/map" });
 if (viaHeader.status !== 200 || viaHeader.body.length !== map.body.length) {
   throw new Error(`header map ${viaHeader.status} len ${viaHeader.body.length}`);
+}
+
+const posted = await request(
+  "POST",
+  "/api/map",
+  { "content-type": "application/octet-stream", "x-map-filename": "world.otbm" },
+  map.body,
+);
+if (posted.status !== 200 || !posted.body.toString().includes('"ok":true')) {
+  throw new Error(`post map ${posted.status} ${posted.body}`);
 }
 
 console.log("API BUNDLE OK", { mapBytes: map.body.length, w: map.headers["x-map-width"] });

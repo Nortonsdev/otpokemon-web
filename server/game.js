@@ -24,6 +24,7 @@ import {
   inBounds,
   isNoPvpZone,
   isProtectionZone,
+  isPvpZone,
   meadowWildSpots,
   tileName,
   walkable,
@@ -750,6 +751,16 @@ export class World {
     return null;
   }
 
+  tileLookExtra(x, y) {
+    const bits = [];
+    const houseId = MAP.houses?.[y]?.[x];
+    if (houseId) bits.push(`house ${houseId}`);
+    if (isProtectionZone(x, y)) bits.push("SAFE");
+    else if (isNoPvpZone(x, y)) bits.push("non-PVP");
+    else if (isPvpZone(x, y)) bits.push("PVP");
+    return bits.length ? ` ${bits.join(" · ")}.` : "";
+  }
+
   sendTarget(player, c) {
     const client = this.clientOf(player);
     if (!client) return;
@@ -773,8 +784,8 @@ export class World {
       if (who.kind === "player" || who.kind === "npc") text = `You see ${who.name}.`;
       else if (who.dead) text = `Você vê o corpo de um ${who.name}.`;
       else text = `You see ${who.name} [${who.level || 5}]. Health: ${who.hp} / ${who.hpMax}.`;
-    } else text = `You see ${tileName(x, y)}.`;
-    this.sys(player, text);
+    }     else text = `You see ${tileName(x, y)}.`;
+    this.sys(player, text + this.tileLookExtra(x, y));
   }
 
   use(player, msg) {
@@ -1385,7 +1396,9 @@ export class World {
     if (!isKantoSlug(key) || !SPECIES[key]) return;
     const spec = SPECIES[key];
     const list = spots || MAP.wildSpawns;
-    const free = list.filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y) && !isProtectionZone(s.x, s.y));
+    const free = list.filter(
+      (s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y) && !isProtectionZone(s.x, s.y) && !(MAP.houses?.[s.y]?.[s.x])
+    );
     if (!free.length) return;
     const spot = free[randomInt(0, free.length)];
     const shiny = randomInt(1, SHINY_RATE + 1) === 1;
