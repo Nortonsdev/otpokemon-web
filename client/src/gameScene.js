@@ -187,8 +187,6 @@ export class GameScene extends Phaser.Scene {
       const payload = this.pendingWorld;
       this.pendingWorld = null;
       this.enterWorld(payload);
-    } else {
-      this.enterPreview();
     }
   }
 

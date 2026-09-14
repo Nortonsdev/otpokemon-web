@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { Net } from "./net.js";
 import { Hud } from "./hud.js";
 import { GameScene } from "./gameScene.js";
+import { LoginBackground } from "./loginBackground.js";
 
 const net = new Net();
 const hud = new Hud(net);
@@ -15,12 +16,25 @@ const STARTERS = [
 let selectedStarter = "charmander";
 let game = null;
 const session = { user: "", pass: "", charName: "", inWorld: false, rejoining: false };
+const loginBg = new LoginBackground(document.getElementById("login-bg"));
+const gameEl = () => document.getElementById("game");
+
+function setPreGameVisuals(preGame) {
+  loginBg.setActive(preGame);
+  gameEl()?.classList.toggle("pre-game-hidden", preGame);
+  if (game) {
+    if (preGame) game.loop.sleep();
+    else game.loop.wake();
+  }
+}
 
 function show(id) {
   for (const el of document.querySelectorAll("#ui > section")) el.classList.add("hidden");
   document.getElementById(id).classList.remove("hidden");
-  document.body.classList.toggle("in-game", id === "screen-game");
-  document.getElementById("world-scrim").classList.toggle("hidden", id === "screen-game");
+  const inGame = id === "screen-game";
+  document.body.classList.toggle("in-game", inGame);
+  document.getElementById("world-scrim").classList.toggle("hidden", inGame);
+  setPreGameVisuals(!inGame);
 }
 
 function msg(el, text) {
@@ -112,8 +126,6 @@ net.on("loggedOut", () => {
   session.charName = "";
   session.rejoining = false;
   show("screen-login");
-  const scene = game?.scene.getScene("game");
-  scene?.enterPreview();
 });
 net.on("_open", ({ reconnect }) => {
   if (!reconnect || !session.user || !session.pass) return;
@@ -152,4 +164,5 @@ document.getElementById("btn-create").onclick = () => {
 };
 
 ensureGame();
+loginBg.init().then(() => setPreGameVisuals(true));
 net.connect().catch((err) => msg("login-msg", err.message));
