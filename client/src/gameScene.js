@@ -24,6 +24,7 @@ const LARGE_MONS = new Set([
   "rapidash",
   "squirtle",
   "venusaur",
+  "wartortle",
 ]);
 
 /** Non-square OTP sheets (frame width × height). */
