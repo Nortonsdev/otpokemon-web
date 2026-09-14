@@ -37,10 +37,29 @@ function creatureSize(tex) {
   return 32;
 }
 
-const NAME_PX = 7;
+/** Target on-screen size after camera zoom compensation (see applyNameplateScreenScale). */
+const NAMEPLATE_SCREEN_PX = 12;
+const NAMEPLATE_SCREEN_STROKE = 4;
 const BAR_W = 22;
 const BAR_H = 3;
 const BAR_PAD = 1;
+
+function nameplateFillColor(kind) {
+  return kind === "npc" ? "#00d4e8" : "#ffffff";
+}
+
+function nameplateTextStyle(kind) {
+  return {
+    fontFamily: "Tahoma, Verdana, Arial, sans-serif",
+    fontSize: `${NAMEPLATE_SCREEN_PX}px`,
+    fontStyle: "bold",
+    color: nameplateFillColor(kind),
+    stroke: "#000000",
+    strokeThickness: NAMEPLATE_SCREEN_STROKE,
+    resolution: Math.max(3, Math.ceil(typeof window !== "undefined" ? window.devicePixelRatio || 2 : 2)),
+    padding: { x: 3, y: 2 },
+  };
+}
 
 function tileWorld(x, y, size) {
   if (size > TILE) {
@@ -499,16 +518,7 @@ export class GameScene extends Phaser.Scene {
     }
     const plateY = want === "human" || size === 64 ? pos.y + 4 : pos.y - 2;
     const plate = this.add
-      .text(pos.x + size / 2, plateY, c.plate || c.name, {
-        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-        fontSize: `${NAME_PX}px`,
-        fontStyle: "bold",
-        color: c.kind === "npc" ? "#00d4e8" : "#3dcc4a",
-        stroke: "#000000",
-        strokeThickness: 1,
-        resolution: 3,
-        padding: { x: 2, y: 1 },
-      })
+      .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
       .setOrigin(0.5, 1);
     plate.setDepth(c.y * 10 + 10);
     this.addActor(plate);
@@ -571,6 +581,17 @@ export class GameScene extends Phaser.Scene {
     return z > 0 ? 1 / z : 1;
   }
 
+  /** Keeps name text ~NAMEPLATE_SCREEN_PX on screen with a thick visible stroke at any zoom. */
+  applyNameplateScreenScale(plate, ui) {
+    const u = Math.max(0.25, ui);
+    const worldPx = Math.max(11, Math.round(NAMEPLATE_SCREEN_PX / u));
+    plate.setFontSize(worldPx);
+    plate.setScale(u);
+    const thickness = Math.max(4, Math.ceil(NAMEPLATE_SCREEN_STROKE / u));
+    plate.setStroke("#000000", thickness);
+    plate.setResolution(Math.max(3, Math.ceil((typeof window !== "undefined" ? window.devicePixelRatio : 2) || 2)));
+  }
+
   layoutNameplate(id, spriteX, spriteY, depth) {
     const sprite = this.sprites.get(id);
     const plate = this.plates.get(id);
@@ -578,14 +599,15 @@ export class GameScene extends Phaser.Scene {
     const st = this.state.get(id);
     const size = st?.spriteSize || creatureSize(sprite.texture.key);
     const ui = this.uiScale();
-    plate.setScale(ui);
+    this.applyNameplateScreenScale(plate, ui);
     const cx = spriteX + size / 2;
     const nameBottom = size > TILE ? spriteY + 4 : spriteY - 2;
-    plate.setPosition(cx, nameBottom);
+    plate.setPosition(Math.round(cx), Math.round(nameBottom));
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const barTop = nameBottom + ui;
+    const nameGap = Math.max(2, Math.round(2 * ui));
+    const barTop = nameBottom + nameGap;
     const innerTop = barTop + BAR_PAD * ui;
     const outW = BAR_W + BAR_PAD * 2;
     const outH = BAR_H + BAR_PAD * 2;
@@ -629,11 +651,12 @@ export class GameScene extends Phaser.Scene {
       plate.setColor("#00d4e8");
     } else if (st.kind === "player") {
       plate.setText(st.name);
-      plate.setColor("#3dcc4a");
+      plate.setColor("#ffffff");
     } else {
       plate.setText(`${st.name} [${st.level || 5}]`);
-      plate.setColor("#3dcc4a");
+      plate.setColor("#ffffff");
     }
+    this.applyNameplateScreenScale(plate, this.uiScale());
     const sprite = this.sprites.get(id);
     if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
   }
