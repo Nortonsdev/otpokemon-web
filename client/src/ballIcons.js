@@ -1,4 +1,4 @@
-/** Ícones de inventário — PNG único (Premier / Ultra / Master). */
+/** Inventário: só premierball/ultraball/masterball.png (32×32 gerados de *_otp.png). */
 export const BALL_REGISTRY = {
   premierball: {
     label: "Premier Ball",
