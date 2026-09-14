@@ -39,15 +39,24 @@ function creatureSize(tex) {
 }
 
 /** Target on-screen size after camera zoom compensation (see applyNameplateScreenScale). */
-const NAMEPLATE_SCREEN_PX = 8;
-const NAMEPLATE_SCREEN_STROKE = 2.5;
-const NAMEPLATE_SCREEN_PX_MAX = 9;
+const NAMEPLATE_SCREEN_PX = 7.5;
+const NAMEPLATE_SCREEN_STROKE = 2.25;
+const NAMEPLATE_SCREEN_PX_MAX = 8.5;
 const BAR_W = 22;
 const BAR_H = 3;
 const BAR_PAD = 1;
 
 function nameplateFillColor(kind) {
   return kind === "npc" ? "#00d4e8" : "#ffffff";
+}
+
+/** Y for name text bottom (origin 0.5,1): wild higher above sprite; player/npc lower on body/feet. */
+function nameplateNameBottomY(kind, spriteY, size) {
+  const large = size > TILE;
+  if (kind === "player" || kind === "npc") {
+    return spriteY + size - (large ? 10 : 6);
+  }
+  return spriteY + (large ? 0 : -3);
 }
 
 function nameplateTextStyle(kind) {
@@ -524,7 +533,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setDisplaySize(size, size);
       sprite.setTint(texTint(want));
     }
-    const plateY = size > TILE ? pos.y + 6 : pos.y + 1;
+    const plateY = nameplateNameBottomY(c.kind, pos.y, size);
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
       .setOrigin(0.5, 1);
@@ -610,7 +619,7 @@ export class GameScene extends Phaser.Scene {
     const ui = this.uiScale();
     this.applyNameplateScreenScale(plate, ui);
     const cx = spriteX + size / 2;
-    const nameBottom = size > TILE ? spriteY + 6 : spriteY + 1;
+    const nameBottom = nameplateNameBottomY(st?.kind, spriteY, size);
     plate.setPosition(Math.round(cx), Math.round(nameBottom));
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
