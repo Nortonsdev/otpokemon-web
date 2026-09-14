@@ -1,6 +1,8 @@
 # Editor de mapas (OTPokemon Web)
 
-Editor web inspirado no [YATME](https://github.com/knobik/yatme) (MIT) e no fluxo do Remere Map Editor, adaptado para **Tibia.spr + Tibia.dat clássicos** (Myst 854 / Brave 1098 / Huntera), não protobuf Tibia 15.
+Editor web inspirado no [YATME](https://github.com/knobik/yatme) (MIT) e no **formato** OTBM do Remere Map Editor (sem port C++). Toda a sprint roda em **JavaScript/TypeScript** no Vite: parser spr/dat, canvas, OTBM read/write no Node (`tsx`) e no browser. **Sem C++, sem WASM obrigatório.**
+
+Adaptado para **Tibia.spr + Tibia.dat clássicos** (Myst 854 / Brave 1098 / Huntera), não protobuf Tibia 15.
 
 ## Pipeline de dados
 
