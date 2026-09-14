@@ -15,23 +15,32 @@ import { CATCH_BALL_ITEMS } from "./ballIcons.js";
 import { speciesAssetSlug } from "../../shared/kantoDex.js";
 
 const TILE = 32;
-/** OTP2072026 looktypes that use 2×2 (64×64) sheets in objectbuilder/Tibia.dat */
+/** 64×64 (2×2 tile) meadow sheets — keep in sync with tools/extract_otp207_sprites.py exports. */
 const LARGE_MONS = new Set([
-  "beedrill",
+  "blastoise",
   "bulbasaur",
-  "butterfree",
   "charizard",
-  "kakuna",
   "pidgeot",
   "rapidash",
-  "raticate",
   "squirtle",
-  "weedle",
+  "venusaur",
 ]);
+
+/** Non-square OTP sheets (frame width × height). */
+const MON_FRAME_SIZE = {
+  charmeleon: { w: 64, h: 32 },
+};
+
 const SPRITE_COL = [0, 1, 1, 2, 2, 3, 3, 0];
 
+function monFrameSize(name) {
+  if (MON_FRAME_SIZE[name]) return MON_FRAME_SIZE[name];
+  const side = LARGE_MONS.has(name) ? 64 : 32;
+  return { w: side, h: side };
+}
+
 function monFrame(name) {
-  return LARGE_MONS.has(name) ? 64 : 32;
+  return monFrameSize(name).w;
 }
 
 function creatureSize(tex) {
@@ -178,10 +187,10 @@ export class GameScene extends Phaser.Scene {
     this.load.image("marble", "/assets/tiles/marble.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
     for (const name of Object.values(LOOK_NAME)) {
-      const fw = monFrame(name);
+      const { w: fw, h: fh } = monFrameSize(name);
       this.load.spritesheet(name, `/assets/pokemon/${name}/sheet.png`, {
         frameWidth: fw,
-        frameHeight: fw,
+        frameHeight: fh,
       });
       this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }

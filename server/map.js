@@ -57,7 +57,7 @@ export function meadowWildSpots() {
 
 /**
  * Meadow wilds — só Kanto #1–151 (nomes oficiais via shared/kantoDex.js + server/species.js).
- * Manter em sync com tools/extract_otp207_sprites.py MEADOW_WILD_SPECIES.
+ * Sprites: tools/extract_otp207_sprites.py (MEADOW_WILD_SPECIES, DAT_LOOK_OVERRIDE + Huntera fallback).
  */
 const MEADOW_WILD_SPECIES = [
   "bulbasaur",
