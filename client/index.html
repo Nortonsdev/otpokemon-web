@@ -6,7 +6,7 @@
     <title>OTPokemon</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -14,6 +14,17 @@
     <div id="game" class="pre-game-hidden"></div>
     <div id="world-scrim"></div>
     <div id="ui">
+      <div id="login-ambient" class="login-ambient" aria-hidden="true">
+        <span class="glow glow-teal"></span>
+        <span class="glow glow-mint"></span>
+        <span class="glow glow-forest"></span>
+        <span class="spark s1"></span>
+        <span class="spark s2"></span>
+        <span class="spark s3"></span>
+        <span class="spark s4"></span>
+        <span class="spark s5"></span>
+        <span class="spark s6"></span>
+      </div>
       <section id="screen-login" class="panel glass-card account-card">
         <div class="brand">
           <span class="gem" aria-hidden="true"></span>
@@ -30,7 +41,7 @@
             <input id="pass" name="password" type="password" value="demo" autocomplete="current-password" />
           </div>
           <div class="account-actions">
-            <button type="submit" id="btn-login">Login</button>
+            <button type="submit" id="btn-login" class="btn-primary">Login</button>
             <button type="button" id="btn-register" class="ghost">Criar conta</button>
           </div>
         </form>

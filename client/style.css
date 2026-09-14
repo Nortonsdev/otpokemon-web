@@ -68,47 +68,103 @@ html, body {
 .hidden { display: none !important; }
 
 body:not(.in-game) #world-scrim {
-  background: radial-gradient(
-    ellipse 78% 68% at 50% 48%,
-    rgba(8, 6, 20, 0.12) 0%,
-    rgba(8, 6, 20, 0.18) 38%,
-    rgba(6, 4, 16, 0.58) 100%
-  );
+  background:
+    radial-gradient(ellipse 46% 52% at 50% 48%, rgba(16, 185, 129, 0.16) 0%, transparent 68%),
+    radial-gradient(ellipse 70% 62% at 50% 48%, rgba(4, 22, 18, 0.08) 0%, rgba(3, 16, 14, 0.22) 46%, rgba(2, 10, 9, 0.58) 100%);
+}
+
+.login-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+body.in-game .login-ambient { display: none; }
+.login-ambient .glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  filter: blur(48px);
+  transform: translate(-50%, -50%);
+}
+.login-ambient .glow-teal {
+  width: min(520px, 78vw);
+  height: min(360px, 48vh);
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.42), transparent 68%);
+}
+.login-ambient .glow-mint {
+  width: min(340px, 58vw);
+  height: min(260px, 38vh);
+  background: radial-gradient(circle, rgba(110, 231, 183, 0.28), transparent 70%);
+  animation: glowPulse 5.6s ease-in-out infinite;
+}
+.login-ambient .glow-forest {
+  width: min(680px, 92vw);
+  height: min(480px, 70vh);
+  background: radial-gradient(circle, rgba(6, 78, 59, 0.28), transparent 72%);
+}
+.login-ambient .spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(204, 251, 241, 0.7);
+  box-shadow: 0 0 8px rgba(167, 243, 208, 0.85);
+  animation: sparkDrift 9s ease-in-out infinite;
+}
+.login-ambient .s1 { margin: -118px 0 0 -150px; animation-delay: 0s; }
+.login-ambient .s2 { margin: 96px 0 0 132px; width: 2px; height: 2px; animation-delay: -2.2s; }
+.login-ambient .s3 { margin: -40px 0 0 178px; animation-delay: -4.1s; }
+.login-ambient .s4 { margin: 70px 0 0 -188px; width: 2px; height: 2px; animation-delay: -1.4s; }
+.login-ambient .s5 { margin: -150px 0 0 40px; animation-delay: -6.3s; }
+.login-ambient .s6 { margin: 140px 0 0 -20px; width: 2px; height: 2px; animation-delay: -3.6s; }
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.75; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
+@keyframes sparkDrift {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 0.9; transform: translateY(-10px); }
 }
 
 .glass-card {
-  --glass-ink: #f4f1ff;
-  --glass-muted: #b9b3d6;
-  --glass-line: rgba(255, 255, 255, 0.16);
-  --glass-accent: #a78bfa;
-  --glass-accent-2: #38bdf8;
+  --glass-ink: #e8faf3;
+  --glass-muted: #8aa397;
+  --glass-line: rgba(167, 243, 208, 0.22);
+  --glass-accent: #6ee7b7;
+  --glass-accent-2: #14b8a6;
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 4;
-  width: min(380px, calc(100vw - 32px));
+  width: min(392px, calc(100vw - 32px));
   max-height: calc(100vh - 28px);
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
-  padding: 28px 28px 22px;
+  padding: 32px 30px 24px;
   color: var(--glass-ink);
   font-family: Outfit, "Segoe UI", system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.4;
   background:
-    linear-gradient(165deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03) 42%, rgba(18, 10, 36, 0.28)),
-    rgba(12, 8, 28, 0.42);
+    linear-gradient(165deg, rgba(167, 243, 208, 0.1), rgba(6, 28, 22, 0.18) 38%, rgba(3, 14, 12, 0.42)),
+    rgba(5, 18, 14, 0.48);
   backdrop-filter: blur(22px) saturate(1.35);
   -webkit-backdrop-filter: blur(22px) saturate(1.35);
   border: 1px solid var(--glass-line);
-  border-radius: 22px;
+  border-radius: 24px;
   box-shadow:
-    0 0 0 1px rgba(167, 139, 250, 0.12) inset,
-    0 18px 50px rgba(8, 4, 24, 0.45),
-    0 0 80px rgba(124, 58, 237, 0.22);
+    0 0 0 1px rgba(110, 231, 183, 0.08) inset,
+    0 22px 56px rgba(1, 10, 8, 0.5),
+    0 0 90px rgba(16, 185, 129, 0.22),
+    0 0 160px rgba(13, 148, 136, 0.16);
 }
 .glass-card:after {
   display: none;
@@ -123,8 +179,16 @@ body:not(.in-game) #world-scrim {
   inset: -1px;
   border-radius: inherit;
   pointer-events: none;
-  background: radial-gradient(120% 80% at 50% -10%, rgba(167, 139, 250, 0.28), transparent 55%);
+  background:
+    linear-gradient(115deg, transparent 0%, rgba(204, 251, 241, 0.14) 38%, transparent 58%),
+    radial-gradient(120% 80% at 50% -12%, rgba(110, 231, 183, 0.22), transparent 56%);
+  background-size: 220% 100%, 100% 100%;
+  animation: cardShimmer 9s linear infinite;
   z-index: 0;
+}
+@keyframes cardShimmer {
+  0% { background-position: 120% 0, 0 0; }
+  100% { background-position: -80% 0, 0 0; }
 }
 .glass-card > * {
   position: relative;
@@ -134,47 +198,48 @@ body:not(.in-game) #world-scrim {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0 0 22px;
+  margin: 0 0 26px;
   text-align: center;
   overflow: visible;
 }
 .glass-card .brand h1 {
-  margin: 10px 0 0;
-  font-size: 1.7rem;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 0 24px rgba(167, 139, 250, 0.55);
+  margin: 12px 0 0;
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-transform: none;
+  color: #f4fffb;
+  text-shadow: 0 0 28px rgba(110, 231, 183, 0.45);
 }
 .glass-card .gem {
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: radial-gradient(circle at 32% 28%, #f3e8ff, #a78bfa 42%, #6d28d9 70%, #2e1065);
-  box-shadow: 0 0 18px rgba(167, 139, 250, 0.85), 0 0 2px #fff inset;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(204, 251, 241, 0.75);
+  background: radial-gradient(circle at 32% 28%, #ecfdf5, #6ee7b7 42%, #0f766e 72%, #042f2e);
+  box-shadow: 0 0 18px rgba(110, 231, 183, 0.85), 0 0 2px #fff inset;
   animation: gemPulse 3.2s ease-in-out infinite;
 }
 @keyframes gemPulse {
-  0%, 100% { box-shadow: 0 0 14px rgba(167, 139, 250, 0.55), 0 0 2px #fff inset; }
-  50% { box-shadow: 0 0 26px rgba(56, 189, 248, 0.7), 0 0 2px #fff inset; }
+  0%, 100% { box-shadow: 0 0 14px rgba(16, 185, 129, 0.55), 0 0 2px #fff inset; }
+  50% { box-shadow: 0 0 26px rgba(45, 212, 191, 0.75), 0 0 2px #fff inset; }
 }
 .glass-card .muted {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: var(--glass-muted);
   font-size: 0.92rem;
   font-weight: 500;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   text-align: center;
 }
 .glass-card .account-form,
 .glass-card .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 .glass-card .account-form {
-  gap: 14px;
+  gap: 16px;
 }
 .glass-card .field {
   margin: 0;
@@ -184,103 +249,113 @@ body:not(.in-game) #world-scrim {
 .glass-card .field-label {
   display: block;
   margin: 0;
-  color: #ddd6fe;
+  color: #9bb8aa;
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .glass-card input {
   width: 100%;
   margin: 0;
-  padding: 12px 14px;
-  color: #fff;
+  padding: 13px 14px;
+  color: #f4fffb;
   font: 500 15px/1.3 Outfit, "Segoe UI", system-ui, sans-serif;
-  background: rgba(8, 6, 20, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
+  background: rgba(3, 14, 12, 0.5);
+  border: 1px solid rgba(167, 243, 208, 0.14);
+  border-radius: 14px;
   outline: none;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
 }
 .glass-card input:hover {
-  border-color: rgba(255, 255, 255, 0.22);
+  border-color: rgba(167, 243, 208, 0.28);
 }
 .glass-card input:focus {
-  border-color: rgba(167, 139, 250, 0.7);
-  background: rgba(16, 10, 36, 0.55);
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: rgba(110, 231, 183, 0.7);
+  background: rgba(4, 22, 18, 0.62);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .glass-card .account-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 4px;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 6px;
 }
 .glass-card button {
   margin: 0;
-  padding: 11px 14px;
+  padding: 12px 16px;
+  min-height: 44px;
   border: 1px solid transparent;
   border-image: none;
-  border-radius: 12px;
-  color: #fff;
-  font: 600 0.92rem/1 Outfit, "Segoe UI", system-ui, sans-serif;
-  letter-spacing: 0.04em;
+  border-radius: 999px;
+  color: #042018;
+  font: 650 0.92rem/1 Outfit, "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  background: linear-gradient(135deg, #8b5cf6, #6366f1 55%, #38bdf8);
-  box-shadow: 0 8px 22px rgba(99, 102, 241, 0.35);
-  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+  background: #86efac;
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.28);
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
 }
 .glass-card button:hover {
-  filter: brightness(1.08);
+  filter: brightness(1.05);
   transform: translateY(-1px);
 }
 .glass-card button:active {
   transform: translateY(0);
   filter: brightness(0.96);
 }
+.glass-card button.btn-primary,
+.glass-card button.btn-full {
+  color: #042018;
+  background: #86efac;
+  border-color: transparent;
+  box-shadow: 0 10px 24px rgba(16, 185, 129, 0.28);
+}
 .glass-card button.ghost {
-  color: #e9e4ff;
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.16);
+  color: #e8faf3;
+  background: rgba(4, 16, 14, 0.42);
+  border-color: rgba(226, 252, 240, 0.22);
   box-shadow: none;
 }
 .glass-card button.ghost:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(6, 24, 20, 0.58);
+  border-color: rgba(167, 243, 208, 0.38);
+  filter: none;
 }
 .glass-card .btn-full {
   width: 100%;
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .glass-card .msg {
   min-height: 1.15em;
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   text-align: center;
   color: #fbbf24;
   font-size: 0.86rem;
   font-weight: 500;
 }
 .glass-card .hint {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   text-align: center;
-  color: #9b93c2;
+  color: #7f9a8e;
   font-size: 0.78rem;
 }
 .glass-card .hint a {
-  color: #c4b5fd;
+  color: #6ee7b7;
   text-decoration: none;
   font-weight: 600;
 }
 .glass-card .hint a:hover {
-  color: #fff;
+  color: #f4fffb;
   text-decoration: underline;
 }
 .glass-card .hint code {
   padding: 1px 6px;
   border-radius: 6px;
-  color: #f5f3ff;
-  background: rgba(255, 255, 255, 0.08);
+  color: #ecfdf5;
+  background: rgba(6, 28, 22, 0.55);
   font-size: 0.78em;
 }
 .glass-card h2,
@@ -290,11 +365,11 @@ body:not(.in-game) #world-scrim {
   font-weight: 650;
   letter-spacing: 0.04em;
 }
-.glass-card h2 { font-size: 0.95rem; color: #ede9fe; }
-.glass-card h3 { margin-top: 4px; font-size: 0.8rem; color: #ddd6fe; text-transform: uppercase; letter-spacing: 0.12em; }
+.glass-card h2 { font-size: 0.95rem; color: #e8faf3; }
+.glass-card h3 { margin-top: 4px; font-size: 0.8rem; color: #9bb8aa; text-transform: uppercase; letter-spacing: 0.12em; }
 .glass-card hr {
   border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(167, 243, 208, 0.12);
   margin: 16px 0;
 }
 .glass-card #char-list {
@@ -303,8 +378,9 @@ body:not(.in-game) #world-scrim {
 .glass-card #char-list li { margin: 0 0 8px; }
 .glass-card #char-list button {
   width: 100%;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e8faf3;
+  background: rgba(4, 16, 14, 0.42);
+  border: 1px solid rgba(226, 252, 240, 0.18);
   box-shadow: none;
 }
 .glass-card .starters {
@@ -313,27 +389,28 @@ body:not(.in-game) #world-scrim {
 .glass-card .starter {
   flex: 1;
   padding: 8px 6px 6px;
-  background: rgba(8, 6, 20, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(3, 14, 12, 0.45);
+  border: 1px solid rgba(167, 243, 208, 0.14);
   border-image: none;
-  border-radius: 12px;
-  color: #e9e4ff;
+  border-radius: 14px;
+  color: #cde7dc;
   font-size: 0.72rem;
 }
 .glass-card .starter.selected {
   border-image: none;
-  border-color: rgba(167, 139, 250, 0.85);
-  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
-  background: rgba(88, 50, 180, 0.28);
+  border-color: rgba(110, 231, 183, 0.85);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+  background: rgba(6, 78, 59, 0.38);
 }
 .glass-card .starter img { width: 56px; height: 56px; }
 
 @media (max-width: 520px) {
   .glass-card {
-    width: min(100% - 20px, 380px);
-    padding: 22px 18px 18px;
-    border-radius: 18px;
+    width: min(100% - 20px, 392px);
+    padding: 24px 18px 18px;
+    border-radius: 20px;
   }
+  .glass-card .brand h1 { font-size: 1.6rem; }
   .glass-card .account-actions {
     grid-template-columns: 1fr;
   }
