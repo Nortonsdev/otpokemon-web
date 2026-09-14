@@ -188,7 +188,10 @@ export class World {
       dir: DIR.S,
       hp: PLAYER_HP,
       hpMax: PLAYER_HP,
-      bag: [{ item: "pokeball", count: 20 }],
+      bag: [
+        { item: "pokeball", count: 20 },
+        { item: "premierball", count: 5 },
+      ],
       party: [this.makeMon(specKey, 5)],
       out: null,
       target: null,
@@ -255,7 +258,10 @@ export class World {
         dir: DIR.S,
         hp: PLAYER_HP,
         hpMax: PLAYER_HP,
-        bag: [{ item: "pokeball", count: 20 }],
+        bag: [
+        { item: "pokeball", count: 20 },
+        { item: "premierball", count: 5 },
+      ],
         party: [],
         out: 0,
         target: null,
@@ -967,7 +973,10 @@ export class World {
   catchBall(player, ballItem = "pokeball") {
     const ball = BALL[ballItem] || BALL.pokeball;
     const balls = player.bag.find((i) => i.item === ball.item);
-    if (!balls || balls.count <= 0) return this.sys(player, "Você não tem Pokébolas.");
+    if (!balls || balls.count <= 0) {
+      const label = ball.item === "premierball" ? "Premier Balls" : "Pokébolas";
+      return this.sys(player, `Você não tem ${label}.`);
+    }
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
     if (!target || !target.wild) return this.sys(player, "Você não tem um alvo.");
     if (!target.dead) return this.sys(player, "O Pokémon ainda está vivo.");
@@ -976,8 +985,9 @@ export class World {
     const spec = SPECIES[target.species];
     const rate = spec.catchRate * ball.rate;
     const roll = randomInt(1, 101);
-    this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id });
-    if (roll <= rate) {
+    const ok = ball.guaranteed === true || roll <= rate;
+    this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id, ball: ball.item, ok });
+    if (ok) {
       const mon = this.makeMon(target.species, target.level || 2);
       let placed = false;
       for (let i = 0; i < PARTY_CAP; i++) {

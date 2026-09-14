@@ -1,8 +1,10 @@
 import WebSocket from "ws";
-import { getMaxHealth } from "../server/species.js";
+import { BALL, getMaxHealth } from "../server/species.js";
 import { hpColorRgb, hpPercent } from "../client/src/hpColor.js";
 import { playerProgressFields, staminaClock } from "../server/otpProgress.js";
 
+if (!BALL.premierball?.guaranteed) throw new Error("Premier Ball must have guaranteed catch");
+if (BALL.premierball.clientId !== 3030) throw new Error("Premier Ball client id must be 3030");
 if (getMaxHealth({ hp: 39 }, 5) !== 18) throw new Error("Charmander lv5 max HP");
 if (getMaxHealth({ hp: 45 }, 2) !== 13) throw new Error("Caterpie lv2 max HP");
 
