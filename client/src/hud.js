@@ -153,6 +153,7 @@ export class Hud {
     this.renderItemWindows();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
+    this.renderAttackBar(out);
   }
 
   log(text, ch = "sistema") {
@@ -265,7 +266,9 @@ export class Hud {
     if (msg.t === "fx") {
       if (this.outCreatureId != null && msg.from === this.outCreatureId) {
         this.moveCdUntil = Date.now() + 1000;
-        this.renderHotbar(this.party.out != null ? this.party.slots[this.party.out] : null);
+        const outMon = this.party.out != null ? this.party.slots[this.party.out] : null;
+        this.renderHotbar(outMon);
+        this.renderAttackBar(outMon);
       }
       const c = this.creatures.get(msg.to);
       if (c && msg.hp != null) {
@@ -422,7 +425,18 @@ export class Hud {
     this.syncInvShortcutState();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
+    this.renderAttackBar(out);
     this.renderOrders();
+  }
+
+  tryUseMove(n) {
+    if (!n || n < 1 || n > 5) return;
+    const outIdx = this.party.out;
+    if (outIdx == null) return;
+    const out = this.party.slots?.[outIdx];
+    if (!out || n > moveCount(out.species)) return;
+    if (Date.now() < this.moveCdUntil) return;
+    this.net.send({ t: "move", n });
   }
 
   renderOrders() {
@@ -780,6 +794,47 @@ export class Hud {
       grid.appendChild(cell);
     }
     this.renderCatchSwapBar();
+  }
+
+  renderAttackBar(out) {
+    const bar = document.getElementById("attack-bar");
+    if (!bar) return;
+    const hasOut = out != null && this.party.out != null;
+    bar.classList.toggle("hidden", !hasOut);
+    bar.setAttribute("aria-hidden", hasOut ? "false" : "true");
+    bar.innerHTML = "";
+    if (!hasOut) return;
+
+    const known = moveCount(out.species);
+    const now = Date.now();
+    const cdLeft = Math.max(0, this.moveCdUntil - now);
+    const cdPct = cdLeft > 0 ? cdLeft / 1000 : 0;
+
+    for (let n = 1; n <= 5; n++) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      const on = n <= known;
+      btn.className = "attack-slot" + (on ? " on" : " off");
+      btn.title = on ? `Ataque ${n}` : "Sem ataque";
+      const moveIcon = `/assets/hud/moves/${n}_${on ? "on" : "off"}.png`;
+      btn.innerHTML = `<img src="${moveIcon}" alt="" /><span class="attack-key">${n}</span>`;
+      if (on && cdPct > 0) {
+        btn.innerHTML += `<span class="attack-cd" style="--cd:${cdPct}"></span>`;
+      }
+      if (on) {
+        btn.onclick = () => this.tryUseMove(n);
+      }
+      bar.appendChild(btn);
+    }
+
+    if (cdPct > 0 && !this._attackCdTimer) {
+      this._attackCdTimer = window.setTimeout(() => {
+        this._attackCdTimer = null;
+        const cur =
+          this.party.out != null ? this.party.slots[this.party.out] : null;
+        if (cur) this.renderAttackBar(cur);
+      }, cdLeft + 20);
+    }
   }
 
   renderHotbar(out) {

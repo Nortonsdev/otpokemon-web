@@ -1233,11 +1233,6 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(k.THREE)) return 3;
     if (Phaser.Input.Keyboard.JustDown(k.FOUR)) return 4;
     if (Phaser.Input.Keyboard.JustDown(k.FIVE)) return 5;
-    if (Phaser.Input.Keyboard.JustDown(k.SIX)) return 6;
-    if (Phaser.Input.Keyboard.JustDown(k.SEVEN)) return 7;
-    if (Phaser.Input.Keyboard.JustDown(k.EIGHT)) return 8;
-    if (Phaser.Input.Keyboard.JustDown(k.NINE)) return 9;
-    if (Phaser.Input.Keyboard.JustDown(k.ZERO)) return 10;
     return null;
   }
 
@@ -1263,10 +1258,7 @@ export class GameScene extends Phaser.Scene {
       document.getElementById("chat-input")?.blur();
     }
     const move = this.moveKey();
-    if (move != null && Date.now() >= (this.hud?.moveCdUntil || 0)) this.net.send({ t: "move", n: move });
-    if (this.keys.TAB && Phaser.Input.Keyboard.JustDown(this.keys.TAB)) {
-      if (Date.now() >= (this.hud?.moveCdUntil || 0)) this.net.send({ t: "move", n: 1 });
-    }
+    if (move != null) this.hud?.tryUseMove(move);
     this.tickAutoCombat();
   }
 
