@@ -2,17 +2,19 @@ import http from "node:http";
 import { WebSocketServer } from "ws";
 import { World } from "./game.js";
 import { STEP_MS } from "./species.js";
+import { handleMapHttp } from "./mapHttp.ts";
 
 const PORT = Number(process.env.PORT || 3001);
 const world = new World();
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const path = (req.url || "/").split("?")[0];
   if (path === "/health" || path === "/ws" || path === "/api/ws") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
     return;
   }
+  if (await handleMapHttp(req, res, path)) return;
   res.writeHead(404);
   res.end();
 });

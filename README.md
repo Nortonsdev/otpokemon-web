@@ -26,7 +26,17 @@ The account screens sit on the live top-down map, Huntera-style (`#111` chrome, 
 5. With a Pokémon out, **M1–M10** (keys **1–0**, HUD clicks, or `m1` in chat) are that Pokémon’s moves. No out → moves do not fire. No target → `Você não tem um alvo.`
 6. Close the tab and log in again: same tile, same party, same Pokémon out.
 
-Layers: ground, item (flowers / gold), creature, wall, roof (roof dims when you walk under). No map/item/sprite editor on the play screen.
+Layers: ground, item (flowers / gold), creature, wall, roof (roof dims when you walk under). O editor de mapas fica em **`/editor.html`** (tela de login tem o link).
+
+## Editor de mapas (OTBM + spr/dat clássicos)
+
+Fluxo estilo [YATME](https://github.com/knobik/yatme) / RME, com **Tibia.spr + Tibia.dat** do capt (não protobuf 15):
+
+1. **RME desktop** — mesmos `spr/dat`, edite `.otbm`, copie para `server/data/world.otbm` ou use o editor web.
+2. **Editor web** — [http://localhost:5173/editor.html](http://localhost:5173/editor.html): carregue DAT/SPR (upload local), pinte, salve OTBM, **Aplicar no jogo** (`POST /api/map`).
+3. **Jogo** — ao entrar no mundo, o servidor envia o mapa ativo (ground/walls + item IDs).
+
+Detalhes: [docs/EDITOR.md](docs/EDITOR.md).
 
 ## Protocol
 

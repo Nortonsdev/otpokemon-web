@@ -5,11 +5,18 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/editor", "destination": "/editor.html" },
     { "source": "/ws", "destination": "/api/ws" },
-    { "source": "/health", "destination": "/api/ws" }
+    { "source": "/health", "destination": "/api/ws" },
+    { "source": "/api/map", "destination": "/api/map" },
+    { "source": "/api/map/json", "destination": "/api/map" },
+    { "source": "/api/map/reload", "destination": "/api/map" }
   ],
   "functions": {
     "api/ws.js": {
+      "includeFiles": "server/**"
+    },
+    "api/map.js": {
       "includeFiles": "server/**"
     }
   }

@@ -16,10 +16,19 @@ export default defineConfig({
         target: "ws://127.0.0.1:3001",
         ws: true,
       },
+      "/api/map": {
+        target: "http://127.0.0.1:3001",
+      },
     },
   },
   build: {
     outDir: "../dist",
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(rootDir, "client/index.html"),
+        editor: path.resolve(rootDir, "client/editor.html"),
+      },
+    },
   },
 });

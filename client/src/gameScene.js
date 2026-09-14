@@ -1,5 +1,7 @@
 import Phaser from "phaser";
-import { MAP, SPAWN } from "../../server/map.js";
+import { buildLegacyMap, SPAWN } from "../../shared/mapLegacy.ts";
+
+const PREVIEW_MAP = buildLegacyMap();
 import { LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
 
@@ -331,13 +333,13 @@ export class GameScene extends Phaser.Scene {
     if (this.input?.keyboard) this.input.keyboard.enabled = false;
     this.clearWorld();
     this.mapData = {
-      w: MAP.w,
-      h: MAP.h,
-      z: MAP.z,
-      ground: MAP.ground,
-      walls: MAP.walls,
-      roofs: MAP.roofs,
-      items: MAP.items,
+      w: PREVIEW_MAP.w,
+      h: PREVIEW_MAP.h,
+      z: PREVIEW_MAP.z,
+      ground: PREVIEW_MAP.ground,
+      walls: PREVIEW_MAP.walls,
+      roofs: PREVIEW_MAP.roofs,
+      items: PREVIEW_MAP.items,
     };
     this.drawMap();
     this.cameras.main.stopFollow();

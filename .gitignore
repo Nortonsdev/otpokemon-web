@@ -1,6 +1,12 @@
 node_modules/
 dist/
 server/data/
+server/maps/*.otbm
+*.spr
+*.dat
+Tibia.spr
+Tibia.dat
+items.otb
 .vercel
 *.log
 .DS_Store

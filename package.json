@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "concurrently -k -n server,client -c blue,green \"npm:start:server\" \"npm:start:client\"",
-    "start:server": "node server/index.js",
+    "start:server": "node --import tsx server/index.js",
     "start:client": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build",
     "test:smoke": "node tools/smoketest.mjs"
@@ -20,6 +20,8 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
     "vite": "^6.0.7"
   }
 }

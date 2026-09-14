@@ -13,7 +13,7 @@ import {
   applyRubyHealth,
   behind,
 } from "./species.js";
-import { MAP, SPAWN, WILD_GROUPS, hasRoof, inBounds, tileName, walkable } from "./map.js";
+import { MAP, SPAWN, WILD_GROUPS, currentSpawn, hasRoof, inBounds, tileName, walkable } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 
@@ -307,8 +307,9 @@ export class World {
       outId: null,
     };
     if (!walkable(player.x, player.y)) {
-      player.x = SPAWN.x;
-      player.y = SPAWN.y;
+      const spawn = currentSpawn();
+      player.x = spawn.x;
+      player.y = spawn.y;
     }
     this.creatures.set(player.id, player);
     this.occupy(player);
@@ -329,6 +330,8 @@ export class World {
         walls: MAP.walls,
         roofs: MAP.roofs,
         items: MAP.items,
+        cells: MAP.cells,
+        spawn: currentSpawn(),
       },
       you: this.publicCreature(player),
       creatures: [...this.creatures.values()].map((c) => this.publicCreature(c)),
@@ -1074,19 +1077,25 @@ export class World {
     return null;
   }
 
+  wildSpots(group) {
+    if (group.spots === "wild") return MAP.wildSpawns;
+    return group.spots || MAP.wildSpawns;
+  }
+
   ensureWild() {
     for (const group of WILD_GROUPS) {
       const living = [...this.creatures.values()].filter(
         (c) => c.wild && !c.dead && c.species === group.species
       ).length;
-      for (let i = living; i < group.want; i++) this.spawnWild(group.species, group.spots);
+      for (let i = living; i < group.want; i++) this.spawnWild(group.species, this.wildSpots(group));
     }
   }
 
   spawnWild(species = "caterpie", spots = MAP.wildSpawns) {
     const spec = SPECIES[species];
     if (!spec) return;
-    const free = (spots || MAP.wildSpawns).filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y));
+    const list = spots || MAP.wildSpawns;
+    const free = list.filter((s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y));
     if (!free.length) return;
     const spot = free[randomInt(0, free.length)];
     const catHp = this.makeMon("caterpie", 2);
