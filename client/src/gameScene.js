@@ -38,8 +38,9 @@ function creatureSize(tex) {
 }
 
 /** Target on-screen size after camera zoom compensation (see applyNameplateScreenScale). */
-const NAMEPLATE_SCREEN_PX = 12;
-const NAMEPLATE_SCREEN_STROKE = 4;
+const NAMEPLATE_SCREEN_PX = 8;
+const NAMEPLATE_SCREEN_STROKE = 2.5;
+const NAMEPLATE_SCREEN_PX_MAX = 9;
 const BAR_W = 22;
 const BAR_H = 3;
 const BAR_PAD = 1;
@@ -57,7 +58,7 @@ function nameplateTextStyle(kind) {
     stroke: "#000000",
     strokeThickness: NAMEPLATE_SCREEN_STROKE,
     resolution: Math.max(3, Math.ceil(typeof window !== "undefined" ? window.devicePixelRatio || 2 : 2)),
-    padding: { x: 3, y: 2 },
+    padding: { x: 2, y: 1 },
   };
 }
 
@@ -516,7 +517,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setDisplaySize(size, size);
       sprite.setTint(texTint(want));
     }
-    const plateY = want === "human" || size === 64 ? pos.y + 4 : pos.y - 2;
+    const plateY = size > TILE ? pos.y + 6 : pos.y + 1;
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
       .setOrigin(0.5, 1);
@@ -581,13 +582,14 @@ export class GameScene extends Phaser.Scene {
     return z > 0 ? 1 / z : 1;
   }
 
-  /** Keeps name text ~NAMEPLATE_SCREEN_PX on screen with a thick visible stroke at any zoom. */
+  /** Keeps name text ~NAMEPLATE_SCREEN_PX on screen with a readable stroke at any zoom. */
   applyNameplateScreenScale(plate, ui) {
     const u = Math.max(0.25, ui);
-    const worldPx = Math.max(11, Math.round(NAMEPLATE_SCREEN_PX / u));
-    plate.setFontSize(worldPx);
+    let worldPx = NAMEPLATE_SCREEN_PX / u;
+    if (worldPx * u > NAMEPLATE_SCREEN_PX_MAX) worldPx = NAMEPLATE_SCREEN_PX_MAX / u;
+    plate.setFontSize(Math.max(6, Math.round(worldPx)));
     plate.setScale(u);
-    const thickness = Math.max(4, Math.ceil(NAMEPLATE_SCREEN_STROKE / u));
+    const thickness = Math.max(2, NAMEPLATE_SCREEN_STROKE / u);
     plate.setStroke("#000000", thickness);
     plate.setResolution(Math.max(3, Math.ceil((typeof window !== "undefined" ? window.devicePixelRatio : 2) || 2)));
   }
@@ -601,12 +603,12 @@ export class GameScene extends Phaser.Scene {
     const ui = this.uiScale();
     this.applyNameplateScreenScale(plate, ui);
     const cx = spriteX + size / 2;
-    const nameBottom = size > TILE ? spriteY + 4 : spriteY - 2;
+    const nameBottom = size > TILE ? spriteY + 6 : spriteY + 1;
     plate.setPosition(Math.round(cx), Math.round(nameBottom));
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const nameGap = Math.max(2, Math.round(2 * ui));
+    const nameGap = 1;
     const barTop = nameBottom + nameGap;
     const innerTop = barTop + BAR_PAD * ui;
     const outW = BAR_W + BAR_PAD * 2;
