@@ -112,20 +112,11 @@ export const STARTERS = ["bulbasaur", "charmander", "squirtle"];
 export const CATCH_BALL_ITEMS = ["premierball", "ultraball", "masterball"];
 
 export const BALL = {
-  premierball: { item: "premierball", rate: 1, guaranteed: true, clientId: 3030, catchKey: "premier" },
-  ultraball: { item: "ultraball", rate: 1, guaranteed: true, catchKey: "ultra" },
-  masterball: { item: "masterball", rate: 1, guaranteed: true, catchKey: "master" },
+  pokeball: { item: "pokeball", rate: 1 },
+  premierball: { item: "premierball", rate: 1, guaranteed: true, clientId: 3030 },
+  ultraball: { item: "ultraball", rate: 1, guaranteed: true },
+  masterball: { item: "masterball", rate: 1, guaranteed: true },
 };
-
-export function ballCatchKey(itemOrKey) {
-  const s = String(itemOrKey || "");
-  if (s === "premier" || s === "ultra" || s === "master") return s;
-  return BALL[s]?.catchKey || "premier";
-}
-
-export function isCatchBallItem(item) {
-  return CATCH_BALL_ITEMS.includes(String(item || ""));
-}
 
 export const POTIONS = {
   small_potion: { heal: 35 },
