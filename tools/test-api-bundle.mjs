@@ -3,7 +3,7 @@
  */
 process.env.VERCEL = "1";
 
-const { server } = await import("../api/server.bundle.js");
+const { server } = await import("../api/_lib/server.bundle.js");
 
 function request(method, url, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -56,6 +56,11 @@ if (viaRewrite.status !== 200 || viaRewrite.body.length !== map.body.length) {
 const slash = await request("GET", "/api/map/");
 if (slash.status !== 200 || slash.body.length !== map.body.length) {
   throw new Error(`trailing slash map ${slash.status} len ${slash.body.length}`);
+}
+
+const viaHeader = await request("GET", "/api/ws", { "x-forwarded-uri": "/api/map" });
+if (viaHeader.status !== 200 || viaHeader.body.length !== map.body.length) {
+  throw new Error(`header map ${viaHeader.status} len ${viaHeader.body.length}`);
 }
 
 console.log("API BUNDLE OK", { mapBytes: map.body.length, w: map.headers["x-map-width"] });

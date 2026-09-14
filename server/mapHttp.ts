@@ -113,12 +113,16 @@ export function resolveMapPath(req: IncomingMessage, pathname: string): string {
   const candidates = [
     pathname,
     String(headers["x-invoke-path"] || ""),
+    String(headers["x-matched-path"] || ""),
     String(headers["x-forwarded-uri"] || ""),
     String(headers["x-vercel-original-path"] || ""),
+    String(headers["x-original-uri"] || ""),
+    String(headers["x-rewrite-url"] || ""),
+    String(req.url || ""),
   ];
   for (const raw of candidates) {
-    const path = raw.split("?")[0].replace(/\/+$/, "") || "/";
-    if (path === "/api/map" || path.startsWith("/api/map/")) return path;
+    const path = String(raw).split("?")[0].replace(/\/+$/, "") || "/";
+    if (path === "/api/map" || path.startsWith("/api/map/")) return path.startsWith("/api/map/") ? path : "/api/map";
   }
   try {
     const url = new URL(req.url || "/", "http://otpokemon.local");
@@ -129,8 +133,12 @@ export function resolveMapPath(req: IncomingMessage, pathname: string): string {
   } catch {
     /* ignore */
   }
+  const invokeQuery = String(headers["x-invoke-query"] || "");
+  if (invokeQuery.includes("otpMap=json")) return "/api/map/json";
+  if (invokeQuery.includes("otpMap=reload")) return "/api/map/reload";
+  if (invokeQuery.includes("otpMap=")) return "/api/map";
   const method = req.method || "GET";
-  const ct = String(req.headers["content-type"] || "");
+  const ct = String(headers["content-type"] || "");
   if (method === "POST" && ct.includes("octet-stream") && pathname.startsWith("/api/")) {
     return "/api/map";
   }

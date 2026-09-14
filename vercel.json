@@ -4,6 +4,7 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "trailingSlash": false,
   "rewrites": [
     { "source": "/editor", "destination": "/editor.html" },
     { "source": "/ws", "destination": "/api/ws" },
@@ -15,7 +16,7 @@
   ],
   "functions": {
     "api/ws.js": {
-      "includeFiles": "api/server.bundle.js",
+      "includeFiles": "api/_lib/server.bundle.js",
       "maxDuration": 300
     }
   }

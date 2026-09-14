@@ -7,7 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 await esbuild.build({
   absWorkingDir: root,
   entryPoints: [path.join(root, "server/index.js")],
-  outfile: path.join(root, "api/server.bundle.js"),
+  outfile: path.join(root, "api/_lib/server.bundle.js"),
   bundle: true,
   platform: "node",
   format: "esm",
@@ -20,4 +20,4 @@ await esbuild.build({
   },
 });
 
-console.log("api/server.bundle.js ready");
+console.log("api/_lib/server.bundle.js ready");

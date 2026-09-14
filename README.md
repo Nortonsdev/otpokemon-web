@@ -83,7 +83,7 @@ This is a Vite static client plus a Node WebSocket world on Vercel Fluid Compute
 npx vercel --prod
 ```
 
-Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` rewrites `/ws` and `/api/map` onto **`api/ws.js`** (one Fluid Function, so apply-map and the Phaser world share the same `world.otbm`). That function imports `api/server.bundle.js` — a committed esbuild of `server/` + `shared/` with **no TypeScript at runtime** (the live 500s were Node trying to `import "./mapHttp.ts"`). `npm run build` regenerates the bundle.
+Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` rewrites `/ws`, `/health`, and `/api/map` onto **`api/ws.js`** (one Fluid Function, so apply-map and the Phaser world share the same `world.otbm`). That function imports **`api/_lib/server.bundle.js`** — a committed esbuild of `server/` + `shared/` with **no TypeScript at runtime**. `npm run build` regenerates the bundle. Do not put the bundle at `api/server.bundle.js`: Vercel would treat it as its own function route (that URL used to 404). See **[docs/VERCEL_API.md](docs/VERCEL_API.md)**.
 
 Limits of this host: the world is in-memory on one Function instance. Connections drop at the plan `maxDuration` (Hobby default 300s; anonymous/temp deploys cap at 60s) and the client reconnects. A reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
 
@@ -98,4 +98,4 @@ Default account after a cold start: **demo** / **demo**.
 - `client/src/editor/` canvas renderer, palette, YATME-style UI
 - `client/` Vite + Phaser 3 (ground, item, creature, wall, roof layers; top-down sqm camera)
 - `client/public/assets/` committed PNG sheets, Huntera frames, and HUD
-- `api/ws.js` Vercel Function (bundled JS) that serves WebSocket **and** `/api/map`
+- `api/ws.js` Vercel Function that serves WebSocket **and** `/api/map` (bundle: `api/_lib/server.bundle.js`)

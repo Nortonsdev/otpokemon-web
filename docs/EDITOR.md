@@ -62,7 +62,7 @@ O jogo é **um andar jogável**: o templo da primeira cidade (ou o Z com mais ti
 | Renderer | `client/src/editor/renderer.ts` |
 | Paleta | `client/src/editor/palette.ts`, `previews.ts` |
 | App | `client/src/editor/main.ts` |
-| API | `server/mapHttp.ts`, `server/mapLoader.ts` (Vercel: rewrite `/api/map` → `/api/ws`) |
+| API | `server/mapHttp.ts`, `server/mapLoader.ts` (Vercel: rewrite `/api/map` → `/api/ws`; bundle in `api/_lib/server.bundle.js`) |
 
 ## Arquivos grandes
 

@@ -20,7 +20,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (await handleMapHttp(req, res, mapPath)) return;
-  if (path === "/health" || path === "/ws" || path === "/api/ws") {
+  if (path === "/health" || path === "/ws" || path === "/api/ws" || path === "/api/health") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
     return;
