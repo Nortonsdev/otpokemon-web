@@ -47,7 +47,7 @@ const DEFAULTS = {
   bag: {
     x: 0,
     y: 0,
-    open: false,
+    open: true,
     locked: false,
     min: false,
     expanded: false,
@@ -67,7 +67,7 @@ const DEFAULTS = {
   pokebag: {
     x: 0,
     y: 0,
-    open: false,
+    open: true,
     locked: false,
     min: false,
     expanded: false,

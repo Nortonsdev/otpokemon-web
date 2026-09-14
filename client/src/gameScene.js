@@ -10,7 +10,8 @@ import {
 const PREVIEW_MAP = buildLegacyMap();
 import { LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
-import { playCatchAudio } from "./catchSfx.js";
+import { playCatchSequence } from "./catchVfx.js";
+import { CATCH_BALL_ITEMS } from "./ballIcons.js";
 
 const TILE = 32;
 /** OTP2072026 looktypes that use 2×2 (64×64) sheets in objectbuilder/Tibia.dat */
@@ -130,6 +131,22 @@ export class GameScene extends Phaser.Scene {
     this.targetGizmo = null;
     this.targetPulse = null;
     this.glow = null;
+    this.outMark = null;
+    this.nextAutoAtk = 0;
+    this.catchBusy = false;
+  }
+
+  ballTextureKey(item) {
+    const key = `ball-${item || "premierball"}`;
+    if (this.textures.exists(key)) return key;
+    return this.textures.exists("ball-premierball") ? "ball-premierball" : "ball-pokeball";
+  }
+
+  outCreatureState() {
+    for (const [, st] of this.state) {
+      if (st.masterId === this.youId && !st.dead) return st;
+    }
+    return null;
   }
 
   preload() {
@@ -157,6 +174,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image("attacked", "/assets/fx/attacked.png");
     this.load.image("ball-pokeball", "/assets/items/pokeball.png");
     this.load.image("ball-premierball", "/assets/items/premierball.png");
+    this.load.image("ball-ultraball", "/assets/items/pokeball.png");
+    this.load.image("ball-masterball", "/assets/items/pokeball.png");
     this.load.audio("catching", "/assets/sfx/catching.ogg");
     this.load.audio("catch_fail", "/assets/sfx/catch_fail.ogg");
     this.load.audio("catch_sucess", "/assets/sfx/catch_sucess.ogg");
@@ -180,7 +199,7 @@ export class GameScene extends Phaser.Scene {
     this.ensurePlaceholder();
     this.ensureAttackedTexture();
     this.keys = this.input.keyboard.addKeys(
-      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,C,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,C,TAB,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
     this.input.keyboard.enabled = false;
     this.input.keyboard.clearCaptures?.();
@@ -210,6 +229,10 @@ export class GameScene extends Phaser.Scene {
     this.actorLayer.add(this.targetGizmo);
     this.actorLayer.add(this.glow);
     this.targetPulse?.stop();
+    this.outMark = this.add.graphics();
+    this.outMark.setVisible(false);
+    this.actorLayer.add(this.outMark);
+
     this.targetPulse = this.tweens.add({
       targets: this.targetMark,
       props: {
@@ -401,6 +424,8 @@ export class GameScene extends Phaser.Scene {
     this.youId = payload.you.id;
     this.drawMap();
     for (const c of payload.creatures || []) this.spawn(c);
+    const out = (payload.creatures || []).find((c) => c.masterId === payload.you.id);
+    if (out) this.hud.outCreatureId = out.id;
     this.cameras.main.stopFollow();
     this.cameras.main.setZoom(2);
     this.cameras.main.setRoundPixels(false);
@@ -762,7 +787,13 @@ export class GameScene extends Phaser.Scene {
 
   handleNet(msg) {
     if (!this.live && msg.t !== "map") return;
-    if (msg.t === "appear") this.spawn(msg.creature);
+    if (msg.t === "appear") {
+      this.spawn(msg.creature);
+      if (msg.creature?.masterId === this.youId) {
+        this.hud.outCreatureId = msg.creature.id;
+        this.flashRelease(msg.creature.id);
+      }
+    }
     if (msg.t === "disappear") this.despawn(msg.id);
     if (msg.t === "turn") {
       const st = this.state.get(msg.id);
@@ -796,89 +827,29 @@ export class GameScene extends Phaser.Scene {
       else this.clearTarget(false);
     }
     if (msg.t === "disappear" && msg.id === this.targetId) this.clearTarget(false);
-    if (msg.t === "catchAttempt") this.playCatch(msg);
-  }
-
-  playCatch(msg) {
-    const fromSt = this.state.get(msg.from);
-    const toSt = this.state.get(msg.to);
-    if (!fromSt || !toSt) return;
-    const ballKey = msg.ball === "premierball" ? "ball-premierball" : "ball-pokeball";
-    const tex = this.textures.exists(ballKey) ? ballKey : "ball-pokeball";
-    const from = this.displayTile(fromSt);
-    const to = this.displayTile(toSt);
-    const sx = from.x * TILE + TILE / 2;
-    const sy = from.y * TILE + TILE / 2;
-    const tx = to.x * TILE + TILE / 2;
-    const ty = to.y * TILE + TILE / 2;
-    const depth = Math.round(to.y) * 10 + 20;
-    const ball = this.add.image(sx, sy, tex).setDepth(depth);
-    ball.setDisplaySize(18, 18);
-    this.addActor(ball);
-    playCatchAudio(this, "throw");
-    const premier = msg.ball === "premierball";
-    this.tweens.add({
-      targets: ball,
-      x: tx,
-      y: ty - 6,
-      duration: 280,
-      ease: "Quad.easeOut",
-      onComplete: () => {
-        const shakes = premier ? 6 : 4;
-        for (let i = 0; i < shakes; i++) {
-          this.time.delayedCall(i * 90, () => {
-            ball.x = tx + (i % 2 ? 3 : -3);
-            ball.angle = i % 2 ? 8 : -8;
-            this.spawnCatchSpark(tx, ty, premier);
-          });
-        }
-        this.time.delayedCall(shakes * 90 + 120, () => {
-          playCatchAudio(this, msg.ok ? "success" : "fail");
-          this.tweens.add({
-            targets: ball,
-            scaleX: 0.2,
-            scaleY: 0.2,
-            alpha: 0,
-            duration: 160,
-            onComplete: () => ball.destroy(),
-          });
-          if (msg.ok) {
-            const corpse = this.sprites.get(msg.to);
-            if (corpse) {
-              this.tweens.add({
-                targets: corpse,
-                alpha: 0,
-                scaleX: 0.6,
-                scaleY: 0.6,
-                duration: 220,
-                onComplete: () => {
-                  corpse.setAlpha(1);
-                  corpse.setScale(1);
-                },
-              });
-            }
-          }
-        });
-      },
-    });
-  }
-
-  spawnCatchSpark(x, y, premier) {
-    const g = this.add.graphics();
-    g.setDepth(Math.round(y / TILE) * 10 + 21);
-    this.addActor(g);
-    const c1 = premier ? 0xffffff : 0xffe8a0;
-    const c2 = premier ? 0xe03030 : 0xff4040;
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI * 2 * i) / 6;
-      const r = 4 + (i % 2);
-      g.fillStyle(i % 2 ? c1 : c2, 0.85);
-      g.fillCircle(x + Math.cos(a) * r, y + Math.sin(a) * r, 2);
+    if (msg.t === "catchAttempt") {
+      this.catchBusy = true;
+      playCatchSequence(this, msg);
+      this.time.delayedCall(3400, () => {
+        this.catchBusy = false;
+      });
     }
+  }
+
+  flashRelease(id) {
+    const s = this.sprites.get(id);
+    if (!s) return;
+    const g = this.add.graphics();
+    g.setDepth(s.depth + 2);
+    this.addActor(g);
+    const cx = s.x + (s.displayWidth || TILE) / 2;
+    const cy = s.y + (s.displayHeight || TILE) / 2;
+    g.fillStyle(0xffffff, 0.75);
+    g.fillCircle(cx, cy, 22);
     this.tweens.add({
       targets: g,
       alpha: 0,
-      duration: 140,
+      duration: 280,
       onComplete: () => g.destroy(),
     });
   }
@@ -939,7 +910,30 @@ export class GameScene extends Phaser.Scene {
       gizmo.lineBetween(x1, y1, x1 - arm, y1);
       gizmo.lineBetween(x1, y1, x1, y1 - arm);
     }
+    this.layoutOutMark();
     this.actorLayer?.queueDepthSort?.();
+  }
+
+  layoutOutMark() {
+    const g = this.outMark;
+    if (!g) return;
+    const out = this.outCreatureState();
+    const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
+    if (!out || !tgt || tgt.dead || !tgt.wild) {
+      g.clear();
+      g.setVisible(false);
+      return;
+    }
+    const d = this.displayTile(out);
+    const cx = d.x * TILE + TILE / 2;
+    const feetY = d.y * TILE + TILE - 2;
+    const depth = Math.round(d.y) * 10 + 7;
+    g.clear();
+    g.setVisible(true);
+    g.setDepth(depth);
+    const pulse = 0.55 + 0.12 * Math.sin((this.now() || 0) / 160);
+    g.lineStyle(2, 0x44ff66, pulse);
+    g.strokeEllipse(cx, feetY - 5, 24, 10);
   }
 
   animateMove(msg) {
@@ -996,23 +990,42 @@ export class GameScene extends Phaser.Scene {
   }
 
   playStrike(fromId, toId) {
+    const a = this.state.get(fromId);
     const b = this.state.get(toId);
-    if (!b) return;
+    if (!a || !b) return;
+    const da = this.displayTile(a);
     const db = this.displayTile(b);
+    const x0 = da.x * TILE + TILE / 2;
+    const y0 = da.y * TILE + TILE / 2;
     const x1 = db.x * TILE + TILE / 2;
-    const y1 = db.y * TILE + 6;
-    const g = this.add.graphics();
-    g.setDepth(Math.round(db.y) * 10 + 14);
-    this.addActor(g);
-    g.fillStyle(0xffe8a0, 0.85);
-    g.fillCircle(x1, y1, 3);
-    g.fillStyle(0xff4040, 0.55);
-    g.fillCircle(x1, y1, 5);
+    const y1 = db.y * TILE + TILE / 2;
+    const dot = this.add.image(x0, y0, "attacked").setDepth(Math.round(db.y) * 10 + 15);
+    dot.setDisplaySize(12, 12);
+    dot.setAlpha(0.85);
+    this.addActor(dot);
     this.tweens.add({
-      targets: g,
-      alpha: 0,
-      duration: 180,
-      onComplete: () => g.destroy(),
+      targets: dot,
+      x: x1,
+      y: y1 - 4,
+      alpha: 0.2,
+      duration: 160,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        dot.destroy();
+        const g = this.add.graphics();
+        g.setDepth(Math.round(db.y) * 10 + 14);
+        this.addActor(g);
+        g.fillStyle(0xffe8a0, 0.85);
+        g.fillCircle(x1, y1, 4);
+        g.fillStyle(0xff4040, 0.55);
+        g.fillCircle(x1, y1, 7);
+        this.tweens.add({
+          targets: g,
+          alpha: 0,
+          duration: 180,
+          onComplete: () => g.destroy(),
+        });
+      },
     });
   }
 
@@ -1100,12 +1113,13 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const item = this.hud?.selectedItem;
-    if (item === "pokeball" || item === "premierball") {
-      if (who && this.isValidTarget(who) && who.wild) {
+    if (item === "pokeball" || CATCH_BALL_ITEMS.includes(item)) {
+      if (this.catchBusy) return;
+      if (who && who.wild && who.dead) {
         this.net.send({ t: "use", item, id: who.id });
-        if (who.dead) this.hud.selectItem(null);
-      } else {
         this.hud.selectItem(null);
+      } else if (who && who.wild && !who.dead) {
+        this.hud.log("Derrote o Pokémon antes de capturar.", "combate");
       }
       return;
     }
@@ -1113,6 +1127,12 @@ export class GameScene extends Phaser.Scene {
       if (who && this.isOwnCreature(who) && who.id !== this.youId) {
         this.net.send({ t: "use", item, id: who.id });
       }
+      return;
+    }
+    if (who && who.wild && !who.dead && this.isValidTarget(who)) {
+      this.setTarget(who.id);
+      this.net.send({ t: "target", id: who.id });
+      this.net.send({ t: "walkTo", x: who.x, y: who.y });
       return;
     }
     if (this.isValidTarget(who)) {
@@ -1189,12 +1209,28 @@ export class GameScene extends Phaser.Scene {
       document.getElementById("chat-input")?.blur();
     }
     const move = this.moveKey();
-    if (move != null) this.net.send({ t: "move", n: move });
-    if (this.keys.C && Phaser.Input.Keyboard.JustDown(this.keys.C)) {
-      if (this.targetId == null) return;
-      const sel = this.hud?.selectedItem;
-      const ball = sel === "premierball" || sel === "pokeball" ? sel : "pokeball";
-      this.net.send({ t: "use", item: ball, id: this.targetId });
+    if (move != null && Date.now() >= (this.hud?.moveCdUntil || 0)) this.net.send({ t: "move", n: move });
+    if (this.keys.TAB && Phaser.Input.Keyboard.JustDown(this.keys.TAB)) {
+      if (Date.now() >= (this.hud?.moveCdUntil || 0)) this.net.send({ t: "move", n: 1 });
     }
+    this.tickAutoCombat();
+  }
+
+  tickAutoCombat() {
+    if (this.hud?.selectedItem || this.catchBusy) return;
+    const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
+    if (!tgt || !tgt.wild || tgt.dead) return;
+    const out = this.outCreatureState();
+    const you = this.state.get(this.youId);
+    if (!out || !you) return;
+    const dist = Math.max(Math.abs(out.x - tgt.x), Math.abs(out.y - tgt.y));
+    if (dist > 1) {
+      this.net.send({ t: "walkTo", x: tgt.x, y: tgt.y });
+      return;
+    }
+    const now = Date.now();
+    if (now < this.nextAutoAtk || now < (this.hud?.moveCdUntil || 0)) return;
+    this.nextAutoAtk = now + 1050;
+    this.net.send({ t: "attack", id: tgt.id });
   }
 }

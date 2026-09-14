@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import {
   ATK_MS,
   BALL,
+  CATCH_BALL_ITEMS,
   DELTA,
   DIR,
   PARTY_CAP,
@@ -33,9 +34,11 @@ import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 
 const CATCH_CAP = ITEM_BOX_SLOTS.catch;
 const BAG_SLOT_CAP = ITEM_BOX_SLOTS.bag;
+const CAPTURE_ANIM_MS = 3200;
+
 const CORPSE_LOOT = [
-  { item: "pokeball", min: 1, max: 3, weight: 5 },
   { item: "premierball", min: 0, max: 1, weight: 2 },
+  { item: "ultraball", min: 0, max: 1, weight: 1 },
   { item: "small_potion", min: 0, max: 2, weight: 3 },
   { item: "great_potion", min: 0, max: 1, weight: 1 },
 ];
@@ -76,6 +79,13 @@ function migrateLootBag(rec) {
   if (!rec.lootBag?.length && rec.bag?.length) rec.lootBag = rec.bag.map((i) => ({ ...i }));
   if (!rec.lootBag) rec.lootBag = [];
   if (!rec.catchBox) rec.catchBox = [];
+  const hasCatch = rec.lootBag.some((i) => i?.count > 0 && CATCH_BALL_ITEMS.includes(i.item));
+  if (!hasCatch) {
+    addStack(rec.lootBag, "premierball", 10);
+    addStack(rec.lootBag, "ultraball", 10);
+    addStack(rec.lootBag, "masterball", 5);
+    addStack(rec.lootBag, "pokeball", 15);
+  }
   return rec;
 }
 
@@ -241,7 +251,12 @@ export class World {
       dir: DIR.S,
       hp: PLAYER_HP,
       hpMax: PLAYER_HP,
-      lootBag: [],
+      lootBag: [
+        { item: "premierball", count: 5 },
+        { item: "ultraball", count: 5 },
+        { item: "masterball", count: 2 },
+        { item: "pokeball", count: 20 },
+      ],
       party: [this.makeMon(specKey, 5)],
       catchBox: [],
       out: null,
@@ -320,8 +335,9 @@ export class World {
     rec.lootBag = [
       { item: "small_potion", count: 87 },
       { item: "great_potion", count: 8 },
-      { item: "premierball", count: 31 },
-      { item: "pokeball", count: 158 },
+      { item: "premierball", count: 42 },
+      { item: "ultraball", count: 42 },
+      { item: "masterball", count: 42 },
     ];
     rec.catchBox = rec.catchBox || [];
     const party = (rec.party || []).filter(Boolean).map((p) => this.ensureMon(p));
@@ -687,6 +703,12 @@ export class World {
   }
 
   zoneCombatMessage(player, target) {
+    if (target?.wild) {
+      if (isProtectionZone(player.x, player.y) && isProtectionZone(target.x, target.y)) {
+        return "Esta é uma área segura.";
+      }
+      return null;
+    }
     if (
       this.playerInSafeZone(player) ||
       isProtectionZone(target.x, target.y) ||
@@ -722,13 +744,13 @@ export class World {
 
   use(player, msg) {
     const item = String(msg?.item || "");
-    if (item === "pokeball" || item === "premierball") {
-      if (msg.id != null) {
-        const id = Number(msg.id);
-        const c = this.creatures.get(id);
-        if (c && c.wild && !this.isForbiddenTarget(player, c)) player.targetId = id;
+    if (item === "pokeball" || CATCH_BALL_ITEMS.includes(item)) {
+      const tid = msg.id != null ? Number(msg.id) : null;
+      if (tid != null) {
+        const c = this.creatures.get(tid);
+        if (c && c.wild && c.dead && !this.isForbiddenTarget(player, c)) player.targetId = tid;
       }
-      return this.catchBall(player, item);
+      return this.catchBall(player, item, tid);
     }
     if (item === "small_potion" || item === "great_potion") {
       return this.usePotion(player, item, msg.id != null ? Number(msg.id) : null);
@@ -794,12 +816,16 @@ export class World {
     }
     player.targetId = id;
     this.sendTarget(player, c);
+    if (!this.outPokemon(player)) {
+      return this.sys(player, "Você precisa ter um Pokémon fora.");
+    }
     const blocked = this.zoneCombatMessage(player, c);
     if (blocked) {
       this.sys(player, blocked);
       return;
     }
-    if (!c.wild || c.dead) return;
+    if (!c.wild) return this.sys(player, "Você não tem um alvo.");
+    if (c.dead) return this.sys(player, "Esse Pokémon já foi derrotado.");
     this.useMove(player, 1);
   }
 
@@ -1008,12 +1034,23 @@ export class World {
   }
 
   summonTile(player) {
+    const trySpot = (x, y) => walkable(x, y) && !this.occupant(x, y) && !isProtectionZone(x, y);
     const b = behind(player.x, player.y, player.dir);
-    if (walkable(b.x, b.y) && !this.occupant(b.x, b.y)) return b;
-    for (const d of DELTA) {
-      const x = player.x + d.x;
-      const y = player.y + d.y;
-      if (walkable(x, y) && !this.occupant(x, y)) return { x, y };
+    if (trySpot(b.x, b.y)) return b;
+    for (let r = 1; r <= 3; r++) {
+      for (const d of DELTA) {
+        const x = player.x + d.x * r;
+        const y = player.y + d.y * r;
+        if (trySpot(x, y)) return { x, y };
+      }
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const x = player.x + dx;
+          const y = player.y + dy;
+          if (trySpot(x, y)) return { x, y };
+        }
+      }
     }
     return null;
   }
@@ -1135,15 +1172,31 @@ export class World {
     this.ensureWild();
   }
 
-  catchBall(player, ballItem = "pokeball") {
+  catchBall(player, ballItem = "pokeball", targetId = null) {
     const ball = BALL[ballItem] || BALL.pokeball;
     if (!takeStack(player.lootBag, ball.item, 1)) {
-      const label = ball.item === "premierball" ? "Premier Balls" : "Pokébolas";
+      const label =
+        ball.item === "premierball"
+          ? "Premier Balls"
+          : ball.item === "ultraball"
+            ? "Ultra Balls"
+            : ball.item === "masterball"
+              ? "Master Balls"
+              : "Pokébolas";
       return this.sys(player, `Você não tem ${label}.`);
     }
-    const target = player.targetId ? this.creatures.get(player.targetId) : null;
-    if (!target || !target.wild) return this.sys(player, "Você não tem um alvo.");
-    if (!target.dead) return this.sys(player, "O Pokémon ainda está vivo.");
+    let target = null;
+    if (targetId != null) target = this.creatures.get(Number(targetId));
+    if (!target && player.targetId) target = this.creatures.get(player.targetId);
+    if (!target || !target.wild) {
+      addStack(player.lootBag, ball.item, 1);
+      return this.sys(player, "Você não tem um alvo.");
+    }
+    if (!target.dead) {
+      addStack(player.lootBag, ball.item, 1);
+      return this.sys(player, "O Pokémon ainda está vivo.");
+    }
+    player.targetId = target.id;
     const spec = SPECIES[target.species];
     const rate = spec.catchRate * ball.rate;
     const roll = randomInt(1, 101);
@@ -1171,11 +1224,14 @@ export class World {
       } else {
         this.sys(player, "Catch successful");
       }
-      this.removeCorpse(target);
+      const corpseId = target.id;
+      setTimeout(() => {
+        const c = this.creatures.get(corpseId);
+        if (c?.dead) this.removeCorpse(c);
+      }, CAPTURE_ANIM_MS);
       player.targetId = null;
     } else {
       this.sys(player, `${target.name} escapou!`);
-      this.removeCorpse(target);
       player.targetId = null;
     }
     this.syncParty(player);

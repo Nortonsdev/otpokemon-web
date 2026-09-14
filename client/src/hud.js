@@ -4,21 +4,27 @@ import { playerProgressFields, staminaClock } from "../../server/otpProgress.js"
 import { hpColorCss, hpPercent } from "./hpColor.js";
 import { isCombatSafeZone } from "../../shared/safeZone.js";
 import {
+  ITEM_BOX_COLS,
   ITEM_BOX_COMPACT_ROWS,
   ITEM_BOX_SLOTS,
   itemBoxRowCount,
 } from "../../shared/itemBoxCaps.js";
+import { BALL_REGISTRY, CATCH_BALL_ITEMS, applyBallAtlas, ballIconHtml } from "./ballIcons.js";
 
-const CATCH_REGISTRY = ["premierball", "pokeball"];
+const CATCH_REGISTRY = CATCH_BALL_ITEMS;
 
 const ITEM_META = {
-  pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true, atlasRow: 1 },
-  premierball: { label: "Premier Ball", icon: "/assets/items/premierball.png", catch: true, atlasRow: 0 },
+  premierball: { label: "Premier Ball", catch: true, atlas: true },
+  ultraball: { label: "Ultra Ball", catch: true, atlas: true },
+  masterball: { label: "Master Ball", catch: true, atlas: true },
+  pokeball: { label: "Pokébola", icon: "/assets/items/pokeball.png", catch: true },
   small_potion: { label: "Small Potion", icon: "/assets/items/small_potion.png", heal: true },
   great_potion: { label: "Great Potion", icon: "/assets/items/great_potion.png", heal: true },
 };
 
-function itemIconHtml(icon, count) {
+function itemIconHtml(entry, count) {
+  if (entry?.atlas && entry.item) return ballIconHtml(entry.item, count);
+  const icon = entry?.icon || entry;
   const n = Math.max(0, Number(count) || 0);
   const stack = n > 0 ? `<span class="item-stack">${n}</span>` : "";
   return `<img class="item-sprite" src="${icon}" alt="" />${stack}`;
@@ -63,10 +69,9 @@ export class Hud {
     this.selectedItem = null;
     this.mapData = null;
     this.minimapZoom = 1;
-    this.catchStats = {
-      premierball: { ok: 0, fail: 0 },
-      pokeball: { ok: 0, fail: 0 },
-    };
+    this.catchStats = Object.fromEntries(CATCH_BALL_ITEMS.map((k) => [k, { ok: 0, fail: 0 }]));
+    this.moveCdUntil = 0;
+    this.outCreatureId = null;
   }
 
   bindGame() {
@@ -132,7 +137,7 @@ export class Hud {
   }
 
   noteCatchAttempt(ballItem, ok) {
-    const key = ballItem === "premierball" ? "premierball" : ballItem === "pokeball" ? "pokeball" : null;
+    const key = CATCH_BALL_ITEMS.includes(ballItem) ? ballItem : ballItem === "pokeball" ? "pokeball" : null;
     if (!key) return;
     if (!this.catchStats[key]) this.catchStats[key] = { ok: 0, fail: 0 };
     if (ok) this.catchStats[key].ok += 1;
@@ -195,6 +200,8 @@ export class Hud {
       this.lootBag = msg.lootBag || msg.bag || [];
       this.catchBox = msg.catchBox || [];
       this.creatures = new Map((msg.creatures || []).map((c) => [c.id, c]));
+      this.outCreatureId =
+        (msg.creatures || []).find((c) => c.masterId === msg.you?.id)?.id ?? this.outCreatureId;
       this.mapData = msg.map;
       this.mapSpawn = msg.map?.spawn || null;
       if (msg.hud) this.windows.merge(msg.hud);
@@ -208,6 +215,7 @@ export class Hud {
       else if (msg.bag) this.lootBag = msg.bag;
       if (msg.catchBox) this.catchBox = msg.catchBox;
       if (msg.gold != null && this.you) this.you.gold = msg.gold;
+      this.renderActivePokeStatus();
       this.render();
     }
     if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
@@ -230,14 +238,18 @@ export class Hud {
     }
     if (msg.t === "appear") {
       this.creatures.set(msg.creature.id, msg.creature);
+      if (msg.creature.masterId === this.you?.id) this.outCreatureId = msg.creature.id;
       this.renderBattle();
       this.drawMinimap();
+      this.render();
     }
     if (msg.t === "disappear") {
       this.creatures.delete(msg.id);
+      if (this.outCreatureId === msg.id) this.outCreatureId = null;
       if (this.target?.id === msg.id) this.setTarget(null);
       else this.renderBattle();
       this.drawMinimap();
+      this.render();
     }
     if (msg.t === "down") {
       const c = this.creatures.get(msg.id);
@@ -250,6 +262,10 @@ export class Hud {
       this.drawMinimap();
     }
     if (msg.t === "fx") {
+      if (this.outCreatureId != null && msg.from === this.outCreatureId) {
+        this.moveCdUntil = Date.now() + 1000;
+        this.renderHotbar(this.party.out != null ? this.party.slots[this.party.out] : null);
+      }
       const c = this.creatures.get(msg.to);
       if (c && msg.hp != null) {
         c.hp = msg.hp;
@@ -398,6 +414,7 @@ export class Hud {
       };
     }
 
+    this.renderActivePokeStatus();
     this.renderPokebar();
     this.renderBattle();
     this.renderItemWindows();
@@ -429,6 +446,27 @@ export class Hud {
       btn.onclick = () => this.net.send({ t: "order", ability: ab });
       bar.appendChild(btn);
     }
+  }
+
+  renderActivePokeStatus() {
+    const el = document.getElementById("poke-active-status");
+    if (!el) return;
+    const outIdx = this.party.out;
+    const p = outIdx != null ? this.party.slots?.[outIdx] : null;
+    if (!p) {
+      el.classList.add("hidden");
+      el.innerHTML = "";
+      return;
+    }
+    el.classList.remove("hidden");
+    const ratio = hpPercent(p.hp, p.hpMax);
+    el.innerHTML = `
+      <img src="${portraitUrl(p)}" alt="" />
+      <div class="pas-text">
+        <strong>[${p.level}] ${p.name}</strong>
+        <div class="pas-hp"><span style="width:${Math.round(ratio * 100)}%;background:${hpColorCss(ratio)}"></span></div>
+        <span class="pas-hp-num">${p.hp}/${p.hpMax}</span>
+      </div>`;
   }
 
   renderPokebar() {
@@ -520,9 +558,9 @@ export class Hud {
     list.innerHTML = "";
     const rows = [...this.creatures.values()].filter((c) => {
       if (!c) return false;
-      if (c.dead) return false;
       if (c.id === this.you?.id) return false;
       if (c.masterId && c.masterId === this.you?.id) return false;
+      if (c.dead && !c.wild) return false;
       return c.kind === "wild" || c.wild || c.kind === "player";
     });
     if (!rows.length) {
@@ -537,8 +575,12 @@ export class Hud {
       el.type = "button";
       el.className = "battle-row" + (this.target?.id === c.id ? " targeted" : "");
       const ratio = Math.max(0, Math.min(1, (c.hp ?? 1) / Math.max(1, c.hpMax ?? 1)));
-      el.innerHTML = `<span>${c.plate || c.name}</span><span class="battle-hp"><span style="width:${ratio * 100}%"></span></span>`;
-      el.onclick = () => this.net.send({ t: "target", id: c.id });
+      const label = c.dead ? `${c.name} (corpo)` : c.plate || c.name;
+      el.innerHTML = `<span>${label}</span><span class="battle-hp"><span style="width:${ratio * 100}%"></span></span>`;
+      el.onclick = () => {
+        this.net.send({ t: "target", id: c.id });
+        if (!c.dead) this.net.send({ t: "walkTo", x: c.x, y: c.y });
+      };
       list.appendChild(el);
     }
   }
@@ -586,29 +628,33 @@ export class Hud {
         label: entry.item,
         icon: "/assets/items/pokeball.png",
       };
-      filled.push({ ...entry, meta });
+      filled.push({ ...entry, meta: { ...meta, item: entry.item } });
     }
+    filled.sort((a, b) => {
+      const ca = a.meta.catch ? 0 : 1;
+      const cb = b.meta.catch ? 0 : 1;
+      return ca - cb;
+    });
     for (let i = 0; i < slots; i++) {
       const row = filled[i];
       const cell = document.createElement("div");
       cell.className = "item-box-cell" + (row ? " has-item" : " empty");
       if (row) {
-        cell.innerHTML = itemIconHtml(row.meta.icon, row.count);
+        cell.innerHTML = itemIconHtml(row.meta, row.count);
         cell.title = `${row.meta.label} ×${row.count}`;
         if (row.meta.catch) {
-          cell.oncontextmenu = (e) => {
-            e.preventDefault();
+          cell.onclick = (e) => {
             e.stopPropagation();
             this.selectItem(this.selectedItem === row.item ? null : row.item);
           };
-        }
-        if (row.meta.heal) {
+        } else if (row.meta.heal) {
           cell.onclick = () => this.net.send({ t: "use", item: row.item });
         }
         cell.classList.toggle("use-with", this.selectedItem === row.item);
       }
       grid.appendChild(cell);
     }
+    applyBallAtlas(grid);
   }
 
   renderCoinsWindow() {
@@ -740,6 +786,9 @@ export class Hud {
     if (!bar) return;
     const known = out ? moveCount(out.species) : 0;
     bar.innerHTML = "";
+    const now = Date.now();
+    const cdLeft = Math.max(0, this.moveCdUntil - now);
+    const cdPct = cdLeft > 0 ? cdLeft / 1000 : 0;
     const slots = [
       { key: "Tab", move: 1 },
       { key: "1", move: 2 },
@@ -751,9 +800,9 @@ export class Hud {
       { key: "R", move: 8 },
       { key: "A", move: 9 },
       { key: "S", move: 10 },
-      { key: "ball", item: "pokeball" },
       { key: "P", item: "premierball" },
-      { key: "pot", item: "small_potion" },
+      { key: "U", item: "ultraball" },
+      { key: "M", item: "masterball" },
     ];
     const row1 = document.createElement("div");
     row1.className = "hot-row";
@@ -769,33 +818,38 @@ export class Hud {
       if (slot.move) {
         const on = out && slot.move <= known;
         btn.classList.add(on ? "on" : "off");
+        const moveIcon = `/assets/hud/moves/${slot.move}_${on ? "on" : "off"}.png`;
         if (on && out) {
-          btn.innerHTML = `<img src="/assets/pokemon/${out.species}/portrait.png" alt="" /><span class="hot-key">${slot.key}</span>`;
-          btn.onclick = () => this.net.send({ t: "move", n: slot.move });
+          btn.innerHTML = `<img src="${moveIcon}" alt="" /><span class="hot-key">${slot.key}</span>`;
+          if (slot.move === 1 && cdPct > 0) {
+            btn.innerHTML += `<span class="hot-cd" style="--cd:${cdPct}"></span>`;
+          }
+          btn.onclick = () => {
+            if (Date.now() < this.moveCdUntil) return;
+            this.net.send({ t: "move", n: slot.move });
+          };
         } else {
-          btn.innerHTML = `<span class="hot-key">${slot.key}</span>`;
+          btn.innerHTML = `<img src="${moveIcon}" alt="" /><span class="hot-key">${slot.key}</span>`;
         }
       } else if (slot.item) {
         const entry = this.lootBag.find((b) => b.item === slot.item);
         const count = entry?.count || 0;
-        const meta = ITEM_META[slot.item];
+        const meta = { ...ITEM_META[slot.item], item: slot.item };
         btn.classList.add(count ? "on" : "off");
         btn.classList.toggle("use-with", this.selectedItem === slot.item);
         const keyHint = slot.key && slot.key.length === 1 ? `<span class="hot-key">${slot.key}</span>` : "";
-        btn.innerHTML = `${itemIconHtml(meta.icon, count)}${keyHint}`;
+        btn.innerHTML = `${itemIconHtml(meta, count)}${keyHint}`;
         if (meta.catch) {
-          btn.oncontextmenu = (e) => {
+          btn.onclick = (e) => {
             e.preventDefault();
             if (!count) return;
             this.selectItem(this.selectedItem === slot.item ? null : slot.item);
           };
         }
-        if (meta.heal) {
-          btn.onclick = () => count && this.net.send({ t: "use", item: slot.item });
-        }
       }
       row.appendChild(btn);
     });
+    applyBallAtlas(bar);
   }
 }
 

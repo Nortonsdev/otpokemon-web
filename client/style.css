@@ -1200,14 +1200,14 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .item-stack,
 .item-box-cell .bag-count {
   position: absolute;
-  right: 0;
+  right: 1px;
   bottom: 0;
   padding: 0 1px;
   font-size: 8px;
   font-weight: 700;
   font-family: Verdana, Tahoma, sans-serif;
-  color: var(--otp-gold-label);
-  text-shadow: 1px 1px 0 #000, -1px 0 0 #000, 0 -1px 0 #000;
+  color: #ffffff;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000;
   line-height: 1;
   pointer-events: none;
 }
@@ -1331,6 +1331,46 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   pointer-events: none; position: absolute;
   left: 50%; bottom: 118px; transform: translateX(-50%);
   z-index: 7;
+}
+.poke-active-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 4px;
+  padding: 4px 6px;
+  background: rgba(8, 16, 24, 0.88);
+  border: 1px solid rgba(90, 140, 110, 0.45);
+}
+.poke-active-status.hidden { display: none; }
+.poke-active-status img {
+  width: 28px;
+  height: 28px;
+  image-rendering: pixelated;
+}
+.poke-active-status .pas-text { flex: 1; min-width: 0; font-size: 8px; color: #e8f0ff; }
+.poke-active-status .pas-hp {
+  height: 4px;
+  background: #1a1a1a;
+  border: 1px solid #000;
+  margin-top: 2px;
+}
+.poke-active-status .pas-hp span {
+  display: block;
+  height: 100%;
+}
+.poke-active-status .pas-hp-num { font-size: 7px; color: #aab8cc; }
+.item-box-cell .ball-atlas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.hot-cd {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(rgba(0, 0, 0, 0.55) calc(var(--cd) * 360deg), transparent 0);
 }
 .hotbar-rows { display: flex; flex-direction: column; gap: 4px; align-items: center; }
 .hot-row { display: flex; gap: 5px; pointer-events: none; }
