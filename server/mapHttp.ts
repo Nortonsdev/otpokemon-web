@@ -127,5 +127,10 @@ export function resolveMapPath(req: IncomingMessage, pathname: string): string {
   } catch {
     /* ignore */
   }
+  const method = req.method || "GET";
+  const ct = String(req.headers["content-type"] || "");
+  if (method === "POST" && ct.includes("octet-stream") && pathname.startsWith("/api/")) {
+    return "/api/map";
+  }
   return pathname;
 }

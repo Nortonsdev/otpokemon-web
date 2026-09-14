@@ -1,6 +1,7 @@
 node_modules/
 dist/
 server/data/
+api/data/
 server/maps/*.otbm
 *.spr
 *.dat
@@ -12,5 +13,3 @@ items.otb
 .DS_Store
 /tmp/
 **/__pycache__/
-server-bundle/
-

@@ -14,8 +14,8 @@
   ],
   "functions": {
     "api/ws.js": {
-      "includeFiles": "{server-bundle,server,shared}/**",
-      "maxDuration": 60
+      "includeFiles": "api/server.bundle.js",
+      "maxDuration": 300
     }
   }
 }

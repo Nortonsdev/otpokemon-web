@@ -13,7 +13,7 @@
     "start:client": "vite --host 0.0.0.0 --port 5173",
     "build": "vite build && node tools/bundle-api.mjs",
     "bundle:api": "node tools/bundle-api.mjs",
-    "test": "node --import tsx tools/test-otbm.mjs",
+    "test": "node --import tsx tools/test-otbm.mjs && node tools/bundle-api.mjs && node tools/test-api-bundle.mjs",
     "test:smoke": "node tools/smoketest.mjs"
   },
   "dependencies": {

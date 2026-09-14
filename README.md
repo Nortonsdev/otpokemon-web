@@ -83,7 +83,7 @@ This is a Vite static client plus a Node WebSocket world on Vercel Fluid Compute
 npx vercel --prod
 ```
 
-Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` already rewrites `/ws` → `/api/ws` and `/api/map` → the **same** function (so Aplicar no jogo e o mundo Phaser partilham o `world.otbm` em memória nessa instância). `npm run build` gera `server-bundle/` com esbuild — as Functions da Vercel não importam TypeScript em runtime.
+Or import the GitHub repo in the Vercel dashboard (root `.`, build `npm run build`, output `dist`). `vercel.json` rewrites `/ws` and `/api/map` onto **`api/ws.js`** (one Fluid Function, so apply-map and the Phaser world share the same `world.otbm`). That function imports `api/server.bundle.js` — a committed esbuild of `server/` + `shared/` with **no TypeScript at runtime** (the live 500s were Node trying to `import "./mapHttp.ts"`). `npm run build` regenerates the bundle.
 
 Limits of this host: the world is in-memory on one Function instance. Connections drop at the plan `maxDuration` (Hobby default 300s; anonymous/temp deploys cap at 60s) and the client reconnects. A reconnect may land on a new instance, so `/tmp` saves are demo-quality, not a durable MMORPG backend.
 
