@@ -57,6 +57,8 @@ const NAMEPLATE_SCREEN_STROKE = 1.125;
 const BAR_W = 16;
 const BAR_H = 2;
 const BAR_PAD = 1;
+/** Nameplates e barras de HP no mundo (sprites). HUD fora do canvas não usa isto. */
+const WORLD_CREATURE_OVERLAYS = false;
 
 function nameplateFillColor(kind) {
   if (kind === "npc") return "#00d4e8";
@@ -573,14 +575,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setTint(texTint(want));
     }
     if (c.shiny && !c.dead) sprite.setTint(0xffe066);
-    const plateY = nameplateNameBottomY(pos.y, c, size);
-    const plate = this.add
-      .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
-      .setOrigin(0.5, 1);
-    plate.setDepth(c.y * 10 + 10);
-    this.addActor(plate);
     this.sprites.set(c.id, sprite);
-    this.plates.set(c.id, plate);
     this.state.set(c.id, {
       ...c,
       spriteSize: size,
@@ -591,19 +586,33 @@ export class GameScene extends Phaser.Scene {
       walkStart: 0,
       walkMs: 0,
     });
-    const cx = pos.x + size / 2;
-    const outline = this.add.rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000).setOrigin(0.5, 0);
-    const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
-    const fg = this.add.rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, c.kind === "npc" ? 0x00d4e8 : 0x2fc24a).setOrigin(0, 0);
-    outline.setDepth(c.y * 10 + 11);
-    track.setDepth(c.y * 10 + 12);
-    fg.setDepth(c.y * 10 + 13);
-    this.addActor(outline);
-    this.addActor(track);
-    this.addActor(fg);
-    this.hpBars.set(c.id, { outline, track, fg });
     this.setHpBar(c.id, c.hp, c.hpMax);
-    this.refreshPlate(c.id);
+    if (WORLD_CREATURE_OVERLAYS) {
+      const plateY = nameplateNameBottomY(pos.y, c, size);
+      const plate = this.add
+        .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
+        .setOrigin(0.5, 1);
+      plate.setDepth(c.y * 10 + 10);
+      this.addActor(plate);
+      this.plates.set(c.id, plate);
+      const cx = pos.x + size / 2;
+      const outline = this.add
+        .rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000)
+        .setOrigin(0.5, 0);
+      const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
+      const fg = this.add
+        .rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, c.kind === "npc" ? 0x00d4e8 : 0x2fc24a)
+        .setOrigin(0, 0);
+      outline.setDepth(c.y * 10 + 11);
+      track.setDepth(c.y * 10 + 12);
+      fg.setDepth(c.y * 10 + 13);
+      this.addActor(outline);
+      this.addActor(track);
+      this.addActor(fg);
+      this.hpBars.set(c.id, { outline, track, fg });
+      this.setHpBar(c.id, c.hp, c.hpMax);
+      this.refreshPlate(c.id);
+    }
     if (c.dead) this.applyCorpseLook(c.id);
   }
 
@@ -653,6 +662,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   layoutNameplate(id, spriteX, spriteY, depth) {
+    if (!WORLD_CREATURE_OVERLAYS) return;
     const sprite = this.sprites.get(id);
     const plate = this.plates.get(id);
     if (!sprite || !plate) return;
@@ -714,6 +724,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   refreshPlate(id) {
+    if (!WORLD_CREATURE_OVERLAYS) return;
     const st = this.state.get(id);
     const plate = this.plates.get(id);
     if (!st || !plate) return;
@@ -783,9 +794,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     sprite.setVisible(true);
-      const plate = this.plates.get(id);
-      if (plate) plate.setVisible(!isWildCreature(st));
-      this.setHpBarVisible(this.hpBars.get(id), true);
       sprite.setOrigin(0, 0);
       sprite.setAngle(0);
       sprite.clearTint();
@@ -807,7 +815,7 @@ export class GameScene extends Phaser.Scene {
       }
       sprite.setPosition(px, py);
       if (hasAnimFrames(sprite.texture)) sprite.setFrame(frameIndex(st.dir, walking, st.phase));
-      this.layoutNameplate(id, px, py, depth);
+      if (WORLD_CREATURE_OVERLAYS) this.layoutNameplate(id, px, py, depth);
       sprite.setDepth(depth);
   }
 
