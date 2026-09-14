@@ -61,6 +61,7 @@ export function applyRubyHealth(mon) {
   return mon;
 }
 
+/** `look` = OTP pokemondata.lua looktype (not National Dex #). */
 function mon(slug, look, types, hp, atk, def, spa, spd, spe, catchRate, moves, abilities = []) {
   const dex = KANTO_BY_SLUG[slug];
   if (!dex) throw new Error(`Species "${slug}" is not Kanto #1–151`);
@@ -81,29 +82,29 @@ const M1 = (name) => [{ id: 1, name, power: 10 }];
 
 /** Kanto com sprites/stats no milestone (subset de #1–151). */
 export const SPECIES = {
-  bulbasaur: mon("bulbasaur", 1, ["grass", "poison"], 45, 49, 49, 65, 65, 45, 45, [
+  bulbasaur: mon("bulbasaur", 25, ["grass", "poison"], 45, 49, 49, 65, 65, 45, 45, [
     { id: 1, name: "Vine Whip", power: 10 },
     { id: 2, name: "Spore", power: 8 },
   ]),
-  ivysaur: mon("ivysaur", 2, ["grass", "poison"], 60, 62, 63, 80, 80, 60, 45, M1("Vine Whip")),
-  venusaur: mon("venusaur", 3, ["grass", "poison"], 80, 82, 83, 100, 100, 80, 45, M1("Vine Whip")),
-  charmander: mon("charmander", 4, ["fire"], 39, 52, 43, 60, 50, 65, 45, M1("Scratch")),
-  charmeleon: mon("charmeleon", 5, ["fire"], 58, 64, 58, 80, 65, 80, 45, M1("Scratch")),
-  charizard: mon("charizard", 6, ["fire", "flying"], 78, 84, 78, 109, 85, 100, 50, M1("Scratch"), ["fly"]),
-  squirtle: mon("squirtle", 7, ["water"], 44, 48, 65, 50, 64, 43, 45, M1("Water Gun")),
-  wartortle: mon("wartortle", 8, ["water"], 59, 63, 80, 65, 80, 58, 45, M1("Water Gun")),
-  blastoise: mon("blastoise", 9, ["water"], 79, 83, 100, 85, 105, 78, 45, M1("Water Gun"), ["surf"]),
-  caterpie: mon("caterpie", 10, ["bug"], 45, 30, 35, 20, 20, 45, 50, M1("Tackle")),
-  metapod: mon("metapod", 11, ["bug"], 50, 20, 55, 25, 25, 30, 45, M1("Tackle")),
-  butterfree: mon("butterfree", 12, ["bug", "flying"], 60, 45, 50, 90, 80, 70, 45, M1("Tackle")),
-  weedle: mon("weedle", 13, ["bug", "poison"], 40, 35, 30, 20, 20, 50, 45, M1("Tackle")),
-  kakuna: mon("kakuna", 14, ["bug", "poison"], 45, 25, 50, 25, 25, 35, 45, M1("Tackle")),
-  beedrill: mon("beedrill", 15, ["bug", "poison"], 65, 90, 40, 45, 80, 75, 45, M1("Tackle")),
-  pidgey: mon("pidgey", 16, ["normal", "flying"], 40, 45, 40, 35, 35, 56, 45, M1("Tackle")),
-  pidgeotto: mon("pidgeotto", 17, ["normal", "flying"], 63, 60, 55, 50, 50, 71, 45, M1("Tackle")),
-  pidgeot: mon("pidgeot", 18, ["normal", "flying"], 83, 80, 75, 70, 70, 101, 45, M1("Tackle")),
-  raticate: mon("raticate", 20, ["normal"], 55, 81, 60, 50, 70, 97, 45, M1("Tackle")),
-  rapidash: mon("rapidash", 78, ["fire"], 65, 100, 70, 80, 80, 105, 50, M1("Tackle"), ["ride"]),
+  ivysaur: mon("ivysaur", 24, ["grass", "poison"], 60, 62, 63, 80, 80, 60, 45, M1("Vine Whip")),
+  venusaur: mon("venusaur", 22, ["grass", "poison"], 80, 82, 83, 100, 100, 80, 45, M1("Vine Whip")),
+  charmander: mon("charmander", 29, ["fire"], 39, 52, 43, 60, 50, 65, 45, M1("Scratch")),
+  charmeleon: mon("charmeleon", 23, ["fire"], 58, 64, 58, 80, 65, 80, 45, M1("Scratch")),
+  charizard: mon("charizard", 67, ["fire", "flying"], 78, 84, 78, 109, 85, 100, 50, M1("Scratch"), ["fly"]),
+  squirtle: mon("squirtle", 2, ["water"], 44, 48, 65, 50, 64, 43, 45, M1("Water Gun")),
+  wartortle: mon("wartortle", 6, ["water"], 59, 63, 80, 65, 80, 58, 45, M1("Water Gun")),
+  blastoise: mon("blastoise", 55, ["water"], 79, 83, 100, 85, 105, 78, 45, M1("Water Gun"), ["surf"]),
+  caterpie: mon("caterpie", 32, ["bug"], 45, 30, 35, 20, 20, 45, 50, M1("Tackle")),
+  metapod: mon("metapod", 31, ["bug"], 50, 20, 55, 25, 25, 30, 45, M1("Tackle")),
+  butterfree: mon("butterfree", 40, ["bug", "flying"], 60, 45, 50, 90, 80, 70, 45, M1("Tackle")),
+  weedle: mon("weedle", 21, ["bug", "poison"], 40, 35, 30, 20, 20, 50, 45, M1("Tackle")),
+  kakuna: mon("kakuna", 60, ["bug", "poison"], 45, 25, 50, 25, 25, 35, 45, M1("Tackle")),
+  beedrill: mon("beedrill", 45, ["bug", "poison"], 65, 90, 40, 45, 80, 75, 45, M1("Tackle")),
+  pidgey: mon("pidgey", 30, ["normal", "flying"], 40, 45, 40, 35, 35, 56, 45, M1("Tackle")),
+  pidgeotto: mon("pidgeotto", 5, ["normal", "flying"], 63, 60, 55, 50, 50, 71, 45, M1("Tackle")),
+  pidgeot: mon("pidgeot", 80, ["normal", "flying"], 83, 80, 75, 70, 70, 101, 45, M1("Tackle")),
+  raticate: mon("raticate", 69, ["normal"], 55, 81, 60, 50, 70, 97, 45, M1("Tackle")),
+  rapidash: mon("rapidash", 220, ["fire"], 65, 100, 70, 80, 80, 105, 50, M1("Tackle"), ["ride"]),
 };
 
 export const PLAYABLE_KANTO_SLUGS = Object.keys(SPECIES);
