@@ -67,6 +67,362 @@ html, body {
 .center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 .hidden { display: none !important; }
 
+/* ── pre-game glass card (login / criar conta) ── */
+body:not(.in-game) #world-scrim {
+  background:
+    radial-gradient(ellipse 42% 46% at 50% 48%, rgba(8, 20, 18, 0.18) 0%, transparent 70%),
+    radial-gradient(1200px 820px at 50% 50%, #0a0b1038, #0a0b1014 55%, #05070c88);
+}
+
+.login-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+body.in-game .login-ambient { display: none; }
+.login-ambient .glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  filter: blur(42px);
+}
+.login-ambient .glow-mint {
+  width: min(280px, 46vw);
+  height: min(180px, 28vh);
+  background: radial-gradient(circle, rgba(110, 231, 183, 0.34), transparent 72%);
+  animation: loginGlowPulse 6s ease-in-out infinite;
+}
+.login-ambient .glow-teal {
+  width: min(420px, 62vw);
+  height: min(280px, 40vh);
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.18), transparent 70%);
+}
+.login-ambient .spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(204, 251, 241, 0.85);
+  box-shadow: 0 0 10px rgba(167, 243, 208, 0.9);
+  animation: loginSpark 8.5s ease-in-out infinite;
+}
+.login-ambient .s1 { margin: -128px 0 0 -168px; }
+.login-ambient .s2 { margin: 108px 0 0 150px; width: 2px; height: 2px; animation-delay: -2.4s; }
+.login-ambient .s3 { margin: -54px 0 0 186px; animation-delay: -4.2s; }
+.login-ambient .s4 { margin: 86px 0 0 -196px; width: 2px; height: 2px; animation-delay: -1.6s; }
+
+@keyframes loginGlowPulse {
+  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+}
+@keyframes loginSpark {
+  0%, 100% { opacity: 0.2; transform: translateY(0); }
+  50% { opacity: 0.95; transform: translateY(-8px); }
+}
+
+.glass-card {
+  --glass-ink: #f3fffb;
+  --glass-muted: #8fafa3;
+  --glass-line: rgba(167, 243, 208, 0.28);
+  --glass-mint: #6ee7b7;
+  isolation: isolate;
+  z-index: 4;
+  width: min(372px, calc(100vw - 32px));
+  max-height: none;
+  overflow: visible;
+  padding: 30px 28px 22px;
+  color: var(--glass-ink);
+  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.35;
+  background:
+    linear-gradient(180deg, rgba(236, 253, 245, 0.1) 0%, rgba(6, 24, 20, 0.08) 36%, rgba(4, 14, 12, 0.22) 100%),
+    rgba(6, 16, 14, 0.52);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border: 1px solid var(--glass-line);
+  border-radius: 20px;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 18px 48px rgba(2, 8, 7, 0.46),
+    0 0 64px rgba(16, 185, 129, 0.18);
+}
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(204, 251, 241, 0.16), transparent 28%),
+    radial-gradient(120% 70% at 50% -20%, rgba(110, 231, 183, 0.18), transparent 55%);
+  z-index: 0;
+}
+.glass-card:after {
+  display: none;
+}
+.glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.glass-card .brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0 22px;
+  text-align: center;
+}
+.glass-card .brand h1 {
+  margin: 10px 0 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  text-transform: none;
+  color: #f7fffc;
+  text-shadow: 0 0 24px rgba(110, 231, 183, 0.4);
+}
+.glass-card .gem {
+  width: 15px;
+  height: 15px;
+  border: 1px solid rgba(204, 251, 241, 0.8);
+  background: radial-gradient(circle at 30% 26%, #ecfdf5, #5eead4 40%, #0f766e 74%, #042f2e);
+  box-shadow: 0 0 16px rgba(110, 231, 183, 0.8), inset 0 0 2px #fff;
+  animation: loginGemPulse 3.4s ease-in-out infinite;
+}
+@keyframes loginGemPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.5), inset 0 0 2px #fff; }
+  50% { box-shadow: 0 0 22px rgba(45, 212, 191, 0.85), inset 0 0 2px #fff; }
+}
+.glass-card .muted {
+  margin: 8px 0 0;
+  color: var(--glass-muted);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.glass-card .account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.glass-card .field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0;
+  text-align: left;
+}
+.glass-card label,
+.glass-card .field-label {
+  display: block;
+  margin: 0;
+  color: #9ec9b8;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.glass-card input {
+  width: 100%;
+  height: 44px;
+  margin: 0;
+  padding: 0 14px;
+  color: #f4fffb;
+  font: 500 15px/1 Outfit, "Segoe UI", system-ui, sans-serif;
+  background: rgba(3, 12, 11, 0.55);
+  border: 1px solid rgba(167, 243, 208, 0.16);
+  border-radius: 12px;
+  outline: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.glass-card input:hover {
+  border-color: rgba(167, 243, 208, 0.32);
+}
+.glass-card input:focus {
+  border-color: rgba(110, 231, 183, 0.78);
+  background: rgba(4, 18, 16, 0.7);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.glass-card .account-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 2px;
+}
+.glass-card button {
+  margin: 0;
+  padding: 0 16px;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-image: none;
+  border-radius: 999px;
+  color: #042018;
+  font: 700 14px/1 Outfit, "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  background: #86efac;
+  box-shadow: none;
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.glass-card button:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.glass-card button:active {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+.glass-card button.btn-primary,
+.glass-card button.btn-full {
+  color: #042016;
+  background: linear-gradient(180deg, #a7f3d0 0%, #34d399 100%);
+  border-color: transparent;
+  box-shadow: 0 8px 22px rgba(16, 185, 129, 0.32);
+}
+.glass-card button.ghost {
+  color: #e8faf3;
+  background: rgba(4, 16, 14, 0.28);
+  border-color: rgba(167, 243, 208, 0.38);
+  box-shadow: none;
+}
+.glass-card button.ghost:hover {
+  background: rgba(6, 28, 24, 0.5);
+  border-color: rgba(167, 243, 208, 0.62);
+  filter: none;
+}
+.glass-card .btn-full {
+  width: 100%;
+  margin-top: 14px;
+}
+
+.glass-card .msg {
+  min-height: 18px;
+  margin: 14px 0 0;
+  text-align: center;
+  color: #fbbf24;
+  font-size: 13px;
+  font-weight: 500;
+}
+.glass-card .hint {
+  margin: 8px 0 0;
+  text-align: center;
+  color: #7f9a8e;
+  font-size: 12px;
+}
+.glass-card .hint a {
+  color: #6ee7b7;
+  text-decoration: none;
+  font-weight: 600;
+}
+.glass-card .hint a:hover {
+  color: #f4fffb;
+  text-decoration: underline;
+}
+.glass-card .hint code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #ecfdf5;
+  background: rgba(6, 28, 22, 0.5);
+  font-size: 0.78em;
+}
+
+.glass-card h2,
+.glass-card h3 {
+  margin: 0 0 8px;
+  text-align: center;
+  font-weight: 650;
+}
+.glass-card h2 {
+  font-size: 14px;
+  color: #e8faf3;
+  letter-spacing: 0.04em;
+}
+.glass-card h3 {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #9ec9b8;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.glass-card hr {
+  border: 0;
+  border-top: 1px solid rgba(167, 243, 208, 0.12);
+  margin: 14px 0;
+}
+.glass-card.character-card {
+  max-height: calc(100vh - 32px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.glass-card.character-card::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.glass-card #char-list {
+  margin: 0 0 4px;
+}
+.glass-card #char-list li { margin: 0 0 8px; }
+.glass-card #char-list button {
+  width: 100%;
+  color: #e8faf3;
+  background: rgba(4, 16, 14, 0.38);
+  border: 1px solid rgba(226, 252, 240, 0.18);
+  box-shadow: none;
+}
+.glass-card .starters { gap: 8px; }
+.glass-card .starter {
+  flex: 1;
+  padding: 8px 6px 6px;
+  background: rgba(3, 14, 12, 0.45);
+  border: 1px solid rgba(167, 243, 208, 0.14);
+  border-image: none;
+  border-radius: 12px;
+  color: #cde7dc;
+  font-size: 11px;
+}
+.glass-card .starter.selected {
+  border-image: none;
+  border-color: rgba(110, 231, 183, 0.85);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+  background: rgba(6, 78, 59, 0.38);
+}
+.glass-card .starter img { width: 56px; height: 56px; }
+
+@media (max-width: 520px) {
+  .glass-card {
+    width: min(100% - 20px, 372px);
+    padding: 22px 18px 16px;
+    border-radius: 18px;
+  }
+  .glass-card .brand h1 { font-size: 24px; }
+  .glass-card .account-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-ambient .glow-mint,
+  .login-ambient .spark,
+  .glass-card .gem {
+    animation: none;
+  }
+}
+
 .brand { display: flex; flex-direction: column; align-items: center; margin-bottom: 8px; }
 .brand h1 {
   margin: 6px 0 0; font-size: 1.6rem; letter-spacing: 0.12em; text-transform: uppercase;
