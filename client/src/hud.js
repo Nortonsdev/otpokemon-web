@@ -47,6 +47,12 @@ function genderMark(p) {
   return g === "f" ? "♀" : "♂";
 }
 
+const INV_ROD_SPRITES = [
+  { src: "/assets/hud/inventory/slots/oldrod.png", title: "Old Rod" },
+  { src: "/assets/hud/inventory/slots/goodrod.png", title: "Good Rod" },
+  { src: "/assets/hud/inventory/slots/superrod.png", title: "Super Rod" },
+];
+
 const PORTRAIT_TOPS = [36, 83, 130, 177, 224, 271];
 const HP_TOPS = [51, 98, 145, 192, 239, 286];
 const SLOT_TOPS = [33, 80, 127, 174, 221, 268];
@@ -73,6 +79,7 @@ export class Hud {
     this.catchStats = Object.fromEntries(CATCH_BALL_ITEMS.map((k) => [k, { ok: 0, fail: 0 }]));
     this.moveCdUntil = 0;
     this.outCreatureId = null;
+    this.invRodIndex = 0;
   }
 
   bindGame() {
@@ -117,7 +124,8 @@ export class Hud {
     document.getElementById("npc-dialog-ok")?.addEventListener("click", () => {
       this.windows.action("npc", "close");
     });
-    document.querySelectorAll(".inv-btn[data-inv-win]").forEach((btn) => {
+    const invRoot = document.getElementById("hud-inv");
+    invRoot?.querySelectorAll("[data-inv-win]").forEach((btn) => {
       btn.addEventListener("mousedown", (e) => e.stopPropagation());
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -126,6 +134,27 @@ export class Hud {
         this.windows.toggle(id);
         this.syncInvShortcutState();
       });
+    });
+    invRoot?.querySelectorAll("[data-inv-action]").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.stopPropagation());
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (btn.dataset.invAction === "order") {
+          const bar = document.getElementById("order-bar");
+          if (bar) {
+            bar.classList.toggle("inv-order-flash");
+            bar.classList.remove("hidden");
+            this.renderOrders();
+          }
+        }
+      });
+    });
+    document.getElementById("inv-rod-cycle")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.cycleInvRod();
+    });
+    invRoot?.querySelectorAll(".inv-otp-rail-btn").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => e.stopPropagation());
     });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -422,6 +451,7 @@ export class Hud {
     this.renderPokebar();
     this.renderBattle();
     this.renderItemWindows();
+    this.renderInvOtp();
     this.syncInvShortcutState();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
@@ -608,8 +638,29 @@ export class Hud {
     });
   }
 
+  cycleInvRod() {
+    this.invRodIndex = (this.invRodIndex + 1) % INV_ROD_SPRITES.length;
+    const spec = INV_ROD_SPRITES[this.invRodIndex];
+    const img = document.getElementById("inv-rod-img");
+    const btn = document.getElementById("inv-rod-btn");
+    if (img) img.src = spec.src;
+    if (btn) btn.title = spec.title;
+  }
+
+  renderInvOtp() {
+    const slot = document.getElementById("inv-otp-portrait");
+    if (!slot) return;
+    const outIdx = this.party.out;
+    const p = outIdx != null ? this.party.slots?.[outIdx] : null;
+    if (!p) {
+      slot.innerHTML = "";
+      return;
+    }
+    slot.innerHTML = `<img src="${portraitUrl(p)}" alt="" />`;
+  }
+
   syncInvShortcutState() {
-    for (const btn of document.querySelectorAll(".inv-btn[data-inv-win]")) {
+    for (const btn of document.querySelectorAll("#hud-inv [data-inv-win]")) {
       const id = btn.dataset.invWin;
       const open = this.windows.layout[id]?.open && !this.windows.layout[id]?.min;
       btn.classList.toggle("on", !!open);

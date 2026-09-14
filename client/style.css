@@ -1102,21 +1102,183 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 }
 
 #hud-inv {
-  width: 128px;
+  width: 200px;
   z-index: 12;
 }
-#hud-inv.miniwindow > .win-body,
+#hud-inv.inv-otp.miniwindow > .win-body,
 .item-box-win.miniwindow > .win-body {
-  background-color: var(--otp-green-frame);
+  background-color: #0a1020;
 }
 #hud-inv .mw-icon {
   background: url(/assets/hud/playerinfo/backpack.png) no-repeat center !important;
   background-size: contain !important;
 }
-#hud-inv.miniwindow > .win-body {
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  padding: 4px 4px 6px;
+#hud-inv.inv-otp.miniwindow > .win-body {
+  height: 200px;
+  max-height: 200px;
+  overflow: hidden;
+  padding: 0;
+  background:
+    url(/assets/hud/inventory/background.png) repeat,
+    #0a1020;
+}
+.inv-otp-panel {
+  position: relative;
+  width: 192px;
+  height: 200px;
+  margin: 0 auto;
+  image-rendering: pixelated;
+}
+.inv-otp-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.inv-otp-slot,
+.inv-otp-rod-cycle {
+  pointer-events: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  image-rendering: pixelated;
+}
+.inv-otp-slot img,
+.inv-otp-ball img {
+  display: block;
+  width: 34px;
+  height: 34px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.inv-otp-slot.on img {
+  filter: brightness(1.15) saturate(1.1);
+}
+.inv-otp-slot:hover img,
+.inv-otp-rod-cycle:hover {
+  filter: brightness(1.12);
+}
+.inv-otp-rod-cycle {
+  position: absolute;
+  left: 5px;
+  top: 11px;
+  width: 24px;
+  height: 20px;
+  background: url(/assets/hud/inventory/combobox.png) no-repeat 0 0;
+  image-rendering: pixelated;
+}
+.inv-otp-rod-cycle:active {
+  background-position: 0 -20px;
+}
+#inv-rod-btn {
+  position: absolute;
+  left: 49px;
+  top: 5px;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(3) {
+  position: absolute;
+  left: 88px;
+  top: 5px;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(4) {
+  position: absolute;
+  left: 30px;
+  top: 43px;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(5) {
+  position: absolute;
+  left: 69px;
+  top: 43px;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(6) {
+  position: absolute;
+  left: 108px;
+  top: 43px;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(7) {
+  position: absolute;
+  left: 30px;
+  top: 82px;
+}
+.inv-otp-portrait {
+  position: absolute;
+  left: 69px;
+  top: 82px;
+  width: 32px;
+  height: 32px;
+  background: #0e152a;
+  border: 1px solid #484338;
+  box-sizing: border-box;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.inv-otp-portrait img {
+  width: 32px;
+  height: 32px;
+  display: block;
+  image-rendering: pixelated;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(8) {
+  position: absolute;
+  left: 108px;
+  top: 82px;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(9) {
+  position: absolute;
+  left: 30px;
+  top: 121px;
+}
+.inv-otp-ball {
+  position: absolute;
+  left: 69px;
+  top: 121px;
+  width: 34px;
+  height: 34px;
+  pointer-events: none;
+}
+.inv-otp-grid .inv-otp-slot:nth-of-type(10) {
+  position: absolute;
+  left: 108px;
+  top: 121px;
+}
+.inv-otp-rail {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.inv-otp-rail-left {
+  left: 6px;
+  bottom: 6px;
+}
+.inv-otp-rail-right {
+  right: 4px;
+  top: 10px;
+  align-items: flex-end;
+}
+.inv-otp-rail-btn {
+  pointer-events: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+  opacity: 0.85;
+  image-rendering: pixelated;
+}
+.inv-otp-rail-btn:hover {
+  opacity: 1;
+  filter: brightness(1.1);
+}
+.inv-otp-rail-btn img {
+  display: block;
+  width: 32px;
+  height: 32px;
+  image-rendering: pixelated;
 }
 
 .item-box-win {
@@ -1252,35 +1414,6 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   cursor: not-allowed;
 }
 .item-box-cell.catch-pick { outline: 2px solid #7dce6a; border-color: #7dce6a; }
-.equip-grid {
-  display: grid; grid-template-columns: 34px 34px 34px;
-  grid-template-areas: ". head ." "neck armor pack" "lhand . rhand" ". legs ." "ring feet .";
-  gap: 3px; justify-content: center; padding: 4px 6px 6px;
-}
-.eq-slot {
-  position: relative; width: 34px; height: 34px;
-  background: var(--otp-green-slot);
-  border: 1px solid var(--otp-green-slot-hi);
-  border-radius: 0;
-  box-shadow:
-    inset 1px 1px 0 rgba(130, 190, 170, 0.14),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.35);
-  font-size: 14px; display: grid; place-items: center;
-}
-.eq-slot.has-icon { color: var(--otp-gold-label); }
-.inv-shortcuts {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px;
-  padding: 0 6px 4px;
-}
-.inv-btn {
-  margin: 0; padding: 2px 0; font-size: 8px; font-weight: 700; letter-spacing: 0.04em;
-  border: 1px solid #4a7268; border-radius: 0;
-  background: #243a34; color: var(--otp-gold-label); cursor: pointer;
-  text-shadow: 1px 1px 0 #000;
-  font-family: Verdana, Tahoma, sans-serif;
-}
-.inv-btn.on { color: #f0d878; border-color: #8a9850; background: #2e4a40; }
-.inv-btn:hover { filter: brightness(1.2); }
 .bag-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; padding: 0 6px 8px; }
 .bag-grid.hidden { display: none; }
 .bag-cell, .eq-slot {
