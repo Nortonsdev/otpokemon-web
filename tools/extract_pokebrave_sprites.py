@@ -26,7 +26,7 @@ HUNTERA_URL = "https://huntera.com.br/things/1332"
 LOOKS = {6: "charizard", 78: "rapidash"}
 ITEMS = {
     "pokeball": (26661, 2456),
-    "premierball": (26678,),
+    "premierball": (3030, 26678),
     "small_potion": (27642,),
     "great_potion": (27643,),
 }
@@ -336,6 +336,8 @@ def export_creature_huntera(outfit, get_sprite, out_dir: Path, name: str) -> Non
 def export_item_huntera(app, get_sprite, out_dir: Path, name: str) -> None:
     sid = app.groups[0].info.sprite_ids[0]
     img = get_sprite(sid)
+    if img.height > 32:
+        img = img.crop((0, 0, 32, 32))
     dest = out_dir / "items" / f"{name}.png"
     dest.parent.mkdir(parents=True, exist_ok=True)
     img.save(dest)

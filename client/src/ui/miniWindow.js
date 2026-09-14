@@ -2,6 +2,19 @@ import { ITEM_BOX_IDS } from "../../../shared/itemBoxCaps.js";
 
 const LEGACY_KEY = "otpokemon-hud-v4";
 const POS_PREFIX = "poketibia.win.";
+const POS_LAYOUT_VERSION = 2;
+const POS_VERSION_KEY = "poketibia.win.layoutVersion";
+
+/** Larguras fixas das janelas de inventário (CSS) — alinhar caixas à esquerda do Inventário. */
+const INV_PANEL_W = 128;
+const ITEM_BOX_W = 158;
+const HUD_MARGIN = 6;
+const HUD_GAP = 4;
+const CHAT_DOCK_H = 118;
+
+function itemBoxRight(slotIndex) {
+  return HUD_MARGIN + INV_PANEL_W + HUD_GAP + slotIndex * (ITEM_BOX_W + HUD_GAP);
+}
 
 export const WINDOW_DEFS = [
   { id: "minimap", title: "Minimapa" },
@@ -30,11 +43,47 @@ const DEFAULTS = {
   pokebar: { x: 6, y: 198, open: true, locked: false, min: false },
   battle: { x: 6, y: 0, open: true, locked: true, min: false, bottom: 118 },
   status: { x: 0, y: 28, open: true, locked: false, min: false, right: 6 },
-  inv: { x: 0, y: 168, open: true, locked: false, min: false, right: 6 },
-  bag: { x: 260, y: 72, open: false, locked: false, min: false, expanded: false },
-  coins: { x: 400, y: 72, open: false, locked: false, min: false, expanded: false },
-  pokebag: { x: 540, y: 72, open: false, locked: false, min: false, expanded: false },
-  catch: { x: 680, y: 72, open: false, locked: false, min: false, expanded: false },
+  inv: { x: 0, y: 0, open: true, locked: false, min: false, right: HUD_MARGIN, bottom: CHAT_DOCK_H },
+  bag: {
+    x: 0,
+    y: 0,
+    open: false,
+    locked: false,
+    min: false,
+    expanded: false,
+    right: itemBoxRight(0),
+    bottom: CHAT_DOCK_H,
+  },
+  coins: {
+    x: 0,
+    y: 0,
+    open: false,
+    locked: false,
+    min: false,
+    expanded: false,
+    right: itemBoxRight(1),
+    bottom: CHAT_DOCK_H,
+  },
+  pokebag: {
+    x: 0,
+    y: 0,
+    open: false,
+    locked: false,
+    min: false,
+    expanded: false,
+    right: itemBoxRight(2),
+    bottom: CHAT_DOCK_H,
+  },
+  catch: {
+    x: 0,
+    y: 0,
+    open: false,
+    locked: false,
+    min: false,
+    expanded: false,
+    right: itemBoxRight(3),
+    bottom: CHAT_DOCK_H,
+  },
   npc: { x: 240, y: 200, open: false, locked: false, min: false },
   chat: { open: true, dock: true },
 };
@@ -93,11 +142,30 @@ export class WindowManager {
   }
 
   loadLocal() {
+    let resetInvLayout = false;
+    try {
+      const ver = Number(localStorage.getItem(POS_VERSION_KEY) || 0);
+      resetInvLayout = ver < POS_LAYOUT_VERSION;
+    } catch {
+      /* ignore */
+    }
     try {
       const raw = localStorage.getItem(LEGACY_KEY);
       if (raw) this.merge(JSON.parse(raw));
     } catch {
       /* ignore */
+    }
+    if (resetInvLayout) {
+      try {
+        for (const id of ["inv", "bag", "coins", "pokebag", "catch"]) {
+          localStorage.removeItem(`${POS_PREFIX}${id}.x`);
+          localStorage.removeItem(`${POS_PREFIX}${id}.y`);
+          this.layout[id] = clone(DEFAULTS[id]);
+        }
+        localStorage.setItem(POS_VERSION_KEY, String(POS_LAYOUT_VERSION));
+      } catch {
+        /* ignore */
+      }
     }
     for (const def of WINDOW_DEFS) {
       if (DOCKED.has(def.id)) continue;
@@ -312,7 +380,26 @@ export class WindowManager {
     el.classList.toggle("win-min", !!w.min);
     el.classList.toggle("win-locked", !!w.locked);
     el.classList.toggle("item-box-expanded", !!w.expanded);
-    if (w.right != null && (w.x === 0 || w.x == null)) {
+    const anchorX = w.x === 0 || w.x == null;
+    const anchorY = w.y === 0 || w.y == null;
+    if (w.right != null && w.bottom != null && anchorX && anchorY) {
+      el.style.left = "auto";
+      el.style.right = `${w.right}px`;
+      el.style.top = "auto";
+      el.style.bottom = `${w.bottom}px`;
+      el.style.transform = "none";
+      const r = el.getBoundingClientRect();
+      if (r.width) {
+        w.x = r.left;
+        w.y = r.top;
+        delete w.right;
+        delete w.bottom;
+        el.style.left = `${w.x}px`;
+        el.style.right = "auto";
+        el.style.top = `${w.y}px`;
+        el.style.bottom = "auto";
+      }
+    } else if (w.right != null && anchorX) {
       el.style.left = "auto";
       el.style.right = `${w.right}px`;
       el.style.top = `${w.y}px`;
@@ -326,7 +413,7 @@ export class WindowManager {
         el.style.left = `${w.x}px`;
         el.style.right = "auto";
       }
-    } else if (w.bottom != null && (w.y === 0 || w.y == null)) {
+    } else if (w.bottom != null && anchorY) {
       el.style.left = `${w.x}px`;
       el.style.right = "auto";
       el.style.top = "auto";
