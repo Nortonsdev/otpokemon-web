@@ -210,12 +210,22 @@ function parseSpr(buffer: ArrayBuffer): Map<number, Uint8Array> {
   return sprites;
 }
 
+/**
+ * Classic Tibia.dat (854/1098): uint32 version + uint16 item count at offset 4.
+ * Huntera appearances.dat / Tibia 15 appearances: protobuf (often starts with 0x0a).
+ * Não tratar DAT clássico como protobuf só porque não tem magic "DAT\\0".
+ */
 function isProtobufDat(buffer: ArrayBuffer): boolean {
-  const u8 = new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength));
+  if (buffer.byteLength < 6) return false;
+  const u8 = new Uint8Array(buffer);
   if (u8[0] === 0x0a) return true;
-  const sig = new DataView(buffer).getUint32(0, true);
-  const s = String.fromCharCode(sig & 0xff, (sig >> 8) & 0xff, (sig >> 16) & 0xff, (sig >> 24) & 0xff);
-  return s !== "DAT\x00";
+  const view = new DataView(buffer);
+  const sig = view.getUint32(0, true);
+  const magic = String.fromCharCode(sig & 0xff, (sig >> 8) & 0xff, (sig >> 16) & 0xff, (sig >> 24) & 0xff);
+  if (magic === "DAT\x00") return false;
+  const itemCount = view.getUint16(4, true);
+  if (itemCount >= 10 && itemCount <= 65000) return false;
+  return false;
 }
 
 export function parseItemsXml(xmlText: string): Map<number, string> {

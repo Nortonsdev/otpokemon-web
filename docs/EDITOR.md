@@ -6,17 +6,13 @@ Adaptado para **Tibia.spr + Tibia.dat clássicos** (Myst 854 / Brave 1098 / Hunt
 
 ## Pipeline de dados
 
+Ver mapeamento completo capt ↔ YATME: **[docs/DATA_PIPELINE.md](DATA_PIPELINE.md)**.
+
+Resumo:
+
 ```
-OTBM (mapa)
-    ├── posições (x, y, z)
-    ├── item IDs por tile
-    ▼
-Tibia.dat + Tibia.spr (+ items.xml opcional)
-    ├── flags / sprites 32px (parser clássico OTClient/Ruby)
-    ▼
-Paleta no browser → pintar no canvas → salvar OTBM
-    ▼
-POST /api/map → servidor → jogo carrega ao entrar no mundo
+OTBM → Tibia.dat → sprite IDs → Tibia.spr → canvas → OTBM → /api/map → jogo
+         (+ items.xml nomes)
 ```
 
 Código OTBM (árvore binária, towns, waypoints): `shared/editor/otbm.ts` (derivado do YATME).
