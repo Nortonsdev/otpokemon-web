@@ -69,7 +69,6 @@ DAT_LOOK_OVERRIDE: dict[str, int] = {
     "ivysaur": 23,
     "venusaur": 21,
     "charmeleon": 28,
-    "wartortle": 5,
     "metapod": 30,
     "weedle": 20,
     "kakuna": 3015,
@@ -85,6 +84,8 @@ HUNTERA_FALLBACK = frozenset(
         "pidgeotto",
         "pidgeot",
         "raticate",
+        # objectbuilder Tibia.dat look ≠ pokemondata (e.g. dat 5 = Pidgeotto, dat 6 = Ekans; pdata wartortle = 6)
+        "wartortle",
     }
 )
 

@@ -12,7 +12,7 @@ import { LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchSequence } from "./catchVfx.js";
 import { CATCH_BALL_ITEMS } from "./ballIcons.js";
-import { speciesAssetSlug } from "../../shared/kantoDex.js";
+import { pokemonPlateText, speciesAssetSlug } from "../../shared/kantoDex.js";
 
 const TILE = 32;
 /** 64×64 (2×2 tile) meadow sheets — keep in sync with tools/extract_otp207_sprites.py exports. */
@@ -49,9 +49,9 @@ function creatureSize(tex) {
 }
 
 /** Alvo em pixels de tela (câmera zoom=2 → fontSize world ≈ alvo/2). */
-const NAMEPLATE_SCREEN_PX = 5;
+const NAMEPLATE_SCREEN_PX = 5.875;
 const NAMEPLATE_SCREEN_PX_MAX = 6.5;
-const NAMEPLATE_SCREEN_STROKE = 1;
+const NAMEPLATE_SCREEN_STROKE = 1.125;
 /** Largura/altura da barra de HP em px de tela (com uiScale na layout). */
 const BAR_W = 16;
 const BAR_H = 2;
@@ -711,7 +711,7 @@ export class GameScene extends Phaser.Scene {
       plate.setText(st.name);
       plate.setColor("#7dce6a");
     } else {
-      plate.setText(`${st.name} [${st.level || 5}]`);
+      plate.setText(pokemonPlateText(st));
       plate.setColor(st.kind === "wild" || st.wild ? "#7aa2f7" : "#ffffff");
     }
     this.applyNameplateScreenScale(plate);
@@ -726,7 +726,7 @@ export class GameScene extends Phaser.Scene {
     st.dead = true;
     st.moving = false;
     st.hp = 0;
-    const name = LOOK_NAME[st.look] || "caterpie";
+    const name = speciesAssetSlug(st.species || LOOK_NAME[st.look] || "caterpie");
     const corpseKey = `${name}-corpse`;
     if (this.textures.exists(corpseKey)) sprite.setTexture(corpseKey, 0);
     sprite.setOrigin(0.5, 0.5);
