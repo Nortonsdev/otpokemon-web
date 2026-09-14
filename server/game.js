@@ -28,7 +28,7 @@ import {
 } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
-import { isSafeZone } from "../shared/safeZone.js";
+import { isSafeZone, isCombatSafeZone } from "../shared/safeZone.js";
 import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 
 const CATCH_CAP = ITEM_BOX_SLOTS.catch;
@@ -400,6 +400,8 @@ export class World {
         roofs: MAP.roofs,
         items: MAP.items,
         cells: MAP.cells,
+        flags: MAP.flags,
+        houses: MAP.houses,
         spawn: currentSpawn(),
       },
       you: this.publicCreature(player),
@@ -581,7 +583,10 @@ export class World {
   }
 
   playerInSafeZone(player) {
-    return isSafeZone(player.x, player.y, currentSpawn()) || isProtectionZone(player.x, player.y);
+    return isCombatSafeZone(player.x, player.y, {
+      spawn: currentSpawn(),
+      flags: MAP.flags,
+    });
   }
 
   grantCorpseLoot(player, creature) {

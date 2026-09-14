@@ -111,6 +111,12 @@ const active = loadActiveMap();
 assert(active.w === 8, "active cache");
 const exported = await exportOtbmBytes();
 assert(parseOtbm(exported).tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "export");
+assert((parseOtbm(exported).tiles.get(tileKey(5, 2, 7)).flags & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "export SAFE");
 rmSync(tmp, { recursive: true, force: true });
+
+const { isCombatSafeZone } = await import("../shared/safeZone.js");
+assert(isCombatSafeZone(5, 2, { flags: runtime.flags, spawn: { x: 99, y: 99 } }), "OTBM SAFE gates swap far from temple");
+assert(!isCombatSafeZone(0, 0, { flags: runtime.flags, spawn: { x: 99, y: 99 } }), "non-SAFE tile blocks swap");
+assert(isCombatSafeZone(99, 99, { flags: runtime.flags, spawn: { x: 99, y: 99 } }), "temple radius still safe");
 
 console.log("OTBM OK", { tiles: re.tiles.size, bytes: bytes.length, fill: filled });

@@ -271,9 +271,8 @@ body,
   stroke-linejoin: round;
 }
 
-.tool-btn.zone-pvp.active { color: var(--ed-danger); }
-.tool-btn.zone-nopvp.active { color: var(--ed-nopvp); }
-.tool-btn.zone-safe.active { color: var(--ed-safe); }
+.tool-btn.zone-safe { color: var(--ed-safe); }
+.tool-btn.zone-safe.active { background: rgba(46, 196, 102, 0.22); color: #9dffc2; }
 
 .guest-link {
   position: absolute;

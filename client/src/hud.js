@@ -2,7 +2,7 @@ import { WindowManager } from "./windows.js";
 import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
-import { isSafeZone } from "../../shared/safeZone.js";
+import { isCombatSafeZone } from "../../shared/safeZone.js";
 import {
   ITEM_BOX_COMPACT_ROWS,
   ITEM_BOX_SLOTS,
@@ -539,7 +539,10 @@ export class Hud {
 
   inSafeZone() {
     if (!this.you) return false;
-    return isSafeZone(this.you.x, this.you.y, this.mapSpawn);
+    return isCombatSafeZone(this.you.x, this.you.y, {
+      spawn: this.mapSpawn,
+      flags: this.mapData?.flags,
+    });
   }
 
   syncInvShortcutState() {

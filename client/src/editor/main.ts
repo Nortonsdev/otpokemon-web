@@ -248,9 +248,9 @@ class EditorApp {
             <button class="tool-btn" data-act="goto" title="Ir para…">${icon("goto")}</button>
           </div>
           <div class="tools">
-            <button class="tool-btn zone-pvp" data-tool="pvp" title="Zona PVP">${icon("pvp")}</button>
-            <button class="tool-btn zone-nopvp" data-tool="nopvp" title="Zona non-PVP">${icon("nopvp")}</button>
-            <button class="tool-btn zone-safe" data-tool="protection" title="Área segura (PZ)">${icon("protection")}</button>
+            <button class="tool-btn zone-pvp" data-tool="pvp" title="PVP">${icon("pvp")}</button>
+            <button class="tool-btn zone-nopvp" data-tool="nopvp" title="non-PVP">${icon("nopvp")}</button>
+            <button class="tool-btn zone-safe" data-tool="protection" title="SAFE — save / non-combat (OTBM PZ)">${icon("protection")}</button>
           </div>
           <div class="tools">
             <button class="tool-btn" data-act="undo" title="Desfazer">${icon("undo")}</button>
@@ -446,6 +446,14 @@ class EditorApp {
     }
     m.towns = [{ id: 1, name: "Spawn", templeX: Math.floor(w / 2), templeY: Math.floor(h / 2), templeZ: z }];
     m.waypoints = [];
+    const tx = m.towns[0].templeX;
+    const ty = m.towns[0].templeY;
+    for (let y = ty - 1; y <= ty + 1; y++) {
+      for (let x = tx - 1; x <= tx + 1; x++) {
+        const t = m.tiles.get(tileKey(x, y, z));
+        if (t) applyZoneToTile(t, "protection");
+      }
+    }
     this.selection = null;
     this.floor = z;
     document.getElementById("floor-label")!.textContent = String(z);
@@ -809,6 +817,9 @@ class EditorApp {
         if (e.key === "r" || e.key === "R") this.setTool("rect");
         if (e.key === "m" || e.key === "M") this.setTool("select");
         if (e.key === "h" || e.key === "H") this.setTool("house");
+        if (e.key === "s" || e.key === "S") this.setTool("protection");
+        if (e.key === "p" || e.key === "P") this.setTool("pvp");
+        if (e.key === "n" || e.key === "N") this.setTool("nopvp");
         if (e.key === "+" || e.key === "=") this.setZoom(this.zoom * 1.1);
         if (e.key === "-" || e.key === "_") this.setZoom(this.zoom * 0.9);
       }
@@ -928,6 +939,8 @@ class EditorApp {
       } else applyZoneToTile(t, "spawn");
     } else if (this.tool === "pvp" || this.tool === "nopvp" || this.tool === "protection") {
       applyZoneToTile(t, clear ? null : (this.tool as ZoneKind));
+      const label = this.tool === "protection" ? "SAFE" : this.tool === "nopvp" ? "non-PVP" : "PVP";
+      this.msg(clear ? `${label} removida.` : `${label} (OTBM flag)`);
     }
     this.pruneTile(t);
     this.syncRuntime(x, y);
