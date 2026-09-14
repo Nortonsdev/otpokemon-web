@@ -173,6 +173,32 @@ export function officialSpeciesName(slug, shiny = false) {
   return shiny ? `Shiny ${base}` : base;
 }
 
+/** ID capt: normal `0025`, shiny `0025-1` (Pikachu #25). */
+export function speciesDexId(slug, shiny = false) {
+  const num = KANTO_BY_SLUG[String(slug)]?.number;
+  if (num == null) return null;
+  const base = String(num).padStart(4, "0");
+  return shiny ? `${base}-1` : base;
+}
+
+/** Slug de assets (sprites em /assets/pokemon/{slug}/); shiny usa o mesmo sheet + tint no cliente. */
+export function speciesAssetSlug(slug) {
+  return isKantoSlug(slug) ? String(slug) : "caterpie";
+}
+
+export function pokemonPlateText(creature) {
+  if (!creature) return "";
+  if (creature.kind === "npc") return `${creature.name} (!)`;
+  if (creature.kind === "player") return creature.name;
+  const label = creature.shiny
+    ? `Shiny ${officialSpeciesName(creature.species, false) || creature.name || "Pokémon"}`
+    : officialSpeciesName(creature.species, false) || creature.name || "Pokémon";
+  const dexId = speciesDexId(creature.species, creature.shiny);
+  const prefix = dexId ? `${dexId} ` : "";
+  const lvl = creature.level || 5;
+  return `${prefix}${label} [${lvl}]`;
+}
+
 export function displayPlateName(creature) {
   if (!creature) return "";
   if (creature.kind === "npc") return `${creature.name} (!)`;

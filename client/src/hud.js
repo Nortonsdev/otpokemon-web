@@ -3,6 +3,7 @@ import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
 import { isCombatSafeZone } from "../../shared/safeZone.js";
+import { pokemonPlateText } from "../../shared/kantoDex.js";
 import {
   ITEM_BOX_COLS,
   ITEM_BOX_COMPACT_ROWS,
@@ -256,7 +257,7 @@ export class Hud {
       if (c) {
         c.dead = true;
         c.hp = 0;
-        c.plate = `${c.name} [${c.level || 5}]  0/${c.hpMax}`;
+        c.plate = `${pokemonPlateText(c)}  0/${c.hpMax}`;
       }
       this.renderBattle();
       this.drawMinimap();
@@ -270,7 +271,7 @@ export class Hud {
       if (c && msg.hp != null) {
         c.hp = msg.hp;
         if (msg.hpMax != null) c.hpMax = msg.hpMax;
-        if (c.name) c.plate = `${c.name} [${c.level || 5}]  ${c.hp}/${c.hpMax}`;
+        if (c.name) c.plate = `${pokemonPlateText(c)}  ${c.hp}/${c.hpMax}`;
       }
       if (this.you && msg.to === this.you.id && msg.hp != null) {
         this.you.hp = msg.hp;
@@ -463,7 +464,7 @@ export class Hud {
     el.innerHTML = `
       <img src="${portraitUrl(p)}" alt="" />
       <div class="pas-text">
-        <strong>[${p.level}] ${p.name}</strong>
+        <strong>${p.dexId ? `${p.dexId} ` : ""}[${p.level}] ${p.name}</strong>
         <div class="pas-hp"><span style="width:${Math.round(ratio * 100)}%;background:${hpColorCss(ratio)}"></span></div>
         <span class="pas-hp-num">${p.hp}/${p.hpMax}</span>
       </div>`;
@@ -503,7 +504,7 @@ export class Hud {
 
         const name = document.createElement("div");
         name.className = "poke-name";
-        name.textContent = `${p.shiny ? "★ " : ""}[${p.level}] ${p.name}`;
+        name.textContent = `${p.dexId ? `${p.dexId} ` : ""}[${p.level}] ${p.name}`;
         row.appendChild(name);
 
         const hp = document.createElement("div");

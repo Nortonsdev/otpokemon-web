@@ -35,6 +35,8 @@ import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 import {
   isKantoSlug,
   officialSpeciesName,
+  pokemonPlateText,
+  speciesDexId,
   SHINY_RATE,
 } from "../shared/kantoDex.js";
 
@@ -300,6 +302,7 @@ export class World {
       baseHp: spec.baseStats.hp,
       baseStats: { ...spec.baseStats },
       ball: opts.ball || "charged",
+      dexId: speciesDexId(key, !!opts.shiny),
     };
     applyRubyHealth(mon);
     if (opts.hp != null) mon.hp = Math.max(0, Math.min(opts.hp, mon.hpMax));
@@ -313,6 +316,7 @@ export class World {
     mon.look = spec.look;
     mon.name = officialSpeciesName(mon.species, false) || spec.name;
     mon.shiny = !!mon.shiny;
+    mon.dexId = speciesDexId(mon.species, mon.shiny);
     mon.baseStats = { ...spec.baseStats };
     mon.baseHp = spec.baseStats.hp;
     delete mon.ivs;
@@ -528,6 +532,7 @@ export class World {
       look: c.look,
       species: c.species || null,
       shiny: !!c.shiny,
+      dexId: c.kind === "player" || c.kind === "npc" ? null : speciesDexId(c.species, c.shiny),
       hp: c.hp,
       hpMax: c.hpMax,
       level: c.level || (c.kind === "player" ? 1 : 5),
@@ -539,7 +544,7 @@ export class World {
           ? `${c.name} (!)`
           : c.kind === "player"
             ? c.name
-            : `${label} [${c.level || 5}]`,
+            : pokemonPlateText(c),
       dead: !!c.dead,
       mount: c.mount
         ? { ability: c.mount.ability, species: c.mount.species, look: c.mount.look }
@@ -569,6 +574,7 @@ export class World {
               hpMax: p.hpMax,
               level: p.level,
               shiny: !!p.shiny,
+              dexId: speciesDexId(p.species, p.shiny),
               gender: p.gender || (String(p.uid || "a").charCodeAt(0) % 2 ? "m" : "f"),
               ball: i === player.outSlot ? "discharged" : p.ball || "charged",
             }
@@ -748,7 +754,14 @@ export class World {
     const client = this.clientOf(player);
     if (!client) return;
     if (!c) this.send(client.ws, { t: "target", id: null });
-    else this.send(client.ws, { t: "target", id: c.id, plate: c.plate || `${c.name} [${c.level || 5}]`, name: c.name });
+    else
+      this.send(client.ws, {
+        t: "target",
+        id: c.id,
+        plate: c.plate || pokemonPlateText(c),
+        name: c.name,
+        dexId: speciesDexId(c.species, c.shiny),
+      });
   }
 
   look(player, x, y) {
@@ -945,6 +958,7 @@ export class World {
       name: mon.name,
       species: mon.species,
       shiny: !!mon.shiny,
+      dexId: speciesDexId(mon.species, mon.shiny),
       look: mon.look,
       x: pos.x,
       y: pos.y,
@@ -1383,6 +1397,7 @@ export class World {
       species: key,
       name: sample.name,
       shiny,
+      dexId: sample.dexId,
       look: spec.look,
       x: spot.x,
       y: spot.y,

@@ -122,7 +122,7 @@ if (map1.party.out == null || !outId) {
   throw new Error("out slot set but poke missing from map");
 } else {
   const existing = map1.creatures.find((c) => c.id === outId);
-  if (existing?.plate && !String(existing.plate).startsWith("Charmander [5]")) {
+  if (existing?.plate && !String(existing.plate).startsWith("0004 Charmander [5]")) {
     throw new Error(`out plate ${existing.plate}`);
   }
   if (existing && existing.hpMax !== 18) {
@@ -135,7 +135,9 @@ if (!wild) throw new Error("no wild Caterpie on map");
 if (wild.hpMax !== 13) {
   throw new Error(`wild hpMax ${wild.hpMax} (Caterpie lv2 without IVs should be 13)`);
 }
-if (!String(wild.plate || "").startsWith("Caterpie [2]")) throw new Error(`wild plate ${wild.plate}`);
+if (!String(wild.plate || "").startsWith("0010 Caterpie [2]") && !String(wild.plate || "").startsWith("0010-1 Shiny Caterpie [2]")) {
+  throw new Error(`wild plate ${wild.plate}`);
+}
 const wildSpecies = new Set(
   map1.creatures.filter((c) => c.wild && !c.dead).map((c) => c.species || c.look)
 );
@@ -196,7 +198,7 @@ if (punch) throw new Error("attacked without an out Pokémon");
 a.send({ t: "pokebar", slot: charmanderSlot });
 const reout = await a.wait((m) => m.t === "appear" && m.creature?.species === "charmander");
 outId = reout.creature.id;
-if (!String(reout.creature.plate || "").startsWith("Charmander [5]")) {
+if (!String(reout.creature.plate || "").startsWith("0004 Charmander [5]")) {
   throw new Error(`out plate ${reout.creature.plate}`);
 }
 if (reout.creature.hpMax !== 18) {

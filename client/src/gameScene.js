@@ -12,6 +12,7 @@ import { LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchSequence } from "./catchVfx.js";
 import { CATCH_BALL_ITEMS } from "./ballIcons.js";
+import { speciesAssetSlug } from "../../shared/kantoDex.js";
 
 const TILE = 32;
 /** OTP2072026 looktypes that use 2×2 (64×64) sheets in objectbuilder/Tibia.dat */
@@ -521,7 +522,7 @@ export class GameScene extends Phaser.Scene {
       }
       return "human";
     }
-    return LOOK_NAME[c.look] || "caterpie";
+    return speciesAssetSlug(c.species || LOOK_NAME[c.look] || "caterpie");
   }
 
   spawn(c) {
