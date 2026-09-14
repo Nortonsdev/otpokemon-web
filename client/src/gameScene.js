@@ -39,28 +39,41 @@ function creatureSize(tex) {
   return 32;
 }
 
-/** Target on-screen size after camera zoom compensation (see applyNameplateScreenScale). */
-const NAMEPLATE_SCREEN_PX = 12;
-const NAMEPLATE_SCREEN_STROKE = 4;
-const BAR_W = 22;
-const BAR_H = 3;
+/** Alvo em pixels de tela (câmera zoom=2 → fontSize world ≈ alvo/2). */
+const NAMEPLATE_SCREEN_PX = 5;
+const NAMEPLATE_SCREEN_PX_MAX = 6.5;
+const NAMEPLATE_SCREEN_STROKE = 1;
+/** Largura/altura da barra de HP em px de tela (com uiScale na layout). */
+const BAR_W = 16;
+const BAR_H = 2;
 const BAR_PAD = 1;
 
 function nameplateFillColor(kind) {
-  return kind === "npc" ? "#00d4e8" : "#ffffff";
+  if (kind === "npc") return "#00d4e8";
+  if (kind === "player") return "#7dce6a";
+  if (kind === "wild") return "#7aa2f7";
+  return "#ffffff";
 }
 
 function nameplateTextStyle(kind) {
   return {
     fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-    fontSize: `${NAMEPLATE_SCREEN_PX}px`,
+    fontSize: "3px",
     fontStyle: "bold",
     color: nameplateFillColor(kind),
     stroke: "#000000",
-    strokeThickness: NAMEPLATE_SCREEN_STROKE,
-    resolution: Math.max(3, Math.ceil(typeof window !== "undefined" ? window.devicePixelRatio || 2 : 2)),
-    padding: { x: 3, y: 2 },
+    strokeThickness: 1,
+    resolution: Math.max(2, Math.ceil(typeof window !== "undefined" ? window.devicePixelRatio || 2 : 2)),
+    padding: { x: 0, y: 0 },
   };
+}
+
+function nameplateNameBottomY(spriteY, st, size) {
+  const wild = st?.kind === "wild" || st?.wild;
+  const playerOrNpc = st?.kind === "player" || st?.kind === "npc";
+  if (wild) return spriteY - 5;
+  if (playerOrNpc || size > TILE) return spriteY + 6;
+  return spriteY - 3;
 }
 
 function tileWorld(x, y, size) {
@@ -543,7 +556,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setTint(texTint(want));
     }
     if (c.shiny && !c.dead) sprite.setTint(0xffe066);
-    const plateY = want === "human" || size === 64 ? pos.y + 4 : pos.y - 2;
+    const plateY = nameplateNameBottomY(pos.y, c, size);
     const plate = this.add
       .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
       .setOrigin(0.5, 1);
@@ -608,15 +621,18 @@ export class GameScene extends Phaser.Scene {
     return z > 0 ? 1 / z : 1;
   }
 
-  /** Keeps name text ~NAMEPLATE_SCREEN_PX on screen with a thick visible stroke at any zoom. */
-  applyNameplateScreenScale(plate, ui) {
-    const u = Math.max(0.25, ui);
-    const worldPx = Math.max(11, Math.round(NAMEPLATE_SCREEN_PX / u));
-    plate.setFontSize(worldPx);
-    plate.setScale(u);
-    const thickness = Math.max(4, Math.ceil(NAMEPLATE_SCREEN_STROKE / u));
-    plate.setStroke("#000000", thickness);
-    plate.setResolution(Math.max(3, Math.ceil((typeof window !== "undefined" ? window.devicePixelRatio : 2) || 2)));
+  /** Texto ~NAMEPLATE_SCREEN_PX px na tela; fontSize em world divide pelo zoom (sem pisos altos). */
+  applyNameplateScreenScale(plate) {
+    const z = Math.max(0.25, this.cameras.main?.zoom || 1);
+    const screenPx = Math.min(NAMEPLATE_SCREEN_PX_MAX, NAMEPLATE_SCREEN_PX);
+    const worldFont = Math.max(1, Math.round(screenPx / z));
+    plate.setFontSize(worldFont);
+    plate.setScale(1);
+    const strokeWorld = Math.max(1, Math.round(NAMEPLATE_SCREEN_STROKE / z));
+    plate.setStroke("#000000", strokeWorld);
+    plate.setResolution(
+      Math.max(2, Math.ceil((typeof window !== "undefined" ? window.devicePixelRatio : 2) || 2))
+    );
   }
 
   layoutNameplate(id, spriteX, spriteY, depth) {
@@ -626,15 +642,21 @@ export class GameScene extends Phaser.Scene {
     const st = this.state.get(id);
     const size = st?.spriteSize || creatureSize(sprite.texture.key);
     const ui = this.uiScale();
-    this.applyNameplateScreenScale(plate, ui);
+    this.applyNameplateScreenScale(plate);
     const cx = spriteX + size / 2;
-    const nameBottom = size > TILE ? spriteY + 4 : spriteY - 2;
+    const nameBottom = nameplateNameBottomY(spriteY, st, size);
     plate.setPosition(Math.round(cx), Math.round(nameBottom));
     plate.setDepth(depth + 1);
     const bar = this.hpBars.get(id);
     if (!bar) return;
-    const nameGap = Math.max(2, Math.round(2 * ui));
-    const barTop = nameBottom + nameGap;
+    const nameGap = Math.max(1, Math.round(1 * ui));
+    const barBlockH = (BAR_H + BAR_PAD * 2) * ui;
+    const z = Math.max(0.25, this.cameras.main?.zoom || 1);
+    const textH = Math.max(1, Math.round(NAMEPLATE_SCREEN_PX / z));
+    const playerStack = st?.kind === "player";
+    const barTop = playerStack
+      ? nameBottom - textH - nameGap - barBlockH
+      : nameBottom + nameGap;
     const innerTop = barTop + BAR_PAD * ui;
     const outW = BAR_W + BAR_PAD * 2;
     const outH = BAR_H + BAR_PAD * 2;
@@ -678,12 +700,12 @@ export class GameScene extends Phaser.Scene {
       plate.setColor("#00d4e8");
     } else if (st.kind === "player") {
       plate.setText(st.name);
-      plate.setColor("#ffffff");
+      plate.setColor("#7dce6a");
     } else {
       plate.setText(`${st.name} [${st.level || 5}]`);
-      plate.setColor("#ffffff");
+      plate.setColor(st.kind === "wild" || st.wild ? "#7aa2f7" : "#ffffff");
     }
-    this.applyNameplateScreenScale(plate, this.uiScale());
+    this.applyNameplateScreenScale(plate);
     const sprite = this.sprites.get(id);
     if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
   }
