@@ -22,6 +22,7 @@ import {
   isWallId,
   itemKindForId,
 } from "./tileCatalog.ts";
+import { parseSpeciesDexId } from "../kantoDex.js";
 
 export interface RuntimeMap {
   w: number;
@@ -36,7 +37,7 @@ export interface RuntimeMap {
   flags: number[][];
   /** House id per cell (0 = none). */
   houses: number[][];
-  wildSpawns: Array<{ x: number; y: number }>;
+  wildSpawns: Array<{ x: number; y: number; dexId?: string; species?: string; shiny?: boolean }>;
   spawn: { x: number; y: number; z: number };
   tile: number;
   towns: OtbmMap["towns"];
@@ -165,7 +166,14 @@ export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ
     runtime.flags[tile.y][tile.x] = tile.flags || 0;
     runtime.houses[tile.y][tile.x] = tile.houseId || 0;
     if (tile.spawnMonster || tile.zones?.includes(ZONE_SPAWN)) {
-      runtime.wildSpawns.push({ x: tile.x, y: tile.y });
+      const parsed = parseSpeciesDexId(tile.spawnMonster?.dexId);
+      runtime.wildSpawns.push({
+        x: tile.x,
+        y: tile.y,
+        dexId: parsed?.id,
+        species: parsed?.slug,
+        shiny: parsed?.shiny,
+      });
     }
   }
 
@@ -216,6 +224,8 @@ export function runtimeToOtbm(runtime: RuntimeMap): OtbmMap {
       if (flags & TILESTATE_NOPVPZONE) zones.push(ZONE_NOPVP);
       if (flags & TILESTATE_PROTECTIONZONE) zones.push(ZONE_PROTECTION);
       if (runtime.wildSpawns?.some((s) => s.x === x && s.y === y)) zones.push(ZONE_SPAWN);
+      const spawnSpot = runtime.wildSpawns?.find((s) => s.x === x && s.y === y);
+      const spawnDex = spawnSpot?.dexId && parseSpeciesDexId(spawnSpot.dexId)?.id;
       tiles.set(tileKey(x, y, floorZ), {
         x,
         y,
@@ -224,7 +234,9 @@ export function runtimeToOtbm(runtime: RuntimeMap): OtbmMap {
         houseId,
         items: ids.map((id) => ({ id })),
         zones: zones.length ? zones : undefined,
-        spawnMonster: zones.includes(ZONE_SPAWN) ? { radius: 3 } : undefined,
+        spawnMonster: zones.includes(ZONE_SPAWN)
+          ? { radius: 3, ...(spawnDex ? { dexId: spawnDex } : {}) }
+          : undefined,
       });
     }
   }

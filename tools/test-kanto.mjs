@@ -3,6 +3,7 @@ import {
   KANTO_BY_SLUG,
   officialSpeciesName,
   speciesDexId,
+  parseSpeciesDexId,
   pokemonPlateText,
 } from "../shared/kantoDex.js";
 import { SPECIES, STARTERS, PLAYABLE_KANTO_SLUGS } from "../server/species.js";
@@ -13,6 +14,13 @@ if (officialSpeciesName("charmander", true) !== "Shiny Charmander") throw new Er
 if (speciesDexId("pikachu", false) !== "0025") throw new Error("pikachu dex id");
 if (speciesDexId("pikachu", true) !== "0025-1") throw new Error("shiny pikachu dex id");
 if (speciesDexId("caterpie", false) !== "0010") throw new Error("caterpie dex id");
+if (parseSpeciesDexId("0025")?.slug !== "pikachu" || parseSpeciesDexId("0025").shiny) throw new Error("parse 0025");
+if (parseSpeciesDexId("25-1")?.id !== "0025-1") throw new Error("parse 25-1 pads");
+if (parseSpeciesDexId("pikachu")?.id !== "0025") throw new Error("parse slug");
+if (parseSpeciesDexId("0152") || parseSpeciesDexId("0000") || parseSpeciesDexId("0025-2")) {
+  throw new Error("reject non-Kanto / bad shiny suffix");
+}
+if (officialSpeciesName("mew") !== "Mew") throw new Error("Mew official name");
 const plate = pokemonPlateText({ kind: "wild", species: "caterpie", shiny: false, level: 2 });
 if (plate !== "0010 Caterpie [2]") throw new Error(`plate ${plate}`);
 

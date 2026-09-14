@@ -181,6 +181,45 @@ export function speciesDexId(slug, shiny = false) {
   return shiny ? `${base}-1` : base;
 }
 
+/**
+ * Parse a capt/map ID. Canonical form is 4-digit `NNNN` or shiny `NNNN-1`.
+ * Also accepts unpadded numbers (`25`, `25-1`) and Kanto slugs (`pikachu`).
+ * Rejects anything outside #1–151.
+ */
+export function parseSpeciesDexId(raw) {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  const shinyWord = /^shiny\s+/i.test(s);
+  const body = s.replace(/^shiny\s+/i, "").trim();
+  const slugKey = body.toLowerCase().replace(/♀/g, "_f").replace(/♂/g, "_m").replace(/[.']/g, "").replace(/\s+/g, "_");
+  const slugEntry = KANTO_BY_SLUG[slugKey] || KANTO_BY_SLUG[body.toLowerCase()];
+  if (slugEntry) {
+    const shiny = shinyWord;
+    return {
+      id: speciesDexId(slugEntry.slug, shiny),
+      slug: slugEntry.slug,
+      number: slugEntry.number,
+      shiny,
+      name: officialSpeciesName(slugEntry.slug, shiny),
+    };
+  }
+  const m = /^(\d{1,4})(-1)?$/.exec(body);
+  if (!m) return null;
+  const number = Number(m[1]);
+  if (!Number.isInteger(number) || number < 1 || number > 151) return null;
+  const entry = KANTO_BY_NUMBER[number];
+  if (!entry) return null;
+  const shiny = shinyWord || m[2] === "-1";
+  return {
+    id: speciesDexId(entry.slug, shiny),
+    slug: entry.slug,
+    number: entry.number,
+    shiny,
+    name: officialSpeciesName(entry.slug, shiny),
+  };
+}
+
 /** Slug de assets (sprites em /assets/pokemon/{slug}/); shiny usa o mesmo sheet + tint no cliente. */
 export function speciesAssetSlug(slug) {
   return isKantoSlug(slug) ? String(slug) : "caterpie";

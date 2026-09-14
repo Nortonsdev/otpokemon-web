@@ -15,8 +15,10 @@ import {
   ZONE_PROTECTION,
   ZONE_PVP,
   ZONE_NOPVP,
+  ZONE_SPAWN,
   applyHouseToTile,
   applyZoneToTile,
+  applySpawnToTile,
 } from "../shared/editor/otbm.ts";
 import { otbmMapToRuntime, runtimeToOtbm } from "../shared/editor/mapRuntime.ts";
 import { BUILTIN_TILE_IDS } from "../shared/editor/tileCatalog.ts";
@@ -53,6 +55,7 @@ applyZoneToTile(map.tiles.get(tileKey(6, 2, 7)), "pvp");
 applyZoneToTile(map.tiles.get(tileKey(7, 2, 7)), "nopvp");
 applyHouseToTile(map.tiles.get(tileKey(4, 3, 7)), 3);
 applyHouseToTile(map.tiles.get(tileKey(5, 3, 7)), 3);
+applySpawnToTile(map.tiles.get(tileKey(1, 1, 7)), "25-1");
 
 const bytes = await serializeOtbm(map);
 assert(bytes[4] === 0xfe, "OTBM NODE_START");
@@ -76,6 +79,8 @@ assert((re.tiles.get(tileKey(7, 2, 7)).flags & TILESTATE_NOPVPZONE) === TILESTAT
 assert(re.tiles.get(tileKey(7, 2, 7)).zones.includes(ZONE_NOPVP), "NOPVP zone id");
 assert(re.tiles.get(tileKey(4, 3, 7)).houseId === 3, "house area 4,3");
 assert(re.tiles.get(tileKey(5, 3, 7)).houseId === 3, "house area 5,3");
+assert(re.tiles.get(tileKey(1, 1, 7)).spawnMonster?.dexId === "0025-1", "spawn shiny pikachu dex id");
+assert(re.tiles.get(tileKey(1, 1, 7)).zones.includes(ZONE_SPAWN), "spawn zone id");
 
 const again = await serializeOtbm(re);
 const re2 = parseOtbm(again);
@@ -93,9 +98,12 @@ assert(runtime.houses[3][4] === 3 && runtime.houses[3][5] === 3, "runtime house 
 assert((runtime.flags[2][5] & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "runtime PZ");
 assert((runtime.flags[2][6] & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "runtime PVP");
 assert((runtime.flags[2][7] & TILESTATE_NOPVPZONE) === TILESTATE_NOPVPZONE, "runtime NOPVP");
+const pkSpawn = runtime.wildSpawns.find((s) => s.x === 1 && s.y === 1);
+assert(pkSpawn?.dexId === "0025-1" && pkSpawn.species === "pikachu" && pkSpawn.shiny === true, "runtime shiny pikachu spawn");
 
 const back = runtimeToOtbm(runtime);
 assert(back.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "runtime→otbm water");
+assert(back.tiles.get(tileKey(1, 1, 7)).spawnMonster?.dexId === "0025-1", "runtime→otbm spawn dex");
 
 let filled = 0;
 floodFill(map, 0, 0, 7, 8, 6, (x, y) => {

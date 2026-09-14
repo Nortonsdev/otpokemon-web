@@ -74,6 +74,7 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
               cells: runtime.cells,
               flags: runtime.flags,
               houses: runtime.houses,
+              wildSpawns: runtime.wildSpawns,
             }
           : {}),
       });

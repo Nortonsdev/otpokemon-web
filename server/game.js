@@ -36,6 +36,7 @@ import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 import {
   isKantoSlug,
   officialSpeciesName,
+  parseSpeciesDexId,
   pokemonPlateText,
   speciesDexId,
   SHINY_RATE,
@@ -1389,19 +1390,39 @@ export class World {
       ).length;
       for (let i = living; i < group.want; i++) this.spawnWild(group.species, this.wildSpots(group));
     }
+    this.ensureMapDexSpawns();
+  }
+
+  ensureMapDexSpawns() {
+    for (const spot of MAP.wildSpawns || []) {
+      const parsed = parseSpeciesDexId(spot.dexId);
+      if (!parsed || !SPECIES[parsed.slug]) continue;
+      const taken = [...this.creatures.values()].some(
+        (c) => c.wild && !c.dead && c.x === spot.x && c.y === spot.y
+      );
+      if (taken) continue;
+      this.spawnWildAt(parsed.slug, spot.x, spot.y, parsed.shiny);
+    }
   }
 
   spawnWild(species = "caterpie", spots = MAP.wildSpawns) {
     const key = String(species || "").toLowerCase();
     if (!isKantoSlug(key) || !SPECIES[key]) return;
-    const spec = SPECIES[key];
     const list = spots || MAP.wildSpawns;
     const free = list.filter(
       (s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y) && !isProtectionZone(s.x, s.y) && !(MAP.houses?.[s.y]?.[s.x])
     );
     if (!free.length) return;
     const spot = free[randomInt(0, free.length)];
-    const shiny = randomInt(1, SHINY_RATE + 1) === 1;
+    this.spawnWildAt(key, spot.x, spot.y, null);
+  }
+
+  spawnWildAt(species, x, y, shinyForced) {
+    const key = String(species || "").toLowerCase();
+    if (!isKantoSlug(key) || !SPECIES[key]) return;
+    if (!walkable(x, y) || this.occupant(x, y) || isProtectionZone(x, y) || MAP.houses?.[y]?.[x]) return;
+    const spec = SPECIES[key];
+    const shiny = shinyForced == null ? randomInt(1, SHINY_RATE + 1) === 1 : !!shinyForced;
     const sample = this.makeMon(key, 2, { shiny });
     const wild = {
       id: cid(),
@@ -1412,8 +1433,8 @@ export class World {
       shiny,
       dexId: sample.dexId,
       look: spec.look,
-      x: spot.x,
-      y: spot.y,
+      x,
+      y,
       z: MAP.z,
       dir: DIR.S,
       hp: sample.hp,

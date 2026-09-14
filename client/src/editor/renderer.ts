@@ -158,6 +158,7 @@ export function tileOverlayHint(tile: OtbmTile | undefined): string {
   if (tile?.houseId) bits.push(`house ${tile.houseId}`);
   const kind = zoneKindFromTile(tile);
   if (kind) bits.push(kind);
+  if (tile?.spawnMonster?.dexId) bits.push(tile.spawnMonster.dexId);
   return bits.join(" · ");
 }
 

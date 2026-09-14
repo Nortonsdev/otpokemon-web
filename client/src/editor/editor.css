@@ -337,15 +337,16 @@ body,
   padding: 4px 0 6px;
 }
 
-.floor-dock .house-id {
-  width: 36px;
+.floor-dock .house-id,
+.floor-dock .spawn-id {
+  width: 52px;
   margin-top: 6px;
   background: #12100e;
   color: var(--ed-fg);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10px;
   padding: 4px 0;
 }
 

@@ -1,6 +1,7 @@
 // ── OTBM binary map parser ──────────────────────────────────────────
 
 import { yieldToMain } from './yieldToMain'
+import { parseSpeciesDexId } from '../kantoDex.js'
 
 /** Classic DAT flag lookup for OTBM v0 stackable items (optional). */
 export type ItemNeedsCountFn = (id: number) => boolean
@@ -114,10 +115,7 @@ export function zoneKindFromTile(tile: OtbmTile | undefined | null): ZoneKind | 
 export function applyZoneToTile(tile: OtbmTile, kind: ZoneKind | null): void {
   const keepSpawn = (tile.zones || []).includes(ZONE_SPAWN) || Boolean(tile.spawnMonster)
   if (kind === "spawn") {
-    tile.spawnMonster = tile.spawnMonster || { radius: 3 }
-    const next = new Set(tile.zones || [])
-    next.add(ZONE_SPAWN)
-    tile.zones = [...next]
+    applySpawnToTile(tile, tile.spawnMonster?.dexId || true)
     return
   }
   tile.flags = (tile.flags || 0) & ~ZONE_FLAG_MASK
@@ -133,6 +131,27 @@ export function applyZoneToTile(tile: OtbmTile, kind: ZoneKind | null): void {
 export function applyHouseToTile(tile: OtbmTile, houseId: number | null): void {
   if (houseId == null || houseId < 1) delete tile.houseId
   else tile.houseId = houseId >>> 0
+}
+
+/** Paint or clear a wild spawn. `dexId` is `NNNN` / `NNNN-1`; `true` keeps the current ID. */
+export function applySpawnToTile(tile: OtbmTile, dexId: string | true | null): void {
+  if (dexId == null || dexId === "") {
+    delete tile.spawnMonster
+    const next = (tile.zones || []).filter((id) => id !== ZONE_SPAWN)
+    tile.zones = next.length ? next : undefined
+    return
+  }
+  let id: string | undefined
+  if (dexId === true) id = tile.spawnMonster?.dexId
+  else {
+    const parsed = parseSpeciesDexId(dexId)
+    if (!parsed) return
+    id = parsed.id
+  }
+  tile.spawnMonster = { radius: tile.spawnMonster?.radius || 3, ...(id ? { dexId: id } : {}) }
+  const next = new Set(tile.zones || [])
+  next.add(ZONE_SPAWN)
+  tile.zones = [...next]
 }
 
 export function tileIsEmpty(tile: OtbmTile): boolean {
@@ -211,7 +230,8 @@ export interface OtbmTile {
   zones?: number[]
   monsters?: TileCreature[]
   npc?: TileCreature
-  spawnMonster?: { radius: number }
+  /** Wild spawn. `dexId` is capt form `NNNN` / `NNNN-1` (Kanto #1–151). */
+  spawnMonster?: { radius: number; dexId?: string }
   spawnNpc?: { radius: number }
   /** Number of items that were stored as inline OTBM_ATTR_ITEM in the original file */
   inlineItemCount?: number
@@ -656,7 +676,17 @@ function parseTile(
         zones.push(child.readU16())
       }
       tile.zones = zones
-      if (zones.includes(ZONE_SPAWN)) tile.spawnMonster = tile.spawnMonster || { radius: 3 }
+      if (zones.includes(ZONE_SPAWN)) {
+        tile.spawnMonster = tile.spawnMonster || { radius: 3 }
+        if (child.canRead()) {
+          try {
+            const parsed = parseSpeciesDexId(child.readString())
+            if (parsed) tile.spawnMonster = { radius: tile.spawnMonster.radius || 3, dexId: parsed.id }
+          } catch {
+            /* leftover bytes from other editors */
+          }
+        }
+      }
     }
   }
 
@@ -1062,6 +1092,8 @@ function serializeTile(writer: BinaryWriter, tile: OtbmTile, saveVersion: number
     for (const zoneId of tile.zones) {
       writer.writeU16(zoneId)
     }
+    const dexId = tile.spawnMonster?.dexId && parseSpeciesDexId(tile.spawnMonster.dexId)?.id
+    if (dexId) writer.writeString(dexId)
     writer.endNode()
   }
 

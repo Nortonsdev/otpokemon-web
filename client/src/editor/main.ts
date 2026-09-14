@@ -7,6 +7,7 @@ import {
   cloneOtbmMap,
   applyHouseToTile,
   applyZoneToTile,
+  applySpawnToTile,
   tileIsEmpty,
   ZONE_SPAWN,
   type OtbmMap,
@@ -27,6 +28,7 @@ import { floodFill, forEachRectTile, type Rect } from "../../../shared/editor/br
 import { loadBuiltinPreviews, rememberPreview } from "./previews.ts";
 import { drawEditorMap, drawMinimap, screenToTile, tileOverlayHint } from "./renderer.ts";
 import { renderPalette } from "./palette.ts";
+import { KANTO_DEX, parseSpeciesDexId, speciesDexId } from "../../../shared/kantoDex.js";
 
 type Tool =
   | "brush"
@@ -75,6 +77,14 @@ const ICONS: Record<string, string> = {
 
 function icon(name: string) {
   return `<svg viewBox="0 0 16 16">${ICONS[name] || ""}</svg>`;
+}
+
+function kantoSpawnOptions() {
+  return KANTO_DEX.map((e) => {
+    const id = speciesDexId(e.slug, false)!;
+    const shiny = speciesDexId(e.slug, true)!;
+    return `<option value="${id}">${id} ${e.name}</option><option value="${shiny}">${shiny} Shiny ${e.name}</option>`;
+  }).join("");
 }
 
 class EditorApp {
@@ -186,6 +196,12 @@ class EditorApp {
     return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
   }
 
+  currentSpawnDexId() {
+    const el = document.getElementById("spawn-dex") as HTMLInputElement | null;
+    const parsed = parseSpeciesDexId(el?.value || "0025");
+    return parsed?.id ?? null;
+  }
+
   effectiveMeta(): MetaStamp | null {
     if (isMetaStamp(this.tool)) return this.tool;
     if (isMetaStamp(this.stamp)) return this.stamp;
@@ -277,7 +293,7 @@ class EditorApp {
             <button class="tool-btn" data-tool="rect" title="Retângulo (R)">${icon("rect")}</button>
             <button class="tool-btn" data-tool="waypoint" title="Waypoint">${icon("waypoint")}</button>
             <button class="tool-btn" data-tool="house" title="Casa (HOUSETILE)">${icon("house")}</button>
-            <button class="tool-btn" data-tool="spawn" title="Spawn">${icon("spawn")}</button>
+            <button class="tool-btn" data-tool="spawn" title="Spawn Kanto NNNN / NNNN-1">${icon("spawn")}</button>
             <button class="tool-btn" data-act="goto" title="Ir para…">${icon("goto")}</button>
           </div>
           <div class="tools">
@@ -302,7 +318,9 @@ class EditorApp {
           <button type="button" id="btn-layers" title="Mostrar zonas/casas">${icon("layers")}</button>
           <button type="button" id="btn-grid" class="active" title="Grade">${icon("grid")}</button>
           <input class="house-id" id="house-id" type="number" min="1" value="1" title="House ID" />
+          <input class="spawn-id" id="spawn-dex" list="kanto-dex" value="0025" title="Espécie NNNN ou NNNN-1 (Pikachu=0025)" />
         </aside>
+        <datalist id="kanto-dex">${kantoSpawnOptions()}</datalist>
 
         <footer class="status-pill glass">
           <span id="st-pos">POS 0, 0, 7</span>
@@ -991,11 +1009,18 @@ class EditorApp {
       this.msg(clear ? "House removida." : `HOUSETILE house ${this.currentHouseId()}`);
     } else if (kind === "spawn") {
       if (clear) {
-        delete t.spawnMonster;
-        t.zones = t.zones?.filter((id) => id !== ZONE_SPAWN);
-        if (!t.zones?.length) delete t.zones;
-      } else applyZoneToTile(t, "spawn");
-    } else {
+        applySpawnToTile(t, null);
+        this.msg("Spawn removido.");
+      } else {
+        const dexId = this.currentSpawnDexId();
+        if (!dexId) {
+          this.msg("ID inválido — use NNNN ou NNNN-1 (Kanto #1–151).");
+          return;
+        }
+        applySpawnToTile(t, dexId);
+        const parsed = parseSpeciesDexId(dexId)!;
+        this.msg(`Spawn ${parsed.id} ${parsed.name}`);
+      } else {
       applyZoneToTile(t, clear ? null : kind);
       const label = kind === "protection" ? "SAFE" : kind === "nopvp" ? "non-PVP" : "PVP";
       this.msg(clear ? `${label} removida.` : `${label} (OTBM flag)`);
