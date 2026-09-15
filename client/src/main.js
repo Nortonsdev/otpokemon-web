@@ -1,3 +1,7 @@
+import { unregisterLegacyServiceWorkers } from "./unregisterLegacyServiceWorkers.js";
+
+unregisterLegacyServiceWorkers();
+
 import Phaser from "phaser";
 import { Net } from "./net.js";
 import { Hud } from "./hud.js";

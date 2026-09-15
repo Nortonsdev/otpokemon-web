@@ -4,6 +4,12 @@ import { defineConfig } from "vite";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
+const htmlNoStoreHeaders = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 export default defineConfig({
   root: "client",
   publicDir: "public",
@@ -31,4 +37,20 @@ export default defineConfig({
       },
     },
   },
+  plugins: [
+    {
+      name: "html-document-no-store-dev",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url?.split("?")[0] ?? "";
+          if (url === "/" || url.endsWith(".html")) {
+            for (const [key, value] of Object.entries(htmlNoStoreHeaders)) {
+              res.setHeader(key, value);
+            }
+          }
+          next();
+        });
+      },
+    },
+  ],
 });

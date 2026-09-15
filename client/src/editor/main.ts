@@ -1,3 +1,7 @@
+import { unregisterLegacyServiceWorkers } from "../unregisterLegacyServiceWorkers.js";
+
+unregisterLegacyServiceWorkers();
+
 import "./editor.css";
 import {
   parseOtbm,
