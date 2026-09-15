@@ -174,7 +174,9 @@ export class Hud {
   selectItem(item) {
     if (item && !this.lootBag.find((i) => i.item === item && i.count > 0)) item = null;
     this.selectedItem = item || null;
-    document.body.classList.toggle("use-with", !!this.selectedItem);
+    const useWith = !!this.selectedItem;
+    document.body.classList.toggle("use-with", useWith);
+    document.getElementById("game")?.classList.toggle("use-with-aim", useWith);
     this.renderItemWindows();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
