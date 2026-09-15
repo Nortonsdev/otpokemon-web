@@ -119,6 +119,8 @@ export class World {
     this.ensureWild();
     this.ensureNpcs();
     this.dirty = false;
+    this.chatSeq = 1;
+    this.chatByMid = new Map();
   }
 
   key(x, y) {
@@ -215,6 +217,7 @@ export class World {
       if (t === "look") return this.look(player, msg.x, msg.y);
       if (t === "use") return this.use(player, msg);
       if (t === "say") return this.say(player, msg.text);
+      if (t === "chatDel") return this.chatDel(player, msg);
       if (t === "logout") return this.logoutPlayer(client, true);
       if (t === "pokebar") return this.pokebar(player, msg.slot);
       if (t === "partyOrder") return this.partyOrder(player, msg);
@@ -429,6 +432,7 @@ export class World {
       walkTo: null,
       mount: null,
       charName,
+      chatRole: rec.chatRole || "player",
       lootBag: normalizeLootBag(rec.lootBag),
       catchBox: (rec.catchBox || []).map((p) => this.ensureMon(p)),
       party: (rec.party || []).map((p) => this.ensureMon(p)),
@@ -472,6 +476,7 @@ export class World {
       catchBox: this.catchBoxPayload(player),
       gold: player.gold,
       hud: player.hud || rec.hud || null,
+      chatRole: player.chatRole || "player",
     });
     this.broadcastArea({ t: "appear", creature: this.publicCreature(player) }, client.ws);
     if (player.outId) {
@@ -905,7 +910,29 @@ export class World {
     if (!text) return;
     const m = /^m(\d{1,2})$/i.exec(text.trim());
     if (m) return this.useMove(player, Number(m[1]));
-    this.broadcastArea({ t: "say", id: player.id, name: player.name, text });
+    const mid = this.chatSeq++;
+    this.chatByMid.set(mid, { playerId: player.id, ts: this.now() });
+    if (this.chatByMid.size > 500) {
+      const oldest = [...this.chatByMid.keys()].slice(0, 100);
+      for (const k of oldest) this.chatByMid.delete(k);
+    }
+    this.broadcastArea({ t: "say", id: player.id, name: player.name, text, mid });
+  }
+
+  chatDel(player, msg) {
+    const mid = Number(msg.mid);
+    if (!Number.isFinite(mid)) return;
+    const entry = this.chatByMid.get(mid);
+    if (!entry) return;
+    const role = player.chatRole || "player";
+    const staff = role === "admin" || role === "mod";
+    if (entry.playerId !== player.id && !staff) {
+      const client = this.clientOf(player);
+      if (client) this.err(client, "Sem permissão para apagar esta mensagem.");
+      return;
+    }
+    this.chatByMid.delete(mid);
+    this.broadcastArea({ t: "sayDel", mid });
   }
 
   setTarget(player, id) {

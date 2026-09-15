@@ -263,14 +263,63 @@
             <button type="button" data-ch="sistema">Sistema</button>
             <button type="button" data-ch="combate">Combate</button>
             <span class="chat-tabs-spacer" aria-hidden="true"></span>
-            <button
-              type="button"
-              id="chat-hide-toggle"
-              class="mw-tool mw-min chat-hide-btn"
-              title="Ocultar chat (Ctrl+Shift+C)"
-              aria-label="Ocultar chat"
-              aria-pressed="false"
-            ></button>
+            <div class="chat-console-tools" role="toolbar" aria-label="Ferramentas do chat">
+              <div class="chat-tool-wrap">
+                <button
+                  type="button"
+                  id="chat-channel-btn"
+                  class="chat-tool chat-ico-channel"
+                  title="Canal de chat"
+                  aria-label="Selecionar canal"
+                  aria-haspopup="true"
+                ></button>
+                <div id="chat-channel-drop" class="chat-popover hidden" role="menu">
+                  <button type="button" data-ch-pick="global" role="menuitem">Servidor</button>
+                  <button type="button" data-ch-pick="local" role="menuitem">Padrão</button>
+                  <button type="button" data-ch-pick="sistema" role="menuitem">Sistema</button>
+                  <button type="button" data-ch-pick="combate" role="menuitem">Combate</button>
+                </div>
+              </div>
+              <div class="chat-tool-wrap">
+                <button
+                  type="button"
+                  id="chat-filter-btn"
+                  class="chat-tool chat-ico-filter"
+                  title="Filtros de mensagem"
+                  aria-label="Filtros"
+                  aria-haspopup="true"
+                ></button>
+                <div id="chat-filter-panel" class="chat-popover chat-filter-panel hidden" role="dialog" aria-label="Filtros do chat">
+                  <label><input type="checkbox" data-filter="player" checked /> Jogadores</label>
+                  <label><input type="checkbox" data-filter="sistema" checked /> Sistema</label>
+                  <label><input type="checkbox" data-filter="combate" checked /> Combate</label>
+                  <button type="button" id="chat-log-mode" class="chat-log-toggle" aria-pressed="false">Modo log (todos os canais)</button>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="chat-wasd-toggle"
+                class="chat-tool chat-ico-wasd"
+                title="Modo WASD — movimento no mapa (clique para digitar com WASD)"
+                aria-label="Modo WASD"
+                aria-pressed="false"
+              ></button>
+              <button
+                type="button"
+                id="chat-clear-btn"
+                class="chat-tool chat-ico-clear"
+                title="Limpar chat (só neste cliente)"
+                aria-label="Limpar chat local"
+              ></button>
+              <button
+                type="button"
+                id="chat-hide-toggle"
+                class="mw-tool mw-min chat-hide-btn"
+                title="Ocultar chat (Ctrl+Shift+C)"
+                aria-label="Ocultar chat"
+                aria-pressed="false"
+              ></button>
+            </div>
           </div>
           <div id="chat-log"></div>
           <div class="chat-input-row">

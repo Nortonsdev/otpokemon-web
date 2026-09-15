@@ -211,6 +211,50 @@ function bag(img, ox, oy, rgb) {
   line(img, ox + 6, oy + 3, ox + 9, oy + 3, rgb);
 }
 
+function drawChatChannel(img, ox, oy, rgb = [210, 210, 214]) {
+  for (let i = 0; i < 3; i++) {
+    fillRect(img, ox + 3, oy + 3 + i * 4, 10, 2, rgb);
+    px(img, ox + 2, oy + 4 + i * 4, rgb[0], rgb[1], rgb[2]);
+  }
+}
+
+function drawChatFilter(img, ox, oy, rgb = [210, 210, 214]) {
+  line(img, ox + 3, oy + 3, ox + 12, oy + 3, rgb);
+  line(img, ox + 5, oy + 3, ox + 3, oy + 12, rgb);
+  line(img, ox + 10, oy + 3, ox + 12, oy + 12, rgb);
+  line(img, ox + 3, oy + 12, ox + 12, oy + 12, rgb);
+  fillRect(img, ox + 6, oy + 7, 4, 3, [90, 94, 98]);
+}
+
+function drawChatWasd(img, ox, oy, rgb = [210, 210, 214]) {
+  fillRect(img, ox + 4, oy + 4, 3, 3, rgb);
+  fillRect(img, ox + 3, oy + 8, 3, 3, rgb);
+  fillRect(img, ox + 7, oy + 8, 3, 3, rgb);
+  fillRect(img, ox + 4, oy + 11, 3, 3, rgb);
+  px(img, ox + 5, oy + 5, 40, 42, 44);
+}
+
+function drawChatKeyboard(img, ox, oy, rgb = [210, 210, 214]) {
+  fillRect(img, ox + 2, oy + 5, 12, 7, rgb);
+  bevel(img, ox + 2, oy + 5, 12, 7, [230, 232, 236], [120, 122, 126]);
+  for (let i = 0; i < 4; i++) fillRect(img, ox + 4 + i * 2, oy + 7, 2, 2, [60, 62, 66]);
+}
+
+function drawChatClear(img, ox, oy, rgb = [210, 210, 214]) {
+  fillRect(img, ox + 4, oy + 3, 8, 10, rgb);
+  line(img, ox + 3, oy + 4, ox + 6, oy + 2, rgb);
+  line(img, ox + 10, oy + 4, ox + 13, oy + 2, rgb);
+  line(img, ox + 6, oy + 2, ox + 10, oy + 2, rgb);
+  line(img, ox + 5, oy + 7, ox + 11, oy + 11, [220, 90, 90]);
+  line(img, ox + 11, oy + 7, ox + 5, oy + 11, [220, 90, 90]);
+}
+
+function drawChatLog(img, ox, oy, rgb = [210, 210, 214]) {
+  fillRect(img, ox + 3, oy + 2, 10, 12, rgb);
+  bevel(img, ox + 3, oy + 2, 10, 12, [230, 232, 236], [100, 102, 106]);
+  for (let i = 0; i < 3; i++) fillRect(img, ox + 5, oy + 4 + i * 3, 6, 1, [80, 84, 88]);
+}
+
 mkdirSync(OUT, { recursive: true });
 
 const atlas = canvas(364, 309, [0, 0, 0, 0]);
@@ -226,6 +270,15 @@ drawIconLock(icons, 36, 0, true, [220, 90, 90]);
 drawIconWrench(icons, 48, 0);
 fillRect(icons, 62, 2, 8, 8, [180, 184, 190]);
 save(icons, "miniwindow_icons.png");
+
+const chatIcons = canvas(96, 16, [0, 0, 0, 0]);
+drawChatChannel(chatIcons, 0, 0);
+drawChatFilter(chatIcons, 16, 0);
+drawChatWasd(chatIcons, 32, 0);
+drawChatKeyboard(chatIcons, 48, 0);
+drawChatClear(chatIcons, 64, 0);
+drawChatLog(chatIcons, 80, 0);
+save(chatIcons, "chat_console_icons.png");
 
 function iconButton(draw) {
   const img = canvas(16, 16, [48, 50, 52, 255]);

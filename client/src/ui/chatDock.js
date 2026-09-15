@@ -47,11 +47,6 @@ export function toggleChatHidden() {
 
 export function bindChatDock() {
   applyChatHidden();
-  document.getElementById("chat-hide-toggle")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleChatHidden();
-  });
   window.addEventListener("keydown", (e) => {
     if (e.key !== "c" && e.key !== "C") return;
     if (!e.ctrlKey || !e.shiftKey || e.altKey || e.metaKey) return;
