@@ -1451,8 +1451,10 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   pointer-events: none;
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   padding: 2px 4px 0;
+  flex-wrap: nowrap;
+  max-width: min(880px, calc(100vw - 240px));
 }
 .attack-bar.hidden { display: none !important; }
 .attack-slot {
@@ -1476,6 +1478,21 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   height: 26px;
   image-rendering: pixelated;
   border-radius: 50%;
+}
+.attack-move-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  image-rendering: pixelated;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+.attack-move-icon.empty {
+  background: radial-gradient(circle at 50% 45%, #2a3544 0%, #121820 72%);
+  opacity: 0.55;
+}
+.attack-slot.on .attack-move-icon {
+  filter: saturate(1.15);
 }
 .attack-slot.on {
   filter: brightness(1.1);
