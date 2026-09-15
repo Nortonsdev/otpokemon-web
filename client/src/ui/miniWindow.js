@@ -1,4 +1,4 @@
-import { ITEM_BOX_IDS } from "../../../shared/itemBoxCaps.js";
+import { ITEM_BOX_IDS, itemBoxWindowWidthPx } from "../../../shared/itemBoxCaps.js";
 import { showChatPanel } from "./chatDock.js";
 
 const LEGACY_KEY = "otpokemon-hud-v4";
@@ -8,7 +8,7 @@ const POS_VERSION_KEY = "poketibia.win.layoutVersion";
 
 /** Larguras fixas das janelas de inventário (CSS) — alinhar caixas à esquerda do Inventário. */
 const INV_PANEL_W = 200;
-const ITEM_BOX_W = 158;
+const ITEM_BOX_W = itemBoxWindowWidthPx();
 const HUD_MARGIN = 6;
 const HUD_GAP = 4;
 const CHAT_DOCK_H = 118;
