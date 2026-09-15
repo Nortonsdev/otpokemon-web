@@ -725,6 +725,7 @@ export class World {
 
   isForbiddenTarget(player, c) {
     if (!c) return true;
+    if (c.dead) return true;
     if (c.kind === "npc" || c.canTarget === false) return true;
     if (c.id === player.id) return true;
     if (c.masterId != null && c.masterId === player.id) return true;
@@ -793,10 +794,6 @@ export class World {
     const item = String(msg?.item || "");
     if (item === "pokeball" || CATCH_BALL_ITEMS.includes(item)) {
       const tid = msg.id != null ? Number(msg.id) : null;
-      if (tid != null) {
-        const c = this.creatures.get(tid);
-        if (c && c.wild && c.dead && !this.isForbiddenTarget(player, c)) player.targetId = tid;
-      }
       return this.catchBall(player, item, tid);
     }
     if (item === "small_potion" || item === "great_potion") {
@@ -1206,7 +1203,11 @@ export class World {
     this.vacate(creature);
     this.broadcastArea({ t: "down", id: creature.id, x: creature.x, y: creature.y });
     for (const c of this.creatures.values()) {
-      if (c.kind === "player" && c.targetId === creature.id) this.grantCorpseLoot(c, creature);
+      if (c.kind === "player" && c.targetId === creature.id) {
+        this.grantCorpseLoot(c, creature);
+        c.targetId = null;
+        this.sendTarget(c, null);
+      }
     }
   }
 
@@ -1236,7 +1237,10 @@ export class World {
     }
     let target = null;
     if (targetId != null) target = this.creatures.get(Number(targetId));
-    if (!target && player.targetId) target = this.creatures.get(player.targetId);
+    if (!target && player.targetId) {
+      const fallback = this.creatures.get(player.targetId);
+      if (fallback?.wild && fallback.dead) target = fallback;
+    }
     if (!target || !target.wild) {
       addStack(player.lootBag, ball.item, 1);
       return this.sys(player, "Você não tem um alvo.");
@@ -1245,12 +1249,19 @@ export class World {
       addStack(player.lootBag, ball.item, 1);
       return this.sys(player, "O Pokémon ainda está vivo.");
     }
-    player.targetId = target.id;
     const spec = SPECIES[target.species];
     const rate = spec.catchRate * ball.rate;
     const roll = randomInt(1, 101);
     const ok = ball.guaranteed === true || roll <= rate;
-    this.broadcastArea({ t: "catchAttempt", from: player.id, to: target.id, ball: ball.item, ok });
+    this.broadcastArea({
+      t: "catchAttempt",
+      from: player.id,
+      to: target.id,
+      ball: ball.item,
+      ok,
+      x: target.x,
+      y: target.y,
+    });
     if (ok) {
       const mon = this.makeMon(target.species, target.level || 2, { shiny: !!target.shiny });
       while (player.party.length < PARTY_CAP) player.party.push(null);

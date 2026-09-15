@@ -265,6 +265,8 @@ async function knockDown(id) {
 }
 
 await knockDown(prey.id);
+const targetCleared = await a.wait((m) => m.t === "target" && (m.id == null || m.id === 0), 2000);
+if (!targetCleared) throw new Error("target not cleared on KO");
 
 const catCount = (slots) => (slots || []).filter((s) => s?.species === "caterpie").length;
 const catsBefore = catCount(map1.party.slots);

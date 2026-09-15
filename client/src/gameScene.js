@@ -364,6 +364,7 @@ export class GameScene extends Phaser.Scene {
 
   isValidTarget(st) {
     if (!st) return false;
+    if (st.dead) return false;
     if (st.kind === "npc" || st.canTarget === false) return false;
     if (this.isOwnCreature(st)) return false;
     return true;
@@ -782,6 +783,7 @@ export class GameScene extends Phaser.Scene {
       if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
       this.refreshPlate(msg.to);
       if (msg.dmg != null) this.floatDamage(msg.to, msg.dmg);
+      if (msg.hp === 0 && msg.to === this.targetId) this.clearTarget();
     }
     if (msg.t === "outfit" && msg.creature) this.spawn(msg.creature);
     if (msg.t === "down") {
@@ -794,6 +796,7 @@ export class GameScene extends Phaser.Scene {
         if (msg.y != null) st.y = msg.y;
       }
       this.applyCorpseLook(msg.id);
+      if (msg.id === this.targetId) this.clearTarget();
     }
     if (msg.t === "target") {
       if (msg.id == null) this.clearTarget(false);

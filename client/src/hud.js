@@ -289,6 +289,7 @@ export class Hud {
         c.hp = 0;
         c.plate = `${pokemonPlateText(c)}  0/${c.hpMax}`;
       }
+      if (this.target?.id === msg.id) this.setTarget(null);
       this.renderBattle();
       this.drawMinimap();
     }
