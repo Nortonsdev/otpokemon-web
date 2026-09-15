@@ -45,6 +45,7 @@ O jogo é **um andar jogável**: o templo da primeira cidade (ou o Z com mais ti
 | Brush / Apagar / Preencher / Retângulo / Selecionar | B E F R M | Pintar, flood fill, retângulo, pan (espaço) |
 | Casa | H | Pinta `OTBM_HOUSETILE` + house id (Alt/direito remove) |
 | PVP / non-PVP / **SAFE** | P / N / S | Remere `TILESTATE_*` + `OTBM_TILE_ZONE`. SAFE = protection zone: Catch↔party só nesses sqm (e no raio do templo) |
+| **PokeZone** / **PZ** | K / Z | Habitat de wilds (zone id 5 + id empacotado) e pad de spawn/movimento (zone id 6). PZ ⊆ PokeZone. Spawn liga-se ao PZ (`pz:N` no nó). |
 | Waypoint / Spawn / Ir para | | Clique no mapa; spawn persiste como zone id 4 |
 | Desfazer / Refazer | Ctrl+Z / Ctrl+Y | Histórico profundo do mapa |
 | Cidades / Waypoints | MAP menu | Modais estilo YATME |

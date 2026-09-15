@@ -285,6 +285,10 @@ body,
 .tool-btn.zone-pvp.active { background: rgba(214, 64, 64, 0.22); color: #ffb3b3; }
 .tool-btn.zone-nopvp { color: var(--ed-nopvp); }
 .tool-btn.zone-nopvp.active { background: rgba(232, 180, 48, 0.22); color: #ffe08a; }
+.tool-btn.zone-pokezone { color: #3aa0d8; }
+.tool-btn.zone-pokezone.active { background: rgba(42, 156, 214, 0.24); color: #9cdcff; }
+.tool-btn.zone-pz { color: #ff8c28; }
+.tool-btn.zone-pz.active { background: rgba(255, 132, 36, 0.24); color: #ffd09a; }
 
 .guest-link {
   position: absolute;
@@ -338,7 +342,9 @@ body,
 }
 
 .floor-dock .house-id,
-.floor-dock .spawn-id {
+.floor-dock .spawn-id,
+.floor-dock .pokezone-id,
+.floor-dock .pz-id {
   width: 52px;
   margin-top: 6px;
   background: #12100e;
