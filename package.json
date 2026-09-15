@@ -12,7 +12,9 @@
     "start:server": "node --import tsx server/index.js",
     "start:client": "vite --host 0.0.0.0 --port 5173",
     "build:balls": "python3 tools/build_ball_inventory_icons.py",
-    "build": "npm run build:balls && vite build && node tools/bundle-api.mjs",
+    "build": "vite build && node tools/bundle-api.mjs",
+    "build:vercel": "npm run build",
+    "build:all": "npm run build:balls && vite build && node tools/bundle-api.mjs",
     "bundle:api": "node tools/bundle-api.mjs",
     "test": "node --import tsx tools/test-otbm.mjs && node tools/test-kanto.mjs && node tools/bundle-api.mjs && node tools/test-api-bundle.mjs",
     "test:smoke": "node tools/smoketest.mjs"
