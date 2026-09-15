@@ -13,7 +13,7 @@ import {
   STARTERS,
   STEP_MS,
   WILD_COMBAT_STEP_MS,
-  WILD_WANDER_INTERVAL_MS,
+  WILD_STEP_MS,
   applyRubyHealth,
   behind,
 } from "./species.js";
@@ -1518,7 +1518,6 @@ export class World {
       baseHp: spec.baseStats.hp,
       baseStats: { ...spec.baseStats },
       busyUntil: 0,
-      wanderReadyAt: 0,
       pokeZone,
     };
     this.creatures.set(wild.id, wild);
@@ -1531,11 +1530,10 @@ export class World {
     for (const c of this.creatures.values()) {
       if (!c.wild || c.dead || t < c.busyUntil) continue;
       if (this.wildIsTargeted(c)) continue;
-      if (t < (c.wanderReadyAt || 0)) continue;
-      c.wanderReadyAt = t + WILD_WANDER_INTERVAL_MS;
+      if (randomInt(0, 5) !== 0) continue;
       const dir = this.pickWildWanderDir(c);
       if (dir == null) continue;
-      this.walk(c, dir, false);
+      this.walk(c, dir, false, WILD_STEP_MS);
     }
   }
 
