@@ -54,6 +54,8 @@ export interface RuntimeMap {
     shiny?: boolean;
     pzId?: number;
     pokeZoneId?: number;
+    /** PokeZone wander radius from OTBM spawnMonster (editor). */
+    radius?: number;
   }>;
   spawn: { x: number; y: number; z: number };
   tile: number;
@@ -256,6 +258,7 @@ export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ
     if (tile.spawnMonster || tile.zones?.includes(ZONE_SPAWN)) {
       const parsed = parseSpeciesDexId(tile.spawnMonster?.dexId);
       const pzId = tile.spawnMonster?.pzId || tile.pzId;
+      const spawnRadius = tile.spawnMonster?.radius;
       runtime.wildSpawns.push({
         x: tile.x,
         y: tile.y,
@@ -264,6 +267,7 @@ export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ
         shiny: parsed?.shiny,
         ...(pzId ? { pzId } : {}),
         ...(tile.pokeZoneId ? { pokeZoneId: tile.pokeZoneId } : {}),
+        ...(spawnRadius != null ? { radius: spawnRadius } : {}),
       });
     }
   }
@@ -338,6 +342,7 @@ export function runtimeToOtbm(runtime: RuntimeMap): OtbmMap {
       if (pzId) applyPzPadToTile(tile, pzId, pokeZoneId || undefined);
       if (zones.includes(ZONE_SPAWN) || spawnSpot) {
         applySpawnToTile(tile, spawnDex || true, spawnSpot?.pzId || pzId || undefined);
+        if (tile.spawnMonster && spawnSpot?.radius != null) tile.spawnMonster.radius = spawnSpot.radius;
       }
       tiles.set(tileKey(x, y, floorZ), tile);
     }

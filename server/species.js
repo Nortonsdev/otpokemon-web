@@ -2,6 +2,10 @@ import { KANTO_BY_SLUG } from "../shared/kantoDex.js";
 
 export const TILE = 32;
 export const STEP_MS = 200;
+/** Passo idle dos wilds (~50% da velocidade do jogador). */
+export const WILD_STEP_MS = STEP_MS * 2;
+/** Passo do wild sob hit de combate (mais lento que o STEP_MS normal). */
+export const WILD_COMBAT_STEP_MS = 480;
 export const ATK_MS = 1000;
 export const PLAYER_HP = 150;
 export const PARTY_CAP = 6;

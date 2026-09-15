@@ -12,6 +12,8 @@ import {
   SPECIES,
   STARTERS,
   STEP_MS,
+  WILD_COMBAT_STEP_MS,
+  WILD_STEP_MS,
   applyRubyHealth,
   behind,
 } from "./species.js";
@@ -26,11 +28,13 @@ import {
   isProtectionZone,
   isPvpZone,
   meadowWildSpots,
+  pokeZoneAtSpawnTile,
   tilesForPz,
   tileName,
   walkable,
   wildMayStep,
 } from "./map.js";
+import { isInPokeZone } from "../shared/pokeZone.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 import { isSafeZone, isCombatSafeZone } from "../shared/safeZone.js";
@@ -130,12 +134,32 @@ export class World {
 
   vacate(creature) {
     const k = this.key(creature.x, creature.y);
-    if (this.occupancy.get(k) === creature.id) this.occupancy.delete(k);
+    if (this.occupancy.get(k) !== creature.id) return;
+    this.occupancy.delete(k);
+    for (const c of this.creatures.values()) {
+      if (c.id === creature.id || c.dead) continue;
+      if (c.x === creature.x && c.y === creature.y) {
+        this.occupancy.set(k, c.id);
+        break;
+      }
+    }
   }
 
   occupant(x, y) {
     const id = this.occupancy.get(this.key(x, y));
     return id ? this.creatures.get(id) : null;
+  }
+
+  /** OTClient-style: só NPCs bloqueiam passo; players/wilds/pokémon fora passam uns pelos outros. */
+  isSolidCreature(c) {
+    return !!c && !c.dead && c.kind === "npc";
+  }
+
+  blockingOccupant(x, y) {
+    for (const c of this.creatures.values()) {
+      if (c.x === x && c.y === y && this.isSolidCreature(c)) return c;
+    }
+    return null;
   }
 
   persist() {
@@ -689,7 +713,7 @@ export class World {
     return Date.now();
   }
 
-  walk(creature, dir, fromClient) {
+  walk(creature, dir, fromClient, stepMs = STEP_MS) {
     dir = Number(dir);
     if (!Number.isInteger(dir) || dir < 0 || dir > 7) return;
     if (fromClient && creature.kind === "player") creature.walkTo = null;
@@ -700,7 +724,11 @@ export class World {
     const d = DELTA[dir];
     const nx = creature.x + d.x;
     const ny = creature.y + d.y;
-    if (!walkable(nx, ny, { surf: creature.mount?.ability === "surf" }) || this.occupant(nx, ny) || !wildMayStep(creature, nx, ny)) {
+    if (
+      !this.canWildEnterTile(creature, nx, ny) ||
+      !walkable(nx, ny, { surf: creature.mount?.ability === "surf" }) ||
+      this.blockingOccupant(nx, ny)
+    ) {
       this.broadcastArea({ t: "turn", id: creature.id, dir });
       if (creature.kind === "player") this.snapshotPlayer(creature);
       return;
@@ -708,7 +736,7 @@ export class World {
     this.vacate(creature);
     creature.x = nx;
     creature.y = ny;
-    creature.busyUntil = t + STEP_MS;
+    creature.busyUntil = t + stepMs;
     this.occupy(creature);
     this.broadcastArea({
       t: "moved",
@@ -716,9 +744,61 @@ export class World {
       x: creature.x,
       y: creature.y,
       dir,
-      ms: STEP_MS,
+      ms: stepMs,
     });
     if (creature.kind === "player") this.snapshotPlayer(creature);
+  }
+
+  canWildEnterTile(creature, x, y) {
+    if (!creature?.wild) return true;
+    if (creature.pzId) return wildMayStep(creature, x, y);
+    const pz = creature.pokeZone;
+    if (!pz) return true;
+    return isInPokeZone(x, y, pz.anchorX, pz.anchorY, pz.radius);
+  }
+
+  wildIsTargeted(wild) {
+    for (const c of this.creatures.values()) {
+      if (c.kind === "player" && c.targetId === wild.id) return true;
+    }
+    return false;
+  }
+
+  pickWildWanderDir(wild) {
+    const opts = [];
+    for (let dir = 0; dir < 8; dir++) {
+      const nx = wild.x + DELTA[dir].x;
+      const ny = wild.y + DELTA[dir].y;
+      if (!walkable(nx, ny) || this.blockingOccupant(nx, ny)) continue;
+      if (!this.canWildEnterTile(wild, nx, ny)) continue;
+      opts.push(dir);
+    }
+    if (!opts.length) return null;
+    return opts[randomInt(0, opts.length)];
+  }
+
+  wildCombatShuffle(wild, attacker) {
+    if (!wild?.wild || wild.dead || !attacker) return;
+    const t = this.now();
+    if (t < wild.busyUntil) return;
+    const ax = attacker.x;
+    const ay = attacker.y;
+    const away = [];
+    const any = [];
+    for (let dir = 0; dir < 8; dir++) {
+      const nx = wild.x + DELTA[dir].x;
+      const ny = wild.y + DELTA[dir].y;
+      if (!walkable(nx, ny) || this.blockingOccupant(nx, ny)) continue;
+      if (!this.canWildEnterTile(wild, nx, ny)) continue;
+      const distNow = Math.max(Math.abs(ax - wild.x), Math.abs(ay - wild.y));
+      const distNew = Math.max(Math.abs(ax - nx), Math.abs(ay - ny));
+      any.push({ dir, distNew, diag: dir % 2 });
+      if (distNew >= distNow) away.push({ dir, distNew, diag: dir % 2 });
+    }
+    const pool = away.length ? away : any;
+    if (!pool.length) return;
+    pool.sort((a, b) => b.distNew - a.distNew || a.diag - b.diag);
+    this.walk(wild, pool[0].dir, false, WILD_COMBAT_STEP_MS);
   }
 
   turn(creature, dir) {
@@ -895,9 +975,9 @@ export class World {
         c.walkTo = null;
         continue;
       }
-      const destOcc = this.occupant(x, y);
+      const destBlock = this.blockingOccupant(x, y);
       const dist = Math.max(Math.abs(x - c.x), Math.abs(y - c.y));
-      if (destOcc && dist <= 1) {
+      if (destBlock && dist <= 1) {
         c.walkTo = null;
         continue;
       }
@@ -1086,7 +1166,7 @@ export class World {
   }
 
   summonTile(player) {
-    const trySpot = (x, y) => walkable(x, y) && !this.occupant(x, y) && !isProtectionZone(x, y);
+    const trySpot = (x, y) => walkable(x, y) && !this.blockingOccupant(x, y) && !isProtectionZone(x, y);
     const b = behind(player.x, player.y, player.dir);
     if (trySpot(b.x, b.y)) return b;
     for (let r = 1; r <= 3; r++) {
@@ -1161,7 +1241,10 @@ export class World {
       this.defeat(target);
       return;
     }
-    if (target.wild) this.wildRetaliate(target, poke);
+    if (target.wild) {
+      this.wildCombatShuffle(target, poke);
+      this.wildRetaliate(target, poke);
+    }
   }
 
   wildRetaliate(wild, poke) {
@@ -1192,6 +1275,7 @@ export class World {
 
   flee(creature) {
     if (!creature.wild) return;
+    if (this.wildIsTargeted(creature)) return;
     this.vacate(creature);
     this.creatures.delete(creature.id);
     this.broadcastArea({ t: "disappear", id: creature.id });
@@ -1328,8 +1412,7 @@ export class World {
       const nx = x + DELTA[dir].x;
       const ny = y + DELTA[dir].y;
       if (!walkable(nx, ny, { surf: false })) continue;
-      const occ = this.occupant(nx, ny);
-      if (occ && occ.id !== selfId) continue;
+      if (this.blockingOccupant(nx, ny)) continue;
       const dist = Math.max(Math.abs(tx - nx), Math.abs(ty - ny));
       const cur = Math.max(Math.abs(tx - x), Math.abs(ty - y));
       if (dist <= cur) opts.push({ dir, dist, diag: dir % 2 });
@@ -1341,13 +1424,13 @@ export class World {
   spawnNpc(def) {
     if ([...this.creatures.values()].some((c) => c.kind === "npc" && c.name === def.name)) return;
     let { x, y } = def;
-    if (!walkable(x, y) || this.occupant(x, y)) {
+    if (!walkable(x, y) || this.blockingOccupant(x, y)) {
       const nearby = [];
       for (let dy = -2; dy <= 2; dy++) {
         for (let dx = -2; dx <= 2; dx++) {
           const nx = def.x + dx;
           const ny = def.y + dy;
-          if (walkable(nx, ny) && !this.occupant(nx, ny)) nearby.push({ x: nx, y: ny });
+          if (walkable(nx, ny) && !this.blockingOccupant(nx, ny)) nearby.push({ x: nx, y: ny });
         }
       }
       if (!nearby.length) return;
@@ -1449,11 +1532,12 @@ export class World {
   spawnWildAt(species, x, y, shinyForced, pzId) {
     const key = String(species || "").toLowerCase();
     if (!isKantoSlug(key) || !SPECIES[key]) return;
-    if (!walkable(x, y) || this.occupant(x, y) || isProtectionZone(x, y) || MAP.houses?.[y]?.[x]) return;
+    if (!walkable(x, y) || this.blockingOccupant(x, y) || isProtectionZone(x, y) || MAP.houses?.[y]?.[x]) return;
     const spec = SPECIES[key];
     const shiny = shinyForced == null ? randomInt(1, SHINY_RATE + 1) === 1 : !!shinyForced;
     const sample = this.makeMon(key, 2, { shiny });
     const linkedPz = Number(pzId) > 0 ? Number(pzId) : 0;
+    const pokeZone = pokeZoneAtSpawnTile(x, y);
     const wild = {
       id: cid(),
       kind: "wild",
@@ -1473,6 +1557,7 @@ export class World {
       baseHp: spec.baseStats.hp,
       baseStats: { ...spec.baseStats },
       busyUntil: 0,
+      pokeZone,
       ...(linkedPz ? { pzId: linkedPz } : {}),
     };
     this.creatures.set(wild.id, wild);
@@ -1481,10 +1566,14 @@ export class World {
   }
 
   tickWildWander() {
+    const t = this.now();
     for (const c of this.creatures.values()) {
-      if (!c.wild || c.dead || this.now() < c.busyUntil) continue;
+      if (!c.wild || c.dead || t < c.busyUntil) continue;
+      if (this.wildIsTargeted(c)) continue;
       if (randomInt(0, 5) !== 0) continue;
-      this.walk(c, randomInt(0, 8), false);
+      const dir = this.pickWildWanderDir(c);
+      if (dir == null) continue;
+      this.walk(c, dir, false, WILD_STEP_MS);
     }
   }
 
