@@ -54,9 +54,18 @@ if (viaRewrite.status !== 200 || viaRewrite.body.length !== map.body.length) {
   throw new Error(`rewrite map ${viaRewrite.status} len ${viaRewrite.body.length}`);
 }
 
-const slash = await request("GET", "/api/map/");
-if (slash.status !== 200 || slash.body.length !== map.body.length) {
-  throw new Error(`trailing slash map ${slash.status} len ${slash.body.length}`);
+const json = await request("GET", "/api/map/json");
+if (json.status !== 200) {
+  throw new Error(`map json ${json.status} ${json.body}`);
+}
+const payload = JSON.parse(json.body.toString());
+if (!Array.isArray(payload.pokeZones) || !Array.isArray(payload.pzPads) || !Array.isArray(payload.wildSpawns)) {
+  throw new Error(`map json missing habitat arrays ${json.body.toString().slice(0, 200)}`);
+}
+
+const viaJsonRewrite = await request("GET", "/api/ws?otpMap=json");
+if (viaJsonRewrite.status !== 200 || viaJsonRewrite.body.toString() !== json.body.toString()) {
+  throw new Error(`rewrite json ${viaJsonRewrite.status}`);
 }
 
 const viaHeader = await request("GET", "/api/ws", { "x-forwarded-uri": "/api/map" });

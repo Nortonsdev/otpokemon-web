@@ -19,6 +19,12 @@ import {
   applyHouseToTile,
   applyZoneToTile,
   applySpawnToTile,
+  applyPokeZoneToTile,
+  applyPzPadToTile,
+  ZONE_POKEZONE,
+  ZONE_PZ_PAD,
+  ZONE_POKEZONE_ID_BASE,
+  ZONE_PZ_ID_BASE,
 } from "../shared/editor/otbm.ts";
 import { otbmMapToRuntime, runtimeToOtbm } from "../shared/editor/mapRuntime.ts";
 import { BUILTIN_TILE_IDS } from "../shared/editor/tileCatalog.ts";
@@ -56,11 +62,17 @@ applyZoneToTile(map.tiles.get(tileKey(7, 2, 7)), "nopvp");
 applyHouseToTile(map.tiles.get(tileKey(4, 3, 7)), 3);
 applyHouseToTile(map.tiles.get(tileKey(5, 3, 7)), 3);
 applySpawnToTile(map.tiles.get(tileKey(1, 1, 7)), "25-1");
+applyPokeZoneToTile(map.tiles.get(tileKey(0, 0, 7)), 2);
+applyPokeZoneToTile(map.tiles.get(tileKey(0, 1, 7)), 2);
+applyPzPadToTile(map.tiles.get(tileKey(0, 1, 7)), 7, 2);
+applySpawnToTile(map.tiles.get(tileKey(0, 1, 7)), "0010", 7);
+applyZoneToTile(map.tiles.get(tileKey(0, 0, 7)), "pvp");
 
 const bytes = await serializeOtbm(map);
 assert(bytes[4] === 0xfe, "OTBM NODE_START");
 const text = new TextDecoder().decode(bytes);
 assert(text.includes("Saved with YATME"), "YATME signature in OTBM");
+assert(text.includes("pz:7"), "spawn→pz payload in OTBM");
 
 const re = parseOtbm(bytes);
 assert(re.width === 8 && re.height === 6, "size roundtrip");
@@ -81,10 +93,20 @@ assert(re.tiles.get(tileKey(4, 3, 7)).houseId === 3, "house area 4,3");
 assert(re.tiles.get(tileKey(5, 3, 7)).houseId === 3, "house area 5,3");
 assert(re.tiles.get(tileKey(1, 1, 7)).spawnMonster?.dexId === "0025-1", "spawn shiny pikachu dex id");
 assert(re.tiles.get(tileKey(1, 1, 7)).zones.includes(ZONE_SPAWN), "spawn zone id");
+const pokeTile = re.tiles.get(tileKey(0, 0, 7));
+assert(pokeTile.pokeZoneId === 2, "pokezone id field");
+assert(pokeTile.zones.includes(ZONE_POKEZONE), "pokezone kind");
+assert(pokeTile.zones.includes(ZONE_POKEZONE_ID_BASE + 2), "pokezone packed id");
+assert((pokeTile.flags & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "PVP still paints over pokezone");
+const pzTile = re.tiles.get(tileKey(0, 1, 7));
+assert(pzTile.pokeZoneId === 2 && pzTile.pzId === 7, "PZ ⊆ PokeZone fields");
+assert(pzTile.zones.includes(ZONE_PZ_PAD) && pzTile.zones.includes(ZONE_PZ_ID_BASE + 7), "PZ packed id");
+assert(pzTile.spawnMonster?.dexId === "0010" && pzTile.spawnMonster?.pzId === 7, "spawn→pz link");
 
 const again = await serializeOtbm(re);
 const re2 = parseOtbm(again);
 assert(re2.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "second roundtrip");
+assert(re2.tiles.get(tileKey(0, 1, 7)).spawnMonster?.pzId === 7, "second roundtrip spawn pz");
 
 const runtime = otbmMapToRuntime(re);
 assert(runtime.w === 8 && runtime.h === 6 && runtime.z === 7, "runtime size");
@@ -100,10 +122,24 @@ assert((runtime.flags[2][6] & TILESTATE_PVPZONE) === TILESTATE_PVPZONE, "runtime
 assert((runtime.flags[2][7] & TILESTATE_NOPVPZONE) === TILESTATE_NOPVPZONE, "runtime NOPVP");
 const pkSpawn = runtime.wildSpawns.find((s) => s.x === 1 && s.y === 1);
 assert(pkSpawn?.dexId === "0025-1" && pkSpawn.species === "pikachu" && pkSpawn.shiny === true, "runtime shiny pikachu spawn");
+assert(runtime.pokeZoneIds[0][0] === 2 && runtime.pokeZones.some((z) => z.id === 2), "runtime pokezone");
+assert(runtime.pzIds[1][0] === 7, "runtime pz pad");
+const pad = runtime.pzPads.find((p) => p.id === 7);
+assert(pad?.pokeZoneId === 2 && pad.tiles.some((t) => t.x === 0 && t.y === 1), "runtime pzPads");
+const catSpawn = runtime.wildSpawns.find((s) => s.x === 0 && s.y === 1);
+assert(catSpawn?.dexId === "0010" && catSpawn.pzId === 7, "runtime spawn→pz");
 
 const back = runtimeToOtbm(runtime);
 assert(back.tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "runtime→otbm water");
 assert(back.tiles.get(tileKey(1, 1, 7)).spawnMonster?.dexId === "0025-1", "runtime→otbm spawn dex");
+assert(back.tiles.get(tileKey(0, 1, 7)).spawnMonster?.pzId === 7, "runtime→otbm spawn pz");
+assert(back.tiles.get(tileKey(0, 1, 7)).pzId === 7, "runtime→otbm pz pad");
+
+applyPzPadToTile(re.tiles.get(tileKey(2, 0, 7)), 3);
+assert(re.tiles.get(tileKey(2, 0, 7)).pokeZoneId === 1 && re.tiles.get(tileKey(2, 0, 7)).pzId === 3, "PZ auto-paints PokeZone");
+const wipe = re.tiles.get(tileKey(2, 0, 7));
+applyPokeZoneToTile(wipe, null);
+assert(!wipe.pokeZoneId && !wipe.pzId, "apagar PokeZone remove PZ no sqm");
 
 let filled = 0;
 floodFill(map, 0, 0, 7, 8, 6, (x, y) => {
@@ -128,6 +164,9 @@ const saved = await saveOtbmBuffer(bytes, "world.otbm");
 assert(saved.ground[2][2] === 4, "loader water");
 const active = loadActiveMap();
 assert(active.w === 8, "active cache");
+assert(active.pokeZones.some((z) => z.id === 2), "loader pokeZones");
+assert(active.pzPads.some((p) => p.id === 7 && p.pokeZoneId === 2), "loader pzPads");
+assert(active.wildSpawns.some((s) => s.x === 0 && s.y === 1 && s.pzId === 7), "loader spawn→pz");
 const exported = await exportOtbmBytes();
 assert(parseOtbm(exported).tiles.get(tileKey(2, 2, 7)).items[0].id === BUILTIN_TILE_IDS.water, "export");
 assert((parseOtbm(exported).tiles.get(tileKey(5, 2, 7)).flags & TILESTATE_PROTECTIONZONE) === TILESTATE_PROTECTIONZONE, "export SAFE");

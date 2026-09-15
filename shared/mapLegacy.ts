@@ -57,6 +57,8 @@ export function buildLegacyMap(): RuntimeMap {
   const roofs: number[][] = [];
   const flags: number[][] = [];
   const houses: number[][] = [];
+  const pokeZoneIds: number[][] = [];
+  const pzIds: number[][] = [];
   const cells: Array<Array<{ items: number[] }>> = [];
   const wildSpawns: Array<{ x: number; y: number }> = [];
 
@@ -67,6 +69,8 @@ export function buildLegacyMap(): RuntimeMap {
     roofs[y] = [];
     flags[y] = [];
     houses[y] = [];
+    pokeZoneIds[y] = [];
+    pzIds[y] = [];
     cells[y] = [];
     for (let x = 0; x < w; x++) {
       const c = row[x];
@@ -84,6 +88,8 @@ export function buildLegacyMap(): RuntimeMap {
       cells[y][x] = { items };
       flags[y][x] = 0;
       houses[y][x] = 0;
+      pokeZoneIds[y][x] = 0;
+      pzIds[y][x] = 0;
 
       if (kind === 2) {
         ground[y][x] = 0;
@@ -129,6 +135,10 @@ export function buildLegacyMap(): RuntimeMap {
     cells,
     flags,
     houses,
+    pokeZoneIds,
+    pzIds,
+    pokeZones: [],
+    pzPads: [],
     wildSpawns,
     spawn: SPAWN,
     tile: 32,

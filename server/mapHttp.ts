@@ -5,6 +5,7 @@ import {
   reloadMap,
   saveOtbmBuffer,
 } from "./mapLoader.ts";
+import { habitatExport } from "../shared/editor/mapRuntime.ts";
 
 function readBody(req: IncomingMessage & { body?: unknown }): Promise<Buffer> {
   const existing = req.body;
@@ -50,6 +51,9 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
         "x-map-height": String(runtime.h),
         "x-map-z": String(runtime.z),
         "x-map-tiles": String(runtime.w * runtime.h),
+        "x-map-pokezones": String(runtime.pokeZones?.length || 0),
+        "x-map-pz-pads": String(runtime.pzPads?.length || 0),
+        "x-map-wild-spawns": String(runtime.wildSpawns?.length || 0),
       });
       res.end(Buffer.from(bytes));
       return true;
@@ -58,6 +62,7 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
     if (pathname === "/api/map/json" && req.method === "GET") {
       const runtime = loadActiveMap();
       const small = runtime.w * runtime.h <= 4096;
+      const habitat = habitatExport(runtime);
       sendJson(res, 200, {
         w: runtime.w,
         h: runtime.h,
@@ -65,6 +70,9 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
         towns: runtime.towns,
         waypoints: runtime.waypoints,
         spawn: runtime.spawn,
+        pokeZones: habitat.pokeZones,
+        pzPads: habitat.pzPads,
+        wildSpawns: habitat.wildSpawns,
         ...(small
           ? {
               ground: runtime.ground,
@@ -74,7 +82,8 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
               cells: runtime.cells,
               flags: runtime.flags,
               houses: runtime.houses,
-              wildSpawns: runtime.wildSpawns,
+              pokeZoneIds: runtime.pokeZoneIds,
+              pzIds: runtime.pzIds,
             }
           : {}),
       });
@@ -89,7 +98,14 @@ export async function handleMapHttp(req: IncomingMessage, res: ServerResponse, p
       }
       const name = safeFilename(String(req.headers["x-map-filename"] || "world.otbm"));
       const runtime = await saveOtbmBuffer(new Uint8Array(body), name);
-      sendJson(res, 200, { ok: true, w: runtime.w, h: runtime.h, z: runtime.z, spawn: runtime.spawn });
+      sendJson(res, 200, {
+        ok: true,
+        w: runtime.w,
+        h: runtime.h,
+        z: runtime.z,
+        spawn: runtime.spawn,
+        ...habitatExport(runtime),
+      });
       return true;
     }
 
