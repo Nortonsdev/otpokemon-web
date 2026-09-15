@@ -1,6 +1,7 @@
 import { loadActiveMap, reloadMap } from "./mapLoader.ts";
 import { MAP_W, MAP_H, MAP_Z, SPAWN, ITEMS, buildLegacyMap } from "../shared/mapLegacy.ts";
 import { TILESTATE_PROTECTIONZONE, TILESTATE_NOPVPZONE, TILESTATE_PVPZONE } from "../shared/editor/otbm.ts";
+import { pokeZoneForSpawnTile } from "../shared/pokeZone.js";
 
 export { MAP_W, MAP_H, MAP_Z, SPAWN, ITEMS, buildLegacyMap, reloadMap };
 
@@ -146,4 +147,10 @@ export function isNoPvpZone(x, y) {
 
 export function isPvpZone(x, y) {
   return (tileFlags(x, y) & TILESTATE_PVPZONE) !== 0;
+}
+
+/** PokeZone do tile de spawn (null se o mapa ainda não tiver radius no runtime). */
+export function pokeZoneAtSpawnTile(x, y) {
+  const r = runtime();
+  return pokeZoneForSpawnTile(r.wildSpawns, x, y);
 }

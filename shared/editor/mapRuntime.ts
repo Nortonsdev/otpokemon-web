@@ -37,7 +37,15 @@ export interface RuntimeMap {
   flags: number[][];
   /** House id per cell (0 = none). */
   houses: number[][];
-  wildSpawns: Array<{ x: number; y: number; dexId?: string; species?: string; shiny?: boolean }>;
+  wildSpawns: Array<{
+    x: number;
+    y: number;
+    dexId?: string;
+    species?: string;
+    shiny?: boolean;
+    /** PokeZone wander radius from OTBM spawnMonster (editor). */
+    radius?: number;
+  }>;
   spawn: { x: number; y: number; z: number };
   tile: number;
   towns: OtbmMap["towns"];
@@ -167,12 +175,14 @@ export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ
     runtime.houses[tile.y][tile.x] = tile.houseId || 0;
     if (tile.spawnMonster || tile.zones?.includes(ZONE_SPAWN)) {
       const parsed = parseSpeciesDexId(tile.spawnMonster?.dexId);
+      const spawnRadius = tile.spawnMonster?.radius;
       runtime.wildSpawns.push({
         x: tile.x,
         y: tile.y,
         dexId: parsed?.id,
         species: parsed?.slug,
         shiny: parsed?.shiny,
+        ...(spawnRadius != null ? { radius: spawnRadius } : {}),
       });
     }
   }
