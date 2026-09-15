@@ -2,7 +2,16 @@ import { playCatchAudio } from "./catchSfx.js";
 
 const TILE = 32;
 
-function footCenter(scene, st) {
+function footCenter(scene, st, msg = null) {
+  if (msg?.x != null && msg?.y != null) {
+    return { x: msg.x * TILE + TILE / 2, y: msg.y * TILE + TILE / 2 + 4 };
+  }
+  const sprite = st?.id != null ? scene.sprites?.get(st.id) : null;
+  if (sprite?.active) {
+    const w = sprite.displayWidth || TILE;
+    const h = sprite.displayHeight || TILE;
+    return { x: sprite.x + w / 2, y: sprite.y + h / 2 };
+  }
   const d = scene.displayTile(st);
   return { x: d.x * TILE + TILE / 2, y: d.y * TILE + TILE / 2 + 4 };
 }
@@ -19,7 +28,7 @@ export function playCatchSequence(scene, msg) {
   if (!fromSt || !toSt) return;
 
   const from = footCenter(scene, fromSt);
-  const to = footCenter(scene, toSt);
+  const to = footCenter(scene, toSt, msg);
   const depth = Math.round(toSt.y) * 10 + 24;
   const corpse = scene.sprites.get(msg.to);
 
