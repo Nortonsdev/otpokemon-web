@@ -1020,7 +1020,8 @@ class EditorApp {
         applySpawnToTile(t, dexId);
         const parsed = parseSpeciesDexId(dexId)!;
         this.msg(`Spawn ${parsed.id} ${parsed.name}`);
-      } else {
+      }
+    } else {
       applyZoneToTile(t, clear ? null : kind);
       const label = kind === "protection" ? "SAFE" : kind === "nopvp" ? "non-PVP" : "PVP";
       this.msg(clear ? `${label} removida.` : `${label} (OTBM flag)`);
