@@ -57,7 +57,11 @@ const NAMEPLATE_SCREEN_STROKE = 1.125;
 const BAR_W = 16;
 const BAR_H = 2;
 const BAR_PAD = 1;
-/** Nameplates e barras de HP no mundo (sprites). HUD fora do canvas não usa isto. */
+/**
+ * Overlays de criatura no canvas (nome/nível/dex + barra de HP).
+ * false = nenhum kind (player, npc, wild, pokemon out, corpse) desenha plate/HP no mundo.
+ * HUD fora do canvas (pokebar, inventário, barra de ataques, Player Info, batalha) não usa isto.
+ */
 const WORLD_CREATURE_OVERLAYS = false;
 
 function nameplateFillColor(kind) {
@@ -612,6 +616,8 @@ export class GameScene extends Phaser.Scene {
       this.hpBars.set(c.id, { outline, track, fg });
       this.setHpBar(c.id, c.hp, c.hpMax);
       this.refreshPlate(c.id);
+    } else {
+      this.hideWorldOverlays(c.id);
     }
     if (c.dead) this.applyCorpseLook(c.id);
   }
@@ -640,6 +646,12 @@ export class GameScene extends Phaser.Scene {
     bar.track?.setVisible(visible);
     bar.bg?.setVisible(visible);
     bar.fg?.setVisible(visible);
+  }
+
+  /** Esconde nameplate + HP no mundo para qualquer kind (player/npc/wild/pokemon/corpse). */
+  hideWorldOverlays(id) {
+    this.plates.get(id)?.setVisible(false);
+    this.setHpBarVisible(this.hpBars.get(id), false);
   }
 
   uiScale() {
@@ -763,9 +775,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setAngle(0);
     sprite.clearTint();
     sprite.setScale(1);
-    const plate = this.plates.get(id);
-    plate?.setVisible(false);
-    this.setHpBarVisible(this.hpBars.get(id), false);
+    this.hideWorldOverlays(id);
   }
 
   layoutCreature(id) {
@@ -788,8 +798,7 @@ export class GameScene extends Phaser.Scene {
         d.x * TILE + (foot * TILE) / 2,
         d.y * TILE + (foot * TILE) / 2 + (size > TILE ? 4 : 0)
       );
-      this.plates.get(id)?.setVisible(false);
-      this.setHpBarVisible(this.hpBars.get(id), false);
+      this.hideWorldOverlays(id);
       sprite.setDepth(depth);
       return;
     }
@@ -816,6 +825,7 @@ export class GameScene extends Phaser.Scene {
       sprite.setPosition(px, py);
       if (hasAnimFrames(sprite.texture)) sprite.setFrame(frameIndex(st.dir, walking, st.phase));
       if (WORLD_CREATURE_OVERLAYS) this.layoutNameplate(id, px, py, depth);
+      else this.hideWorldOverlays(id);
       sprite.setDepth(depth);
   }
 
