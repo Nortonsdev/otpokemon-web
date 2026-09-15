@@ -274,8 +274,12 @@
         <div id="hud-bottom-stack" class="hud-bottom-stack">
           <div id="attack-bar" class="attack-bar hidden" aria-label="Ataques do Pokémon" aria-hidden="true"></div>
           <footer id="chat-dock" class="chat-dock" data-win="chat">
-          <div class="chat-head">
-            <span class="chat-head-title">Chat</span>
+          <div class="chat-tabs" id="chat-tabs">
+            <button type="button" data-ch="global">Servidor</button>
+            <button type="button" data-ch="local" class="active">Padrão</button>
+            <button type="button" data-ch="sistema">Sistema</button>
+            <button type="button" data-ch="combate">Combate</button>
+            <span class="chat-tabs-spacer" aria-hidden="true"></span>
             <button
               type="button"
               id="chat-hide-toggle"
@@ -285,15 +289,9 @@
               aria-pressed="false"
             ></button>
           </div>
-          <div class="chat-tabs" id="chat-tabs">
-            <button type="button" data-ch="global">Servidor</button>
-            <button type="button" data-ch="local" class="active">Padrão</button>
-            <button type="button" data-ch="sistema">Sistema</button>
-            <button type="button" data-ch="combate">Combate</button>
-          </div>
           <div id="chat-log"></div>
           <div class="chat-input-row">
-            <input id="chat-input" maxlength="120" placeholder="Digite…  1–5 ataques" autocomplete="off" />
+            <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10" autocomplete="off" />
           </div>
         </footer>
         </div>
