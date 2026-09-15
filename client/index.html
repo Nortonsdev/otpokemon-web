@@ -279,10 +279,19 @@
             <button type="button" data-ch="local" class="active">Padrão</button>
             <button type="button" data-ch="sistema">Sistema</button>
             <button type="button" data-ch="combate">Combate</button>
+            <span class="chat-tabs-spacer" aria-hidden="true"></span>
+            <button
+              type="button"
+              id="chat-hide-toggle"
+              class="mw-tool mw-min chat-hide-btn"
+              title="Ocultar chat (Ctrl+Shift+C)"
+              aria-label="Ocultar chat"
+              aria-pressed="false"
+            ></button>
           </div>
           <div id="chat-log"></div>
           <div class="chat-input-row">
-            <input id="chat-input" maxlength="120" placeholder="Digite…  1–5 ataques" autocomplete="off" />
+            <input id="chat-input" maxlength="120" placeholder="Digite…  m1–m10" autocomplete="off" />
           </div>
         </footer>
         </div>

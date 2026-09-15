@@ -9,10 +9,10 @@ import {
 
 const PREVIEW_MAP = buildLegacyMap();
 import { LOOK_NAME, STEP_MS } from "../../server/species.js";
-import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchSequence } from "./catchVfx.js";
 import { CATCH_BALL_ITEMS } from "./ballIcons.js";
-import { pokemonPlateText, speciesAssetSlug } from "../../shared/kantoDex.js";
+import { isChatHidden, showChatPanel } from "./ui/chatDock.js";
+import { speciesAssetSlug } from "../../shared/kantoDex.js";
 
 const TILE = 32;
 /** 64×64 (2×2 tile) meadow sheets — keep in sync with tools/extract_otp207_sprites.py exports. */
@@ -47,56 +47,6 @@ function monFrame(name) {
 function creatureSize(tex) {
   if (tex === "human" || LARGE_MONS.has(tex)) return 64;
   return 32;
-}
-
-/** Alvo em pixels de tela (câmera zoom=2 → fontSize world ≈ alvo/2). */
-const NAMEPLATE_SCREEN_PX = 5.875;
-const NAMEPLATE_SCREEN_PX_MAX = 6.5;
-const NAMEPLATE_SCREEN_STROKE = 1.125;
-/** Largura/altura da barra de HP em px de tela (com uiScale na layout). */
-const BAR_W = 16;
-const BAR_H = 2;
-const BAR_PAD = 1;
-/**
- * Overlays de criatura no canvas (nome/nível/dex + barra de HP).
- * false = nenhum kind (player, npc, wild, pokemon out, corpse) desenha plate/HP no mundo.
- * HUD fora do canvas (pokebar, inventário, barra de ataques, Player Info, batalha) não usa isto.
- */
-const WORLD_CREATURE_OVERLAYS = false;
-
-function nameplateFillColor(kind) {
-  if (kind === "npc") return "#00d4e8";
-  if (kind === "player") return "#7dce6a";
-  if (kind === "wild") return "#7aa2f7";
-  return "#ffffff";
-}
-
-function nameplateTextStyle(kind) {
-  return {
-    fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-    fontSize: "3px",
-    fontStyle: "bold",
-    color: nameplateFillColor(kind),
-    stroke: "#000000",
-    strokeThickness: 1,
-    resolution: Math.max(2, Math.ceil(typeof window !== "undefined" ? window.devicePixelRatio || 2 : 2)),
-    padding: { x: 0, y: 0 },
-  };
-}
-
-function isWildCreature(st) {
-  return st?.kind === "wild" || !!st?.wild;
-}
-
-function nameplateNameBottomY(spriteY, st, size) {
-  const playerOrNpc = st?.kind === "player" || st?.kind === "npc";
-  if (playerOrNpc || size > TILE) return spriteY + 6;
-  return spriteY - 3;
-}
-
-/** Topo da barra de HP para wilds: colada sob os pés do sprite (origin 0,0). */
-function wildHpBarTopY(spriteY, size) {
-  return spriteY + size;
 }
 
 function tileWorld(x, y, size) {
@@ -151,8 +101,6 @@ export class GameScene extends Phaser.Scene {
     this.net = net;
     this.hud = hud;
     this.sprites = new Map();
-    this.plates = new Map();
-    this.hpBars = new Map();
     this.state = new Map();
     this.youId = null;
     this.mapData = null;
@@ -311,11 +259,7 @@ export class GameScene extends Phaser.Scene {
 
   clearWorld() {
     for (const s of this.sprites.values()) s.destroy();
-    for (const p of this.plates.values()) p.destroy();
-    for (const bar of this.hpBars.values()) this.destroyHpBar(bar);
     this.sprites.clear();
-    this.plates.clear();
-    this.hpBars.clear();
     this.state.clear();
     this.groundLayer.removeAll(true);
     this.clearActorLayer();
@@ -381,6 +325,7 @@ export class GameScene extends Phaser.Scene {
 
   isValidTarget(st) {
     if (!st) return false;
+    if (st.dead) return false;
     if (st.kind === "npc" || st.canTarget === false) return false;
     if (this.isOwnCreature(st)) return false;
     return true;
@@ -590,68 +535,14 @@ export class GameScene extends Phaser.Scene {
       walkStart: 0,
       walkMs: 0,
     });
-    this.setHpBar(c.id, c.hp, c.hpMax);
-    if (WORLD_CREATURE_OVERLAYS) {
-      const plateY = nameplateNameBottomY(pos.y, c, size);
-      const plate = this.add
-        .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
-        .setOrigin(0.5, 1);
-      plate.setDepth(c.y * 10 + 10);
-      this.addActor(plate);
-      this.plates.set(c.id, plate);
-      const cx = pos.x + size / 2;
-      const outline = this.add
-        .rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000)
-        .setOrigin(0.5, 0);
-      const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
-      const fg = this.add
-        .rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, c.kind === "npc" ? 0x00d4e8 : 0x2fc24a)
-        .setOrigin(0, 0);
-      outline.setDepth(c.y * 10 + 11);
-      track.setDepth(c.y * 10 + 12);
-      fg.setDepth(c.y * 10 + 13);
-      this.addActor(outline);
-      this.addActor(track);
-      this.addActor(fg);
-      this.hpBars.set(c.id, { outline, track, fg });
-      this.setHpBar(c.id, c.hp, c.hpMax);
-      this.refreshPlate(c.id);
-    } else {
-      this.hideWorldOverlays(c.id);
-    }
+    this.syncCreatureHp(c.id, c.hp, c.hpMax);
     if (c.dead) this.applyCorpseLook(c.id);
   }
 
   despawn(id) {
     this.sprites.get(id)?.destroy();
-    this.plates.get(id)?.destroy();
-    this.destroyHpBar(this.hpBars.get(id));
     this.sprites.delete(id);
-    this.plates.delete(id);
-    this.hpBars.delete(id);
     this.state.delete(id);
-  }
-
-  destroyHpBar(bar) {
-    if (!bar) return;
-    bar.outline?.destroy();
-    bar.track?.destroy();
-    bar.bg?.destroy();
-    bar.fg?.destroy();
-  }
-
-  setHpBarVisible(bar, visible) {
-    if (!bar) return;
-    bar.outline?.setVisible(visible);
-    bar.track?.setVisible(visible);
-    bar.bg?.setVisible(visible);
-    bar.fg?.setVisible(visible);
-  }
-
-  /** Esconde nameplate + HP no mundo para qualquer kind (player/npc/wild/pokemon/corpse). */
-  hideWorldOverlays(id) {
-    this.plates.get(id)?.setVisible(false);
-    this.setHpBarVisible(this.hpBars.get(id), false);
   }
 
   uiScale() {
@@ -659,106 +550,12 @@ export class GameScene extends Phaser.Scene {
     return z > 0 ? 1 / z : 1;
   }
 
-  /** Texto ~NAMEPLATE_SCREEN_PX px na tela; fontSize em world divide pelo zoom (sem pisos altos). */
-  applyNameplateScreenScale(plate) {
-    const z = Math.max(0.25, this.cameras.main?.zoom || 1);
-    const screenPx = Math.min(NAMEPLATE_SCREEN_PX_MAX, NAMEPLATE_SCREEN_PX);
-    const worldFont = Math.max(1, Math.round(screenPx / z));
-    plate.setFontSize(worldFont);
-    plate.setScale(1);
-    const strokeWorld = Math.max(1, Math.round(NAMEPLATE_SCREEN_STROKE / z));
-    plate.setStroke("#000000", strokeWorld);
-    plate.setResolution(
-      Math.max(2, Math.ceil((typeof window !== "undefined" ? window.devicePixelRatio : 2) || 2))
-    );
-  }
-
-  layoutNameplate(id, spriteX, spriteY, depth) {
-    if (!WORLD_CREATURE_OVERLAYS) return;
-    const sprite = this.sprites.get(id);
-    const plate = this.plates.get(id);
-    if (!sprite || !plate) return;
+  /** Atualiza HP no estado da criatura (HUD/alvo); sem overlay no mundo. */
+  syncCreatureHp(id, hp, hpMax) {
     const st = this.state.get(id);
-    const size = st?.spriteSize || creatureSize(sprite.texture.key);
-    const ui = this.uiScale();
-    this.applyNameplateScreenScale(plate);
-    const cx = spriteX + size / 2;
-    const nameBottom = nameplateNameBottomY(spriteY, st, size);
-    plate.setPosition(Math.round(cx), Math.round(nameBottom));
-    plate.setDepth(depth + 1);
-    const bar = this.hpBars.get(id);
-    if (!bar) return;
-    const wild = isWildCreature(st);
-    if (wild) plate.setVisible(false);
-    else plate.setVisible(true);
-
-    const nameGap = Math.max(1, Math.round(1 * ui));
-    const barBlockH = (BAR_H + BAR_PAD * 2) * ui;
-    const z = Math.max(0.25, this.cameras.main?.zoom || 1);
-    const textH = Math.max(1, Math.round(NAMEPLATE_SCREEN_PX / z));
-    const playerStack = st?.kind === "player";
-    let barTop;
-    if (wild) barTop = wildHpBarTopY(spriteY, size);
-    else if (playerStack) barTop = nameBottom - textH - nameGap - barBlockH;
-    else barTop = nameBottom + nameGap;
-    const innerTop = barTop + BAR_PAD * ui;
-    const outW = BAR_W + BAR_PAD * 2;
-    const outH = BAR_H + BAR_PAD * 2;
-    for (const part of [bar.outline, bar.track, bar.fg]) part?.setScale(ui);
-    bar.outline?.setSize(outW, outH);
-    bar.outline?.setOrigin(0.5, 0);
-    bar.outline?.setPosition(cx, barTop);
-    bar.outline?.setDepth(depth + 2);
-    bar.track?.setSize(BAR_W, BAR_H);
-    bar.track?.setOrigin(0.5, 0);
-    bar.track?.setPosition(cx, innerTop);
-    bar.track?.setDepth(depth + 3);
-    bar.fg.height = BAR_H;
-    bar.fg.setOrigin(0, 0);
-    bar.fg.setPosition(cx - (BAR_W * ui) / 2, innerTop);
-    bar.fg.setDepth(depth + 4);
-    this.setHpBar(id, st?.hp, st?.hpMax);
-  }
-
-  setHpBar(id, hp, hpMax) {
-    const st = this.state.get(id);
-    if (st) {
-      if (hp != null) st.hp = hp;
-      if (hpMax != null) st.hpMax = hpMax;
-    }
-    const bar = this.hpBars.get(id);
-    if (!bar) return;
-    const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
-    const ratio = hpPercent(hp ?? st?.hp ?? 0, max);
-    bar.fg.width = BAR_W * ratio;
-    if (st?.kind === "npc") bar.fg.setFillStyle(0x00d4e8);
-    else bar.fg.setFillStyle(hpColorHex(ratio));
-  }
-
-  refreshPlate(id) {
-    if (!WORLD_CREATURE_OVERLAYS) return;
-    const st = this.state.get(id);
-    const plate = this.plates.get(id);
-    if (!st || !plate) return;
-    if (st.kind === "npc") {
-      plate.setText(`${st.name} (!)`);
-      plate.setColor("#00d4e8");
-      plate.setVisible(true);
-    } else if (st.kind === "player") {
-      plate.setText(st.name);
-      plate.setColor("#7dce6a");
-      plate.setVisible(true);
-    } else if (isWildCreature(st)) {
-      plate.setText("");
-      plate.setVisible(false);
-    } else {
-      plate.setText(pokemonPlateText(st));
-      plate.setColor("#ffffff");
-      plate.setVisible(true);
-    }
-    this.applyNameplateScreenScale(plate);
-    const sprite = this.sprites.get(id);
-    if (sprite) this.layoutNameplate(id, sprite.x, sprite.y, sprite.depth);
+    if (!st) return;
+    if (hp != null) st.hp = hp;
+    if (hpMax != null) st.hpMax = hpMax;
   }
 
   applyCorpseLook(id) {
@@ -775,7 +572,6 @@ export class GameScene extends Phaser.Scene {
     sprite.setAngle(0);
     sprite.clearTint();
     sprite.setScale(1);
-    this.hideWorldOverlays(id);
   }
 
   layoutCreature(id) {
@@ -798,7 +594,6 @@ export class GameScene extends Phaser.Scene {
         d.x * TILE + (foot * TILE) / 2,
         d.y * TILE + (foot * TILE) / 2 + (size > TILE ? 4 : 0)
       );
-      this.hideWorldOverlays(id);
       sprite.setDepth(depth);
       return;
     }
@@ -824,8 +619,6 @@ export class GameScene extends Phaser.Scene {
       }
       sprite.setPosition(px, py);
       if (hasAnimFrames(sprite.texture)) sprite.setFrame(frameIndex(st.dir, walking, st.phase));
-      if (WORLD_CREATURE_OVERLAYS) this.layoutNameplate(id, px, py, depth);
-      else this.hideWorldOverlays(id);
       sprite.setDepth(depth);
   }
 
@@ -877,9 +670,9 @@ export class GameScene extends Phaser.Scene {
       this.flash(msg.to);
       this.flash(msg.from);
       this.playStrike(msg.from, msg.to);
-      if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
-      this.refreshPlate(msg.to);
+      if (msg.hp != null) this.syncCreatureHp(msg.to, msg.hp, msg.hpMax);
       if (msg.dmg != null) this.floatDamage(msg.to, msg.dmg);
+      if (msg.hp === 0 && msg.to === this.targetId) this.clearTarget();
     }
     if (msg.t === "outfit" && msg.creature) this.spawn(msg.creature);
     if (msg.t === "down") {
@@ -892,6 +685,7 @@ export class GameScene extends Phaser.Scene {
         if (msg.y != null) st.y = msg.y;
       }
       this.applyCorpseLook(msg.id);
+      if (msg.id === this.targetId) this.clearTarget();
     }
     if (msg.t === "target") {
       if (msg.id == null) this.clearTarget(false);
@@ -1265,6 +1059,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.input.keyboard.enabled = true;
     if (this.keys.ENTER && Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
+      if (isChatHidden()) showChatPanel();
       document.getElementById("chat-input")?.focus();
       return;
     }

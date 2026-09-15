@@ -1,4 +1,5 @@
 import { WindowManager } from "./windows.js";
+import { bindChatDock } from "./ui/chatDock.js";
 import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
@@ -86,6 +87,7 @@ export class Hud {
     if (this.bound) return;
     this.bound = true;
     this.windows.bind();
+    bindChatDock();
     const wm = this.windows;
     const applyAll = wm.applyAll.bind(wm);
     wm.applyAll = () => {
@@ -289,6 +291,7 @@ export class Hud {
         c.hp = 0;
         c.plate = `${pokemonPlateText(c)}  0/${c.hpMax}`;
       }
+      if (this.target?.id === msg.id) this.setTarget(null);
       this.renderBattle();
       this.drawMinimap();
     }
