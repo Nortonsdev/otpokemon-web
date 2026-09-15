@@ -263,10 +263,20 @@ export class WindowManager {
     });
     head.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-act]");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.action(def.id, btn.dataset.act);
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.action(def.id, btn.dataset.act);
+        return;
+      }
+      const w = this.layout[def.id];
+      if (w?.open && w.min) {
+        e.preventDefault();
+        w.min = false;
+        this.raise(def.id);
+        this.applyAll();
+        this.persist();
+      }
     });
   }
 
@@ -282,7 +292,13 @@ export class WindowManager {
     if (!w) return;
     if (act === "lock") w.locked = !w.locked;
     if (act === "min") w.min = !w.min;
-    if (act === "close") w.open = false;
+    if (act === "close") {
+      if (w.open && !w.min) w.min = true;
+      else {
+        w.open = false;
+        w.min = false;
+      }
+    }
     if (act === "resize") w.expanded = !w.expanded;
     if (act === "wrench") {
       this.reorder = !this.reorder;
@@ -309,7 +325,7 @@ export class WindowManager {
     if (!w) return;
     if (!w.open || w.min) this.open(id);
     else {
-      w.open = false;
+      w.min = true;
       this.applyAll();
       this.persist();
     }
@@ -320,7 +336,7 @@ export class WindowManager {
     if (e.target.closest("[data-act]")) return;
     if (e.button !== 0) return;
     const w = this.layout[id];
-    if (!w || w.locked || !w.open) return;
+    if (!w || w.locked || !w.open || w.min) return;
     const el = document.querySelector(`[data-win="${id}"]`);
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -358,7 +374,7 @@ export class WindowManager {
     if (!w || !el || DOCKED.has(id)) return;
     const pad = 24;
     const width = el.offsetWidth || 120;
-    const height = w.min ? 24 : el.offsetHeight || 48;
+    const height = w.min ? 28 : el.offsetHeight || 48;
     const maxX = Math.max(0, window.innerWidth - Math.min(width, pad));
     const maxY = Math.max(pad, window.innerHeight - Math.min(height, pad));
     w.x = Math.max(0, Math.min(num(w.x, 0), maxX));
@@ -443,7 +459,11 @@ export class WindowManager {
       lockBtn.title = w.locked ? "Trancada (clique para mover)" : "Destrancada — arraste o título";
     }
     const minBtn = el.querySelector('[data-act="min"]');
-    if (minBtn) minBtn.title = w.min ? "Restaurar" : "Minimizar";
+    if (minBtn) {
+      minBtn.classList.toggle("on", !!w.min);
+      minBtn.title = w.min ? "Mostrar janela (Hide ON)" : "Ocultar conteúdo (minimizar)";
+    }
+    el.classList.toggle("win-strip", !!w.open && !!w.min);
     const resizeBtn = el.querySelector('[data-act="resize"]');
     if (resizeBtn) {
       resizeBtn.classList.toggle("on", !!w.expanded);
