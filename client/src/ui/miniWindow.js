@@ -1,5 +1,6 @@
 import { ITEM_BOX_IDS, itemBoxWindowWidthPx } from "../../../shared/itemBoxCaps.js";
 import { showChatPanel } from "./chatDock.js";
+import { bindOtpTopbar, syncOtpTopbar } from "./otpTopbar.js";
 
 const LEGACY_KEY = "otpokemon-hud-v4";
 const POS_PREFIX = "poketibia.win.";
@@ -29,13 +30,9 @@ export const WINDOW_DEFS = [
   { id: "pokebag", title: "Pokebag", mini: true },
   { id: "catch", title: "Catch", mini: true },
   { id: "npc", title: "NPC", mini: true, icon: "shop_button.png" },
+  { id: "options", title: "Opções", mini: true },
+  { id: "hotkeys", title: "Hotkeys", mini: true },
   { id: "chat", title: "Chat" },
-];
-
-const TOP_ICONS = [
-  { id: "status", src: "/assets/ui/tibia/modulemanager.png", title: "Player Info" },
-  { id: "pokebar", src: "/assets/ui/tibia/party.png", title: "Lista de Pokemon" },
-  { id: "npc", src: "/assets/ui/tibia/shop_button.png", title: "Diálogo NPC" },
 ];
 
 const DEFAULTS = {
@@ -86,17 +83,17 @@ const DEFAULTS = {
     bottom: CHAT_DOCK_H,
   },
   npc: { x: 240, y: 200, open: false, locked: false, min: false },
+  options: { x: 260, y: 48, open: false, locked: false, min: false },
+  hotkeys: { x: 260, y: 160, open: false, locked: false, min: false },
   chat: { open: true, dock: true },
 };
 
 const DOCKED = new Set(["chat"]);
-const MINI_IDS = new Set(["status", "pokebar", "npc", "bag", "coins", "pokebag", "catch"]);
+const MINI_IDS = new Set(["status", "pokebar", "npc", "bag", "coins", "pokebag", "catch", "options", "hotkeys"]);
 /** Janelas móveis: se não houver poketibia.win.<id>.lock, usa DEFAULTS (ignora locked legado). */
 const MOBILE_LOCK_DEFAULTS = new Set([...MINI_IDS, "inv"]);
 
-const WINDOWS_SRC = "/assets/ui/tibia/windows.png";
-const CLIP_BG = [0, 127, 182, 182];
-const CLIP_FG = [182, 127, 182, 182];
+const WINDOWS_SRC = "/assets/ui/window-panel.png";
 
 function clone(obj) {
   return JSON.parse(JSON.stringify(obj));
@@ -107,27 +104,10 @@ function num(v, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function sliceToUrl(img, x, y, w, h) {
-  const c = document.createElement("canvas");
-  c.width = w;
-  c.height = h;
-  const ctx = c.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-  const sx = img.width >= x + w && img.height >= y + h ? x : 0;
-  const sy = img.width >= x + w && img.height >= y + h ? y : 0;
-  ctx.drawImage(img, sx, sy, w, h, 0, 0, w, h);
-  return c.toDataURL("image/png");
-}
-
 export async function loadMiniWindowChrome() {
-  const img = new Image();
-  img.src = WINDOWS_SRC;
-  await img.decode();
-  const bg = sliceToUrl(img, ...CLIP_BG);
-  const fg = sliceToUrl(img, ...CLIP_FG);
   const root = document.documentElement.style;
-  root.setProperty("--mw-bg", `url("${bg}")`);
-  root.setProperty("--mw-fg", `url("${fg}")`);
+  root.setProperty("--mw-bg", `url("${WINDOWS_SRC}")`);
+  root.setProperty("--mw-fg", `url("${WINDOWS_SRC}")`);
   document.documentElement.classList.add("mw-ready");
 }
 
@@ -210,9 +190,10 @@ export class WindowManager {
     }
   }
 
-  bind() {
+  bind(hud) {
     if (this.bound) return;
     this.bound = true;
+    this.hud = hud || null;
     this.loadLocal();
     loadMiniWindowChrome().catch(() => {});
     for (const def of WINDOW_DEFS) {
@@ -487,43 +468,12 @@ export class WindowManager {
   }
 
   renderTaskbar() {
-    const icons = document.getElementById("hud-top-icons");
-    if (icons) {
-      if (!icons.dataset.ready) {
-        icons.dataset.ready = "1";
-        icons.innerHTML = "";
-        for (const spec of TOP_ICONS) {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "top-icon";
-          btn.dataset.winToggle = spec.id;
-          btn.title = spec.title;
-          btn.innerHTML = `<img src="${spec.src}" alt="" width="16" height="16" />`;
-          btn.onclick = () => this.toggle(spec.id);
-          icons.appendChild(btn);
-        }
-      }
-      for (const spec of TOP_ICONS) {
-        const btn = icons.querySelector(`[data-win-toggle="${spec.id}"]`);
-        const w = this.layout[spec.id];
-        btn?.classList.toggle("on", !!w?.open);
-        btn?.classList.toggle("off", !w?.open);
-      }
+    if (this.hud) {
+      bindOtpTopbar(this.hud);
+      syncOtpTopbar(this.hud);
     }
     const bar = document.getElementById("hud-taskbar");
-    if (!bar) return;
-    bar.innerHTML = "";
-    for (const def of WINDOW_DEFS) {
-      if (MINI_IDS.has(def.id)) continue;
-      const w = this.layout[def.id];
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "task-btn" + (w?.open ? " open" : " closed");
-      btn.textContent = def.title;
-      btn.title = w?.open ? def.title : `Reabrir ${def.title}`;
-      btn.onclick = () => this.open(def.id);
-      bar.appendChild(btn);
-    }
+    if (bar) bar.innerHTML = "";
   }
 
   persist() {

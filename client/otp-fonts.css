@@ -1,0 +1,28 @@
+@font-face {
+  font-family: "MonaKo";
+  src: url("/assets/fonts/MonaKo-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Times OTP";
+  src: url("/assets/fonts/times.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --otp-font-ui: "MonaKo", "Times OTP", "Times New Roman", Times, serif;
+  --otp-font-bitmap: "MonaKo", "Times OTP", Times, serif;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--otp-font-ui);
+}

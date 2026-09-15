@@ -193,7 +193,7 @@ export class World {
   attach(ws) {
     const client = { ws, account: null, playerId: null, charName: null };
     this.clients.set(ws, client);
-    this.send(ws, { t: "hello", motd: "OTPokemon Web milestone. demo/demo" });
+    this.send(ws, { t: "hello", motd: "Pokebyt Online. demo/demo" });
   }
 
   detach(ws) {

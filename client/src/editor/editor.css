@@ -1,13 +1,13 @@
 :root {
-  --ed-bg: #0c0b09;
-  --ed-panel: rgba(18, 16, 14, 0.92);
-  --ed-panel-border: rgba(232, 196, 96, 0.14);
-  --ed-fg: #e8e4dc;
-  --ed-muted: #9a9284;
-  --ed-accent: #d4b56a;
-  --ed-accent-dim: #8a7344;
-  --ed-btn: #1c1a16;
-  --ed-btn-hover: #2a2620;
+  --ed-bg: #060b1e;
+  --ed-panel: rgba(8, 16, 40, 0.94);
+  --ed-panel-border: rgba(90, 140, 220, 0.28);
+  --ed-fg: #e8eef8;
+  --ed-muted: #8aa0c4;
+  --ed-accent: #e8c05e;
+  --ed-accent-dim: #6a9fd8;
+  --ed-btn: #101c38;
+  --ed-btn-hover: #1a3268;
   --ed-danger: #d64040;
   --ed-safe: #2ec466;
   --ed-nopvp: #e8b430;
@@ -22,7 +22,7 @@ body,
   height: 100%;
   background: var(--ed-bg);
   color: var(--ed-fg);
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--otp-font-ui, "MonaKo", "Times OTP", Times, serif);
   overflow: hidden;
 }
 
@@ -156,10 +156,33 @@ body,
   box-shadow: 0 0 0 1px var(--ed-accent);
 }
 
-.palette-item canvas {
+.spawn-shiny-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 10px 8px;
+  font-size: 12px;
+  color: var(--ed-fg);
+  cursor: pointer;
+}
+.spawn-shiny-row.hidden { display: none !important; }
+.spawn-portrait {
   width: 32px;
   height: 32px;
   image-rendering: pixelated;
+  display: block;
+  margin: 0 auto 2px;
+}
+.spawn-portrait.shiny {
+  filter: hue-rotate(40deg) saturate(1.6) brightness(1.12);
+}
+.palette-item.spawn-mon span {
+  display: block;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .palette-item span {

@@ -1,0 +1,491 @@
+/* Pokebyt Online — OTP navy chrome over the existing HUD structure. */
+
+:root {
+  --otp-panel: url(/assets/ui/window-panel.png);
+  --otp-npc: url(/assets/ui/npc-dialog-window.png);
+  --otp-textedit: url(/assets/ui/textedit.png);
+  --otp-actionbar: url(/assets/ui/actionbar_background.png);
+  --otp-menubox: url(/assets/ui/menubox.png);
+  --otp-menubox2: url(/assets/ui/menubox2.png);
+  --otp-checkbox: url(/assets/ui/checkbox.png);
+  --otp-hp-fill: url(/assets/ui/hp-exp-bar.png);
+  --otp-text-bar: url(/assets/ui/text-bar.png);
+  --otp-pokebar-default: url(/assets/ui/game_pokebar/pokebar_default.png);
+  --otp-pokebar-use: url(/assets/ui/game_pokebar/pokebar_use.png);
+  --otp-pokebar-faint: url(/assets/ui/game_pokebar/pokebar_fainted.png);
+  --otp-pokebar-bar: url(/assets/ui/pokebar-bar-bg.png);
+  --otp-btn-round: url(/assets/ui/button_rounded2.png);
+  --mw-bg: url(/assets/ui/window-panel.png);
+  --mw-fg: url(/assets/ui/window-panel.png);
+  --myst-pokebar-slot: url(/assets/ui/game_pokebar/pokebar_default.png);
+  --myst-pokebar-slot-use: url(/assets/ui/game_pokebar/pokebar_use.png);
+}
+
+html,
+body {
+  font-family: var(--otp-font-ui);
+  color: #dce6f8;
+}
+
+/* ── Login / criar conta: navy OTP, sem cinza ── */
+.glass-card {
+  font-family: var(--otp-font-ui);
+  color: #e8f0ff;
+  background:
+    linear-gradient(180deg, rgba(18, 40, 88, 0.55) 0%, rgba(6, 12, 32, 0.82) 40%, rgba(4, 8, 22, 0.9) 100%),
+    #081028;
+  border: 8px solid transparent;
+  border-image: var(--otp-panel) 20 8 8 8 fill stretch;
+  border-radius: 0;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+.glass-card::before,
+.glass-card:after { display: none !important; }
+.glass-card .brand h1 {
+  font-family: var(--otp-font-ui);
+  color: #e8c05e;
+  text-shadow: 1px 1px 0 #000, 0 0 18px rgba(232, 192, 94, 0.35);
+  letter-spacing: 0;
+}
+.glass-card label,
+.glass-card .field-label { color: #9cb4e0; }
+.glass-card input {
+  font-family: var(--otp-font-ui);
+  background: #0a1428 url(/assets/ui/textedit.png);
+  background-size: 100% 100%;
+  border: 1px solid #2a4a88;
+  border-radius: 0;
+  color: #f4f7ff;
+}
+.glass-card input:focus {
+  border-color: #6a9fd8;
+  box-shadow: 0 0 0 2px rgba(80, 130, 210, 0.35);
+  background-color: #0c1a38;
+}
+.glass-card button {
+  font-family: var(--otp-font-ui);
+  border-radius: 0;
+  background: linear-gradient(180deg, #2a5088, #142848);
+  color: #f0f6ff;
+  border: 1px solid #5a8cc8;
+  box-shadow: none;
+}
+.glass-card button.ghost {
+  background: #101c38;
+  color: #dce6f8;
+  border-color: #3d5ca0;
+}
+.glass-card .hint a { color: #7ab4f0; }
+
+/* ── Top bar OTP ── */
+#hud-top {
+  height: 42px;
+  padding: 0 8px 0 6px;
+  gap: 6px;
+  background: var(--otp-actionbar) center / 100% 42px no-repeat, #081428;
+  border-bottom: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  z-index: 40;
+}
+.hud-top-icons {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 42px;
+}
+.otp-top-btn,
+.top-icon {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--otp-menubox) center / 30px 30px no-repeat;
+  box-shadow: none;
+  opacity: 1;
+  image-rendering: pixelated;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.otp-top-btn img,
+.top-icon img {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.otp-top-btn:hover,
+.top-icon:hover {
+  background-image: var(--otp-menubox2);
+  filter: brightness(1.18);
+  opacity: 1;
+}
+.otp-top-btn.on,
+.top-icon.on {
+  filter: brightness(1.28) saturate(1.15);
+  outline: 1px solid #e8c05e;
+  outline-offset: -2px;
+}
+.otp-top-btn.off,
+.top-icon.off { opacity: 0.78; filter: none; }
+.hud-taskbar { display: none !important; }
+
+/* ── Miniwindows navy 9-slice ── */
+.miniwindow,
+html.mw-ready .miniwindow:not(.player-info) {
+  color: #dce6f8;
+  font-family: var(--otp-font-ui);
+  border-style: solid;
+  border-width: 20px 8px 8px 8px;
+  border-color: transparent;
+  border-image-source: var(--otp-panel);
+  border-image-slice: 20 8 8 8 fill;
+  border-image-repeat: stretch;
+  background: transparent;
+}
+.miniwindow > .win-head {
+  top: -20px;
+  height: 20px;
+  min-height: 20px;
+  color: #e8c05e;
+  font-family: var(--otp-font-ui);
+  font-size: 11px;
+}
+.miniwindow .win-title {
+  color: #e8c05e;
+  text-shadow: 1px 1px 0 #000;
+}
+.miniwindow > .win-body {
+  background: transparent;
+}
+html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win):not(.player-info) {
+  border-image-source: var(--otp-panel);
+  border-image-slice: 20 8 8 8 fill;
+}
+
+.myst-frame {
+  border: 8px solid transparent;
+  border-image: var(--otp-panel) 20 8 8 8 fill stretch;
+  background: transparent;
+}
+.myst-frame > .win-head {
+  color: #e8c05e;
+  border-bottom: 1px solid rgba(80, 120, 200, 0.35);
+  background: transparent;
+}
+
+.win-tools button {
+  background: #142448;
+  color: #e8f0ff;
+}
+
+/* ── Player Info: OTP print, PNG/alpha, sem caixa cinza ── */
+#hud-pokeinfo {
+  width: 280px;
+  background: transparent !important;
+}
+.player-info,
+.player-info > .win-body,
+.pi-body,
+.pi-wrap {
+  background: transparent !important;
+  box-shadow: none;
+  border: 0;
+}
+.pi-wrap {
+  width: 280px;
+  min-height: 136px;
+}
+.pi-panel {
+  left: 74px;
+  top: 10px;
+  width: 200px;
+  height: auto;
+  padding: 8px 8px 6px;
+  background: rgba(8, 16, 36, 0.88);
+  border: 1px solid #1c3268;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+.pi-nameplate {
+  color: #e8c05e;
+  font-family: var(--otp-font-ui);
+  font-size: 12px;
+  font-weight: 400;
+  height: 14px;
+  margin-bottom: 4px;
+  text-shadow: 1px 1px 0 #000;
+}
+.pi-row {
+  grid-template-columns: 12px 28px 1fr 34px;
+  height: 12px;
+  gap: 3px;
+  margin-bottom: 3px;
+}
+.pi-lab {
+  color: #c5d4ea;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-shadow: 1px 1px 0 #000;
+}
+.pi-bar {
+  height: 5px;
+  background: #05080e;
+  border: 1px solid #000;
+  border-radius: 1px;
+  overflow: hidden;
+  box-shadow: none;
+}
+.pi-fill {
+  height: 100%;
+  background-image: var(--otp-hp-fill);
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+}
+.pi-row.hp .pi-fill { background-color: #2fc24a; background-blend-mode: multiply; mix-blend-mode: normal; }
+.pi-row.exp .pi-fill { background-color: #18b1f9; background-blend-mode: multiply; mix-blend-mode: normal; }
+.pi-row.fish .pi-fill { background-color: #6b6dc7; background-blend-mode: multiply; mix-blend-mode: normal; }
+.pi-row.stm .pi-fill { background-color: #e56c00; background-blend-mode: multiply; mix-blend-mode: normal; }
+.pi-pct {
+  color: #f3f6fa;
+  font-size: 8px;
+  font-family: var(--otp-font-ui);
+}
+.pi-ring {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #1a2438 0%, #070b14 70%);
+  box-shadow: 0 0 0 2px #0a1018, 0 0 0 3px #1a2848;
+  overflow: hidden;
+}
+.pi-portrait { width: 68px; height: 68px; }
+.pi-lv {
+  background: linear-gradient(180deg, #e04850, #9a181c);
+  color: #fff;
+  font-family: var(--otp-font-ui);
+  bottom: -12px;
+}
+.pi-chips { gap: 6px; }
+.pi-chip {
+  background: rgba(6, 10, 16, 0.92);
+  border: 1.5px solid #e03840;
+  border-radius: 6px;
+  color: #f0f4fa;
+  font-family: var(--otp-font-ui);
+}
+.player-info.win-min > .win-head {
+  background: #101c3c;
+  border: 1px solid #3d5ca0;
+}
+
+/* ── Pokebar OTP slots (alpha, sem fundo quadrado) ── */
+#hud-pokebar.miniwindow > .win-body.pokebar-body,
+.pokebar-list {
+  background: transparent !important;
+}
+.pokebar-list {
+  background-image: none !important;
+}
+.poke-slot {
+  width: 183px;
+  height: 43px;
+  left: 0;
+}
+.poke-slot-bg {
+  left: 0;
+  top: 0;
+  width: 183px;
+  height: 43px;
+  background: var(--otp-pokebar-default) no-repeat left top;
+  background-size: 183px 43px;
+  image-rendering: pixelated;
+}
+.poke-slot.out .poke-slot-bg {
+  background-image: var(--otp-pokebar-use);
+}
+.poke-slot.faint .poke-slot-bg {
+  background-image: var(--otp-pokebar-faint);
+}
+.poke-slot.empty .poke-slot-bg { opacity: 0.55; }
+.poke-ico {
+  left: 6px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: transparent;
+  border: 0;
+}
+.poke-slot.out .poke-name { color: #7dff9a; }
+.poke-hp {
+  left: 66px;
+  width: 87px;
+  height: 12px;
+  background: var(--otp-pokebar-bar) no-repeat center / 100% 100%;
+  border: 0;
+}
+.poke-hp-fill { background: #02ec0d; }
+.poke-name { color: #cda953; font-family: var(--otp-font-ui); }
+.poke-pct { color: #c5e4f9; font-family: var(--otp-font-ui); }
+
+.poke-active-status {
+  background: rgba(8, 24, 16, 0.9);
+  border: 1px solid #3cff6a;
+}
+.poke-active-status strong { color: #7dff9a; }
+
+/* ── Battle: seleção vermelha ── */
+.battle-row {
+  background: rgba(8, 16, 36, 0.88);
+  border: 1px solid #2a4a88;
+  border-radius: 0;
+  font-family: var(--otp-font-ui);
+}
+.battle-row:hover { border-color: #6a9fd8; }
+.battle-row.targeted {
+  background: #3a1018;
+  border-color: #e02828;
+  box-shadow: inset 0 0 0 1px #ff5050;
+  color: #ffd0d0;
+}
+.battle-hp { background: #05080e; }
+.battle-hp > span { background: #2fc24a; }
+
+/* ── NPC 9-slice ── */
+.miniwindow.npc-dialog {
+  min-width: 220px;
+  width: auto;
+  max-width: 420px;
+}
+.miniwindow.npc-dialog > .win-head {
+  background: transparent;
+}
+.npc-dialog-frame {
+  border: 16px solid transparent;
+  border-image: var(--otp-npc) 16 fill stretch;
+  padding: 8px 10px 10px;
+  min-height: 48px;
+  color: #e8e8e8;
+  font-family: var(--otp-font-ui);
+  background: transparent;
+}
+.otp-btn {
+  font-family: var(--otp-font-ui);
+}
+
+/* ── Chat navy + textedit ── */
+.chat-dock {
+  background: linear-gradient(180deg, #1e4088 0%, #060b1e 32%, #060b1e 100%);
+  border-color: #1a3568;
+  border-radius: 0;
+}
+.chat-popover,
+.chat-ctx-menu {
+  background: #101c3c;
+  border: 1px solid #3d5ca0;
+}
+.chat-input-row {
+  background: transparent;
+  border-top: 1px solid #1a3568;
+  padding: 2px 6px 4px;
+}
+.chat-input-row input {
+  height: 26px;
+  font-family: var(--otp-font-ui);
+  background: var(--otp-textedit) center / 100% 100% no-repeat;
+  color: #e8f0ff;
+  border: 1px solid #2a4a88;
+  padding: 4px 10px;
+}
+.chat-input-row input:focus {
+  outline: 1px solid #5a8cc8;
+  background-color: #0c1a38;
+}
+.chat-filter-panel input[type="checkbox"] {
+  appearance: none;
+  width: 19px;
+  height: 19px;
+  background: var(--otp-checkbox) 0 0 / 19px 79px no-repeat;
+  image-rendering: pixelated;
+  border: 0;
+  vertical-align: middle;
+}
+.chat-filter-panel input[type="checkbox"]:checked {
+  background-position: 0 -60px;
+}
+
+/* ── Attack clock ── */
+.attack-slot {
+  background: var(--myst-action-slot) no-repeat center / 44px 44px;
+}
+.attack-slot.locked { cursor: default; filter: brightness(0.72); }
+.attack-slot.cd-active { box-shadow: 0 0 0 2px #e8c05e; }
+.attack-cd-clock {
+  position: absolute;
+  inset: 1px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(from -90deg, rgba(4, 8, 18, 0.78) var(--cd-deg, 0deg), transparent 0);
+}
+.attack-cd-clock::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 2px;
+  height: 42%;
+  background: #f4f7ff;
+  transform-origin: 50% 0;
+  transform: translate(-50%, 0) rotate(var(--cd-deg, 0deg));
+  box-shadow: 0 0 2px #000;
+}
+
+/* ── Options / hotkeys ── */
+.otp-help {
+  padding: 8px 10px;
+  color: #dce6f8;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.otp-help kbd {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 4px;
+  margin-right: 4px;
+  border: 1px solid #3d5ca0;
+  background: #142448;
+  color: #e8c05e;
+  font-family: var(--otp-font-ui);
+  font-size: 10px;
+}
+.otp-opt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  cursor: pointer;
+}
+.otp-opt-row input[type="checkbox"] {
+  appearance: none;
+  width: 19px;
+  height: 19px;
+  background: var(--otp-checkbox) 0 0 / 19px 79px no-repeat;
+  image-rendering: pixelated;
+  border: 0;
+}
+.otp-opt-row input[type="checkbox"]:checked { background-position: 0 -60px; }
+
+#hud-options, #hud-hotkeys { width: 220px; }
+
+.miniwindow .win-body::-webkit-scrollbar-track { background: #0a1428; }
+.miniwindow .win-body::-webkit-scrollbar-thumb {
+  background: #2a4a88;
+  border: 2px solid #0a1428;
+}
+.miniwindow .win-body { scrollbar-color: #2a4a88 #0a1428; }

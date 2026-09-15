@@ -1,17 +1,26 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
-    <!-- deploy-doc: html-cache-bust-2026-09-15 -->
+    <!-- deploy-doc: pokebyt-otp-hud-2026-09-15 -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <title>OTPokemon</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <title>Pokebyt Online</title>
+    <meta name="description" content="Pokebyt Online — MMORPG Pokémon no navegador" />
+    <meta property="og:title" content="Pokebyt Online" />
+    <meta property="og:description" content="MMORPG Pokémon no navegador" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://otpokemon-web.vercel.app" />
+    <meta property="og:site_name" content="Pokebyt Online" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Pokebyt Online" />
+    <meta name="twitter:description" content="MMORPG Pokémon no navegador" />
+    <link rel="preload" href="/assets/fonts/MonaKo-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="stylesheet" href="/otp-fonts.css" />
     <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="/otp-theme.css" />
   </head>
   <body>
     <canvas id="login-bg" aria-hidden="true"></canvas>
@@ -32,7 +41,7 @@
       <section id="screen-login" class="panel glass-card account-card">
         <div class="brand">
           <span class="gem" aria-hidden="true"></span>
-          <h1>OTPokemon</h1>
+          <h1>Pokebyt Online</h1>
           <p class="muted">Entre para jogar</p>
         </div>
         <form id="account-form" class="account-form" autocomplete="on">
@@ -56,7 +65,7 @@
       <section id="screen-chars" class="panel glass-card character-card hidden">
         <div class="brand">
           <span class="gem" aria-hidden="true"></span>
-          <h1>OTPokemon</h1>
+          <h1>Pokebyt Online</h1>
           <p class="muted">Escolha ou crie um personagem</p>
         </div>
         <h2>Personagens</h2>
@@ -135,23 +144,27 @@
                 <div class="pi-nameplate" id="pokeinfo-name">—</div>
                 <div class="pi-row hp" id="player-hp-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/hp.png" alt="" />
+                  <span class="pi-lab">HP</span>
                   <div class="pi-bar"><div id="player-hp-fill" class="pi-fill"></div></div>
-                  <span id="player-hp-pct" class="pi-pct">HP 100%</span>
+                  <span id="player-hp-pct" class="pi-pct">100%</span>
                 </div>
                 <div class="pi-row exp" id="player-xp-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/exp.png" alt="" />
+                  <span class="pi-lab">EXP</span>
                   <div class="pi-bar"><div id="hud-xp-fill" class="pi-fill"></div></div>
-                  <span id="hud-xp-pct" class="pi-pct">EXP 0%</span>
+                  <span id="hud-xp-pct" class="pi-pct">0%</span>
                 </div>
                 <div class="pi-row fish" id="player-fish-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/fish.png" alt="" />
+                  <span class="pi-lab">FISH</span>
                   <div class="pi-bar"><div id="hud-fish-fill" class="pi-fill"></div></div>
-                  <span id="hud-fish-pct" class="pi-pct">FISH 0%</span>
+                  <span id="hud-fish-pct" class="pi-pct">0%</span>
                 </div>
                 <div class="pi-row stm" id="player-stm-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/stm.png" alt="" />
+                  <span class="pi-lab">STM</span>
                   <div class="pi-bar"><div id="hud-stm-fill" class="pi-fill"></div></div>
-                  <span id="hud-stm-pct" class="pi-pct">STM</span>
+                  <span id="hud-stm-pct" class="pi-pct"></span>
                 </div>
               </div>
               <div class="pi-portrait-col">
@@ -227,6 +240,24 @@
           <div class="win-body">
             <div class="item-box-scroll"><div id="catch-grid" class="item-box-grid catch-grid" aria-label="Reserva Catch"></div></div>
             <div id="catch-swap-bar" class="catch-swap-bar hidden" aria-live="polite"></div>
+          </div>
+        </aside>
+
+        <aside id="hud-options" class="ot-window miniwindow win-closed" data-win="options">
+          <header class="win-head"><span class="win-title">Opções</span></header>
+          <div class="win-body otp-help">
+            <label class="otp-opt-row"><input type="checkbox" id="opt-mute" /> Mudo</label>
+            <label class="otp-opt-row"><input type="checkbox" id="opt-aloot" /> Auto loot (abrir Bag)</label>
+          </div>
+        </aside>
+
+        <aside id="hud-hotkeys" class="ot-window miniwindow win-closed" data-win="hotkeys">
+          <header class="win-head"><span class="win-title">Hotkeys</span></header>
+          <div class="win-body otp-help">
+            <div><kbd>1</kbd>–<kbd>8</kbd> Ataques (um por vez)</div>
+            <div><kbd>Esc</kbd> Cancela alvo</div>
+            <div><kbd>WASD</kbd> Andar</div>
+            <div><kbd>Enter</kbd> Chat</div>
           </div>
         </aside>
 

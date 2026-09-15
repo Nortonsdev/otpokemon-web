@@ -56,7 +56,7 @@ html, body {
   width: 100%;
   background: #0a0e16;
   color: var(--ot-text);
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--otp-font-ui, "MonaKo", "Times OTP", Times, serif);
   font-size: 11px;
   overflow: hidden;
 }
@@ -167,7 +167,7 @@ body.in-game .login-ambient { display: none; }
   -ms-overflow-style: none;
   padding: 32px 30px 24px;
   color: var(--glass-ink);
-  font-family: Outfit, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--otp-font-ui, "MonaKo", Times, serif);
   font-size: 15px;
   line-height: 1.4;
   background:
@@ -277,7 +277,7 @@ body.in-game .login-ambient { display: none; }
   margin: 0;
   padding: 13px 14px;
   color: #f4fffb;
-  font: 500 15px/1.3 Outfit, "Segoe UI", system-ui, sans-serif;
+  font: 500 15px/1.3 var(--otp-font-ui, "MonaKo", Times, serif);
   background: rgba(3, 14, 12, 0.5);
   border: 1px solid rgba(167, 243, 208, 0.14);
   border-radius: 14px;
@@ -308,7 +308,7 @@ body.in-game .login-ambient { display: none; }
   border-image: none;
   border-radius: 999px;
   color: #042018;
-  font: 650 0.92rem/1 Outfit, "Segoe UI", system-ui, sans-serif;
+  font: 650 0.92rem/1 var(--otp-font-ui, "MonaKo", Times, serif);
   letter-spacing: 0.01em;
   cursor: pointer;
   background: #86efac;
@@ -667,7 +667,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
 .miniwindow {
   pointer-events: auto;
   color: #d0d4d8;
-  font-family: Verdana, Tahoma, sans-serif;
+  font-family: var(--otp-font-ui, "MonaKo", Times, serif);
   image-rendering: pixelated;
   border-style: solid;
   border-width: 23px 4px 4px 4px;
@@ -761,7 +761,7 @@ html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win):not(.player-info) {
 .mw-tool.mw-resize {
   background-image: none !important;
   color: #c8ccd0;
-  font: 10px/16px Verdana, sans-serif;
+  font: 10px/16px var(--otp-font-ui, "MonaKo", Times, serif);
 }
 .mw-tool.mw-resize::after { content: "⤢"; }
 .mw-tool.mw-resize.on::after { content: "⤡"; }
@@ -877,7 +877,7 @@ html.mw-ready .item-box-win.miniwindow > .win-body {
   background: transparent;
   image-rendering: pixelated;
   cursor: pointer;
-  font: 11px Verdana, sans-serif;
+  font: 11px var(--otp-font-ui, "MonaKo", Times, serif);
 }
 .otp-btn:hover { filter: brightness(1.2); }
 
@@ -1457,7 +1457,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   padding: 0 1px;
   font-size: 8px;
   font-weight: 700;
-  font-family: Verdana, Tahoma, sans-serif;
+  font-family: var(--otp-font-ui, "MonaKo", Times, serif);
   color: #ffffff;
   text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000;
   line-height: 1;
@@ -1521,11 +1521,14 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 }
 .bag-cell.has-item { cursor: pointer; }
 .bag-cell.use-with, .hot-slot.use-with { outline: 1px solid #d4a848; border-color: #d4a848; }
-body.use-with,
-body.use-with * {
-  cursor: url("/assets/ui/crosshair/crosshair-main.png") 16 16, crosshair !important;
+body.use-with #game,
+#game.use-with-aim {
+  cursor: url("/assets/ui/crosshair/crosshair-main.png") 16 16, crosshair;
 }
-#game.use-with-aim { cursor: url("/assets/ui/crosshair/crosshair-main.png") 16 16, crosshair !important; }
+.attack-bar,
+.attack-bar * {
+  cursor: pointer;
+}
 .bag-count {
   position: absolute; right: 2px; bottom: 0; font-size: 8px; color: #fff;
   text-shadow: 0 0 3px #000, 0 1px 2px #000;
@@ -1570,15 +1573,20 @@ body.use-with * {
   left: 50%;
   bottom: 0;
   transform: translateX(-50%);
-  z-index: 9;
+  z-index: 25;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   width: min(880px, calc(100vw - 240px));
 }
+.hud-bottom-stack .attack-bar,
+.hud-bottom-stack .chat-dock {
+  pointer-events: auto;
+}
 .attack-bar {
-  pointer-events: none;
+  pointer-events: auto;
+  z-index: 25;
   display: flex;
   justify-content: center;
   gap: 8px;
@@ -1718,7 +1726,7 @@ body.use-with * {
 .hot-slot .item-stack {
   position: absolute; right: 1px; bottom: 0;
   font-size: 8px; font-weight: 700;
-  font-family: Verdana, Tahoma, sans-serif;
+  font-family: var(--otp-font-ui, "MonaKo", Times, serif);
   color: #ffffff;
   text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000;
   pointer-events: none;

@@ -64,7 +64,7 @@ process.on("SIGTERM", shutdown);
 
 if (!process.env.VERCEL) {
   server.listen(PORT, "0.0.0.0", () => {
-    console.log(`OTPokemon server ws://0.0.0.0:${PORT}/ws`);
+    console.log(`Pokebyt Online server ws://0.0.0.0:${PORT}/ws`);
   });
 }
 

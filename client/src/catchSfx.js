@@ -29,6 +29,7 @@ function tone(freq, dur, type = "sine", gain = 0.08) {
 }
 
 export function playCatchSfx(phase) {
+  if (typeof document !== "undefined" && document.body.classList.contains("otp-muted")) return;
   const ac = audioCtx();
   if (ac?.state === "suspended") ac.resume().catch(() => {});
   if (phase === "throw") tone(880, 0.12, "triangle", 0.06);
@@ -40,6 +41,7 @@ export function playCatchSfx(phase) {
 }
 
 export function playCatchAudio(scene, phase) {
+  if (typeof document !== "undefined" && document.body.classList.contains("otp-muted")) return;
   const key =
     phase === "throw" ? "catching" : phase === "success" ? "catch_sucess" : phase === "fail" ? "catch_fail" : null;
   if (key && scene?.cache?.audio?.exists(key)) {

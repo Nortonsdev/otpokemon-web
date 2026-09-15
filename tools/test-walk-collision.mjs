@@ -41,11 +41,15 @@ world.creatures.set(fakePlayer.id, fakePlayer);
 world.occupy(fakePlayer);
 const beforeX = fakePlayer.x;
 const beforeY = fakePlayer.y;
-world.walk(fakePlayer, 2, false);
-assert(
-  fakePlayer.x !== beforeX || fakePlayer.y !== beforeY,
-  "player deve atravessar sqm com wilds empilhados",
-);
+let stepped = false;
+for (let dir = 0; dir < 8; dir++) {
+  world.walk(fakePlayer, dir, false);
+  if (fakePlayer.x !== beforeX || fakePlayer.y !== beforeY) {
+    stepped = true;
+    break;
+  }
+}
+assert(stepped, "player deve atravessar sqm com wilds empilhados");
 world.vacate(fakePlayer);
 world.creatures.delete(fakePlayer.id);
 

@@ -120,7 +120,11 @@ net.on("map", (m) => {
   const g = ensureGame();
   const pushWorld = () => {
     const scene = g.scene.getScene("game") || g.scene.scenes?.[0];
-    if (scene?.enterWorld) scene.enterWorld(m);
+    if (scene?.enterWorld) {
+      hud.scene = scene;
+      window.__otpGame = g;
+      scene.enterWorld(m);
+    }
     else setTimeout(pushWorld, 40);
   };
   pushWorld();

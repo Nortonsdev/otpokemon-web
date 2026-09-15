@@ -15,6 +15,8 @@ import {
   itemBoxRowCount,
 } from "../../shared/itemBoxCaps.js";
 import { BALL_REGISTRY, CATCH_BALL_ITEMS, ballIconHtml } from "./ballIcons.js";
+import { applyOtpAudioBoot, isAloot, isMuted, setAloot, setMuted } from "./ui/otpAudio.js";
+import { ATK_MS } from "../../server/species.js";
 
 const CATCH_REGISTRY = CATCH_BALL_ITEMS;
 
@@ -56,7 +58,7 @@ function genderMark(p) {
 
 const PORTRAIT_TOPS = [36, 83, 130, 177, 224, 271];
 const HP_TOPS = [51, 98, 145, 192, 239, 286];
-const SLOT_TOPS = [33, 80, 127, 174, 221, 268];
+const SLOT_TOPS = [30, 77, 124, 171, 218, 265];
 
 export class Hud {
   constructor(net) {
@@ -79,7 +81,11 @@ export class Hud {
     this.minimapZoom = 1;
     this.catchStats = Object.fromEntries(CATCH_BALL_ITEMS.map((k) => [k, { ok: 0, fail: 0 }]));
     this.moveCdUntil = 0;
+    this.moveCdSlot = 0;
+    this.moveCdMs = ATK_MS;
     this.combatMoveSlot = 1;
+    this.lastMoveSlot = 1;
+    this.worldZoom = 2;
     this.outCreatureId = null;
     this.orderBarOpen = false;
     this.chatRole = "player";
@@ -90,7 +96,9 @@ export class Hud {
   bindGame() {
     if (this.bound) return;
     this.bound = true;
-    this.windows.bind();
+    this.windows.bind(this);
+    applyOtpAudioBoot();
+    this.bindOptionsPanel();
     bindChatDock();
     bindChatToolbar(this);
     const wm = this.windows;
@@ -160,6 +168,41 @@ export class Hud {
         document.getElementById("chat-input")?.blur();
       }
     });
+  }
+
+  bindOptionsPanel() {
+    const mute = document.getElementById("opt-mute");
+    const aloot = document.getElementById("opt-aloot");
+    if (mute) {
+      mute.checked = isMuted();
+      mute.onchange = () => {
+        setMuted(mute.checked);
+        this.windows.renderTaskbar();
+      };
+    }
+    if (aloot) {
+      aloot.checked = isAloot();
+      aloot.onchange = () => {
+        setAloot(aloot.checked);
+        this.windows.renderTaskbar();
+      };
+    }
+  }
+
+  changeWorldZoom(dir) {
+    const step = dir > 0 ? 0.2 : -0.2;
+    this.worldZoom = Math.max(1.2, Math.min(3.4, Number(this.worldZoom || 2) + step));
+    this.scene?.cameras?.main?.setZoom(this.worldZoom);
+  }
+
+  syncOutCreatureId() {
+    if (!this.you) return;
+    for (const c of this.creatures.values()) {
+      if (c.masterId === this.you.id && !c.dead) {
+        this.outCreatureId = c.id;
+        return;
+      }
+    }
   }
 
   noteCatchAttempt(ballItem, ok) {
@@ -311,8 +354,14 @@ export class Hud {
     if (!who || who.kind !== "npc") return;
     const title = document.getElementById("npc-dialog-title");
     const text = document.getElementById("npc-dialog-text");
+    const msg = "Oi, o que você quer?";
     if (title) title.textContent = who.name || "NPC";
-    if (text) text.textContent = "Oi, o que você quer?";
+    if (text) text.textContent = msg;
+    const win = document.getElementById("hud-npc");
+    if (win) {
+      const w = Math.min(420, Math.max(220, 160 + msg.length * 7));
+      win.style.width = `${w}px`;
+    }
     this.windows.open("npc");
   }
 
@@ -334,11 +383,15 @@ export class Hud {
       this.drawMinimap();
     }
     if (msg.t === "party") {
+      const prevBag = this.lootBag;
       this.party = msg.party;
       if (msg.lootBag) this.lootBag = msg.lootBag;
       else if (msg.bag) this.lootBag = msg.bag;
       if (msg.catchBox) this.catchBox = msg.catchBox;
       if (msg.gold != null && this.you) this.you.gold = msg.gold;
+      if (isAloot() && JSON.stringify(prevBag) !== JSON.stringify(this.lootBag)) {
+        this.windows.open("bag");
+      }
       this.renderActivePokeStatus();
       this.render();
     }
@@ -400,7 +453,8 @@ export class Hud {
     }
     if (msg.t === "fx") {
       if (this.outCreatureId != null && msg.from === this.outCreatureId) {
-        this.moveCdUntil = Date.now() + 1000;
+        this.moveCdUntil = Date.now() + this.moveCdMs;
+        this.moveCdSlot = this.lastMoveSlot || this.combatMoveSlot || 1;
         const outMon = this.party.out != null ? this.party.slots[this.party.out] : null;
         this.renderHotbar(outMon);
         this.renderAttackBar(outMon);
@@ -490,7 +544,7 @@ export class Hud {
     const hpFill = document.getElementById("player-hp-fill");
     hpFill.style.width = `${hpPct}%`;
     hpFill.style.background = hpColorCss(hpRatio);
-    document.getElementById("player-hp-pct").textContent = `HP ${hpPct}%`;
+    document.getElementById("player-hp-pct").textContent = `${hpPct}%`;
     const hpRow = document.getElementById("player-hp-row");
     if (hpRow) {
       const tip = `Health ${hpPct}% (${hp}/${hpMax})`;
@@ -500,7 +554,7 @@ export class Hud {
 
     const xpPct = progress.expPercent;
     document.getElementById("hud-xp-fill").style.width = `${xpPct}%`;
-    document.getElementById("hud-xp-pct").textContent = `EXP ${xpPct}%`;
+    document.getElementById("hud-xp-pct").textContent = `${xpPct}%`;
     const xpRow = document.getElementById("player-xp-row");
     if (xpRow) {
       const tip =
@@ -513,12 +567,12 @@ export class Hud {
 
     const fishPct = this.you?.fishPct ?? 31;
     document.getElementById("hud-fish-fill").style.width = `${fishPct}%`;
-    document.getElementById("hud-fish-pct").textContent = `FISH ${fishPct}%`;
+    document.getElementById("hud-fish-pct").textContent = `${fishPct}%`;
 
     const stmPct = progress.stmPercent;
     document.getElementById("hud-stm-fill").style.width = `${stmPct}%`;
     document.getElementById("hud-stm-pct").textContent =
-      stmPct >= 100 ? "STM" : `STM ${stmPct}%`;
+      stmPct >= 100 ? "" : `${stmPct}%`;
     const stmRow = document.getElementById("player-stm-row");
     if (stmRow) {
       const tip = `Stamina ${stmPct}% (${staminaClock(progress.staminaMinutes)})`;
@@ -573,7 +627,8 @@ export class Hud {
     const max = out?.barMoves?.length || attackSlotCount(out?.species);
     if (!out || !n || n < 1 || n > max) return;
     if (Date.now() < this.moveCdUntil) return;
-    this.combatMoveSlot = (n % max) + 1;
+    this.lastMoveSlot = n;
+    this.combatMoveSlot = n;
     this.net.send({ t: "move", n });
   }
 
@@ -631,8 +686,9 @@ export class Hud {
     for (let i = 0; i < 6; i++) {
       const p = this.party.slots?.[i];
       const isOut = this.party.out === i || this.party.mount?.slot === i;
+      const faint = !!(p && p.hp <= 0);
       const row = document.createElement("div");
-      row.className = "poke-slot" + (p ? "" : " empty") + (isOut ? " out" : "");
+      row.className = "poke-slot" + (p ? "" : " empty") + (isOut ? " out" : "") + (faint ? " faint" : "");
       row.dataset.slot = String(i);
       row.style.top = `${SLOT_TOPS[i]}px`;
 
@@ -729,6 +785,7 @@ export class Hud {
       const el = document.createElement("button");
       el.type = "button";
       el.className = "battle-row" + (this.target?.id === c.id ? " targeted" : "");
+      el.setAttribute("aria-pressed", this.target?.id === c.id ? "true" : "false");
       const ratio = Math.max(0, Math.min(1, (c.hp ?? 1) / Math.max(1, c.hpMax ?? 1)));
       const label = c.dead ? `${c.name} (corpo)` : c.plate || c.name;
       el.innerHTML = `<span>${label}</span><span class="battle-hp"><span style="width:${ratio * 100}%"></span></span>`;
@@ -952,10 +1009,8 @@ export class Hud {
   renderAttackBar(out) {
     const bar = document.getElementById("attack-bar");
     if (!bar) return;
-    const hasOut =
-      out != null &&
-      this.party.out != null &&
-      this.outCreatureId != null;
+    this.syncOutCreatureId();
+    const hasOut = out != null && this.party.out != null;
     bar.classList.toggle("hidden", !hasOut);
     bar.setAttribute("aria-hidden", hasOut ? "false" : "true");
     bar.innerHTML = "";
@@ -970,21 +1025,29 @@ export class Hud {
 
     const now = Date.now();
     const cdLeft = Math.max(0, this.moveCdUntil - now);
-    const cdPct = cdLeft > 0 ? cdLeft / 1000 : 0;
+    const cdActive = cdLeft > 0;
+    const cdSlot = this.moveCdSlot || this.lastMoveSlot || 1;
 
     for (let n = 1; n <= slotCount; n++) {
       const btn = document.createElement("button");
       btn.type = "button";
       const move = moves[n - 1];
       const on = !!move;
-      btn.className = "attack-slot" + (on ? " on" : " off");
+      const selected = this.combatMoveSlot === n;
+      btn.className =
+        "attack-slot" +
+        (on ? " on" : " off") +
+        (cdActive ? " locked" : "") +
+        (cdActive && n === cdSlot ? " cd-active" : "") +
+        (selected ? " selected-move" : "");
       btn.title = on ? `${move.name} (${n})` : "Sem ataque";
       const iconStyle = on ? attackMoveIconStyle(move.name) : "";
       btn.innerHTML = on
         ? `<span class="attack-move-icon" style="${iconStyle}" aria-hidden="true"></span><span class="attack-key">${n}</span>`
         : `<span class="attack-move-icon empty" aria-hidden="true"></span><span class="attack-key">${n}</span>`;
-      if (on && cdPct > 0) {
-        btn.innerHTML += `<span class="attack-cd" style="--cd:${cdPct}"></span>`;
+      if (on && cdActive && n === cdSlot) {
+        const deg = Math.round((cdLeft / this.moveCdMs) * 360);
+        btn.innerHTML += `<span class="attack-cd-clock" style="--cd-deg:${deg}deg"></span>`;
       }
       if (on) {
         btn.onclick = () => this.tryUseMove(n);
@@ -992,13 +1055,13 @@ export class Hud {
       bar.appendChild(btn);
     }
 
-    if (cdPct > 0 && !this._attackCdTimer) {
-      this._attackCdTimer = window.setTimeout(() => {
-        this._attackCdTimer = null;
-        const cur =
-          this.party.out != null ? this.party.slots[this.party.out] : null;
+    if (cdActive) {
+      if (this._attackCdRaf) cancelAnimationFrame(this._attackCdRaf);
+      this._attackCdRaf = requestAnimationFrame(() => {
+        this._attackCdRaf = null;
+        const cur = this.party.out != null ? this.party.slots[this.party.out] : null;
         if (cur) this.renderAttackBar(cur);
-      }, cdLeft + 20);
+      });
     }
   }
 
@@ -1042,7 +1105,7 @@ export class Hud {
         const moveIcon = `/assets/hud/moves/${slot.move}_${on ? "on" : "off"}.png`;
         if (on && out) {
           btn.innerHTML = `<img src="${moveIcon}" alt="" /><span class="hot-key">${slot.key}</span>`;
-          if (slot.move === 1 && cdPct > 0) {
+          if (cdPct > 0 && slot.move === (this.moveCdSlot || this.lastMoveSlot || 1)) {
             btn.innerHTML += `<span class="hot-cd" style="--cd:${cdPct}"></span>`;
           }
           btn.onclick = () => {

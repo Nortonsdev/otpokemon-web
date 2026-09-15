@@ -135,6 +135,15 @@ assert(back.tiles.get(tileKey(1, 1, 7)).spawnMonster?.dexId === "0025-1", "runti
 assert(back.tiles.get(tileKey(0, 1, 7)).spawnMonster?.pzId === 7, "runtime→otbm spawn pz");
 assert(back.tiles.get(tileKey(0, 1, 7)).pzId === 7, "runtime→otbm pz pad");
 
+const previewBytes = await serializeOtbm(back);
+const previewRt = otbmMapToRuntime(parseOtbm(previewBytes));
+assert(JSON.stringify(previewRt.ground) === JSON.stringify(runtime.ground), "preview ground identical");
+assert(JSON.stringify(previewRt.walls) === JSON.stringify(runtime.walls), "preview walls identical");
+assert(JSON.stringify(previewRt.houses) === JSON.stringify(runtime.houses), "preview houses identical");
+assert(JSON.stringify(previewRt.flags) === JSON.stringify(runtime.flags), "preview flags identical");
+assert(JSON.stringify(previewRt.pokeZoneIds) === JSON.stringify(runtime.pokeZoneIds), "preview pokeZoneIds identical");
+assert(JSON.stringify(previewRt.pzIds) === JSON.stringify(runtime.pzIds), "preview pzIds identical");
+
 applyPzPadToTile(re.tiles.get(tileKey(2, 0, 7)), 3);
 assert(re.tiles.get(tileKey(2, 0, 7)).pokeZoneId === 1 && re.tiles.get(tileKey(2, 0, 7)).pzId === 3, "PZ auto-paints PokeZone");
 const wipe = re.tiles.get(tileKey(2, 0, 7));

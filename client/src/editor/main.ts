@@ -32,7 +32,7 @@ import {
 import { floodFill, forEachRectTile, type Rect } from "../../../shared/editor/brushes.ts";
 import { loadBuiltinPreviews, rememberPreview } from "./previews.ts";
 import { drawEditorMap, drawMinimap, screenToTile, tileOverlayHint } from "./renderer.ts";
-import { renderPalette } from "./palette.ts";
+import { renderPalette, renderSpawnPalette } from "./palette.ts";
 import { KANTO_DEX, parseSpeciesDexId, speciesDexId } from "../../../shared/kantoDex.js";
 
 type Tool =
@@ -138,7 +138,7 @@ class EditorApp {
   selecting = false;
   recting = false;
   paletteFilter = "";
-  paletteTab: PaletteTab = "terrain";
+  paletteTab: PaletteTab | "spawn" = "terrain";
   showGrid = true;
   showZones = true;
   showHouses = true;
@@ -271,10 +271,14 @@ class EditorApp {
             <button type="button" data-tab="terrain" class="active">TERRAIN</button>
             <button type="button" data-tab="doodad">DOODAD</button>
             <button type="button" data-tab="items">ITEMS</button>
+            <button type="button" data-tab="spawn">SPAWN</button>
             <button type="button" data-tab="raw">RAW</button>
           </div>
           <select id="tileset-filter"><option>All Tilesets</option></select>
           <input class="search" id="palette-search" placeholder="Search brushes..." />
+          <label class="spawn-shiny-row hidden" id="spawn-shiny-row">
+            <input type="checkbox" id="spawn-shiny" /> Shiny (NNNN-1)
+          </label>
           <div class="palette-grid" id="palette"></div>
         </aside>
 
@@ -354,7 +358,7 @@ class EditorApp {
           <button type="button" id="btn-layers" title="Mostrar zonas/casas">${icon("layers")}</button>
           <button type="button" id="btn-grid" class="active" title="Grade">${icon("grid")}</button>
           <input class="house-id" id="house-id" type="number" min="1" value="1" title="House ID" />
-          <input class="spawn-id" id="spawn-dex" list="kanto-dex" value="0025" title="Espécie NNNN ou NNNN-1 (Pikachu=0025)" />
+          <input class="spawn-id" id="spawn-dex" list="kanto-dex" value="0025" title="Espécie NNNN ou NNNN-1 (Pikachu=0025, shiny=0025-1)" />
           <input class="pokezone-id" id="pokezone-id" type="number" min="1" max="4095" value="1" title="PokeZone ID" />
           <input class="pz-id" id="pz-id" type="number" min="1" max="4095" value="1" title="PZ pad ID" />
         </aside>
@@ -419,9 +423,14 @@ class EditorApp {
 
     this.root.querySelectorAll("[data-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        this.paletteTab = (btn as HTMLElement).dataset.tab as PaletteTab;
+        this.paletteTab = (btn as HTMLElement).dataset.tab as PaletteTab | "spawn";
         this.root.querySelectorAll("[data-tab]").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
+        if (this.paletteTab === "spawn") {
+          this.tool = "spawn";
+          this.stamp = "spawn";
+          this.highlightTools();
+        }
         this.refreshPalette();
       });
     });
@@ -461,6 +470,16 @@ class EditorApp {
       this.paletteFilter = (e.target as HTMLInputElement).value;
       this.refreshPalette();
     });
+    document.getElementById("spawn-shiny")?.addEventListener("change", () => {
+      const shiny = (document.getElementById("spawn-shiny") as HTMLInputElement).checked;
+      const el = document.getElementById("spawn-dex") as HTMLInputElement | null;
+      if (el) {
+        const parsed = parseSpeciesDexId(el.value || "0025");
+        if (parsed) el.value = speciesDexId(parsed.slug, shiny) || el.value;
+      }
+      this.refreshPalette();
+    });
+    document.getElementById("spawn-dex")?.addEventListener("change", () => this.refreshPalette());
     document.getElementById("floor-up")!.addEventListener("click", () => this.setFloor(this.floor - 1));
     document.getElementById("floor-down")!.addEventListener("click", () => this.setFloor(this.floor + 1));
     document.getElementById("btn-grid")!.addEventListener("click", () => this.toggleGrid());
@@ -504,6 +523,11 @@ class EditorApp {
     this.tool = tool;
     this.highlightTools();
     this.canvas.style.cursor = tool === "pan" ? "grab" : tool === "select" || tool === "rect" ? "cell" : "crosshair";
+    if (tool === "spawn") {
+      this.paletteTab = "spawn";
+      this.root.querySelectorAll("[data-tab]").forEach((b) => b.classList.toggle("active", (b as HTMLElement).dataset.tab === "spawn"));
+      this.refreshPalette();
+    }
     if (isMetaStamp(tool) && this.selection) {
       this.applyMetaToSelection(tool, false);
       this.selection = null;
@@ -852,6 +876,24 @@ class EditorApp {
   }
 
   refreshPalette() {
+    const shinyRow = document.getElementById("spawn-shiny-row");
+    shinyRow?.classList.toggle("hidden", this.paletteTab !== "spawn");
+    if (this.paletteTab === "spawn") {
+      const shiny = !!(document.getElementById("spawn-shiny") as HTMLInputElement | null)?.checked;
+      renderSpawnPalette({
+        filter: this.paletteFilter,
+        selectedId: this.currentSpawnDexId(),
+        shiny,
+        onPick: (dexId) => {
+          const el = document.getElementById("spawn-dex") as HTMLInputElement | null;
+          if (el) el.value = dexId;
+          this.setTool("spawn");
+          this.refreshPalette();
+          this.msg(`Spawn ${dexId}`);
+        },
+      });
+      return;
+    }
     renderPalette({
       ids: this.paletteIds,
       selectedId: this.selectedId,
@@ -921,7 +963,7 @@ class EditorApp {
         if (e.key === "s" || e.key === "S") this.setTool("protection");
         if (e.key === "p" || e.key === "P") this.setTool("pvp");
         if (e.key === "n" || e.key === "N") this.setTool("nopvp");
-        if (e.key === "k" || e.key === "K") this.setTool("pokezone");
+        if (e.key === "o" || e.key === "O") this.setTool("spawn");
         if (e.key === "z" || e.key === "Z") this.setTool("pz");
         if (e.key === "g" || e.key === "G") this.toggleGrid();
         if (e.key === "+" || e.key === "=") this.setZoom(this.zoom * 1.1);

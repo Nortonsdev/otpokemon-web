@@ -14,6 +14,8 @@ import { CATCH_BALL_ITEMS } from "./ballIcons.js";
 import { isChatHidden, showChatPanel } from "./ui/chatDock.js";
 import { isChatWasdMode } from "./ui/chatToolbar.js";
 import { speciesAssetSlug } from "../../shared/kantoDex.js";
+import { preloadOtpFonts, registerOtpBitmapFonts } from "./ui/otpBitmapFont.js";
+import { ATK_MS } from "../../server/species.js";
 
 const TILE = 32;
 const CROSSHAIR_KEYS = ["crosshair-main", "crosshair-a", "crosshair-b"];
@@ -172,6 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.load.audio("catching", "/assets/sfx/catching.ogg");
     this.load.audio("catch_fail", "/assets/sfx/catch_fail.ogg");
     this.load.audio("catch_sucess", "/assets/sfx/catch_sucess.ogg");
+    preloadOtpFonts(this);
     this.load.on("loaderror", (file) => {
       const key = file?.key || file?.src || "unknown";
       if (this.missingSpriteLog.has(`load:${key}`)) return;
@@ -207,6 +210,10 @@ export class GameScene extends Phaser.Scene {
     document.getElementById("game")?.addEventListener("contextmenu", onRight);
     document.addEventListener("contextmenu", onRight, true);
     this.input.on("pointerdown", (p) => {
+      const t = p.event?.target;
+      if (t?.closest?.(".attack-bar, .ot-window, .chat-dock, .otp-top-btn, .hud-top-icons, input, textarea, select")) {
+        return;
+      }
       document.getElementById("chat-input")?.blur();
       this.onPointer(p);
     });
@@ -230,6 +237,18 @@ export class GameScene extends Phaser.Scene {
     this.applyCrosshairSprite(this.outMarkSprite);
     this.outMarkSprite.setVisible(false);
     this.actorLayer.add(this.outMarkSprite);
+    this.outName = this.add.text(0, 0, "", {
+      fontFamily: "MonaKo, Times OTP, Times, serif",
+      fontSize: "10px",
+      color: "#3cff6a",
+      stroke: "#041008",
+      strokeThickness: 3,
+      resolution: 2,
+    });
+    this.outName.setOrigin(0.5, 1);
+    this.outName.setVisible(false);
+    this.actorLayer.add(this.outName);
+    registerOtpBitmapFonts(this);
 
     this.targetPulse = this.tweens.add({
       targets: this.targetMark,
@@ -283,14 +302,16 @@ export class GameScene extends Phaser.Scene {
     this.targetMark?.setVisible(false);
     this.targetGizmo?.clear();
     this.targetGizmo?.setVisible(false);
+    this.outMark?.clear();
     this.outMarkSprite?.setVisible(false);
+    this.outName?.setVisible(false);
     this.glow?.clear();
   }
 
   clearActorLayer() {
     if (!this.actorLayer) return;
     const keep = new Set(
-      [this.glow, this.targetMark, this.targetGizmo, this.outMarkSprite].filter(Boolean)
+      [this.glow, this.targetMark, this.targetGizmo, this.outMark, this.outMarkSprite, this.outName].filter(Boolean)
     );
     for (const child of [...(this.actorLayer.list || [])]) {
       if (!keep.has(child)) child.destroy();
@@ -298,9 +319,11 @@ export class GameScene extends Phaser.Scene {
     if (this.glow && this.glow.displayList !== this.actorLayer) this.actorLayer.add(this.glow);
     if (this.targetMark && this.targetMark.displayList !== this.actorLayer) this.actorLayer.add(this.targetMark);
     if (this.targetGizmo && this.targetGizmo.displayList !== this.actorLayer) this.actorLayer.add(this.targetGizmo);
+    if (this.outMark && this.outMark.displayList !== this.actorLayer) this.actorLayer.add(this.outMark);
     if (this.outMarkSprite && this.outMarkSprite.displayList !== this.actorLayer) {
       this.actorLayer.add(this.outMarkSprite);
     }
+    if (this.outName && this.outName.displayList !== this.actorLayer) this.actorLayer.add(this.outName);
   }
 
   ensurePlaceholder() {
@@ -383,7 +406,6 @@ export class GameScene extends Phaser.Scene {
     this.targetMark?.setVisible(false);
     this.targetGizmo?.clear();
     this.targetGizmo?.setVisible(false);
-    this.outMarkSprite?.setVisible(false);
   }
 
   logMissingSprite(key) {
@@ -455,7 +477,7 @@ export class GameScene extends Phaser.Scene {
     const out = (payload.creatures || []).find((c) => c.masterId === payload.you.id);
     if (out) this.hud.outCreatureId = out.id;
     this.cameras.main.stopFollow();
-    this.cameras.main.setZoom(2);
+    this.cameras.main.setZoom(this.hud?.worldZoom || 2);
     this.cameras.main.setRoundPixels(false);
     this.layoutAll();
     this.lockCamera();
@@ -678,6 +700,7 @@ export class GameScene extends Phaser.Scene {
     const st = this.state.get(this.youId);
     if (!st) return;
     const d = this.displayTile(st);
+    this.cameras.main.setZoom(this.hud?.worldZoom || this.cameras.main.zoom || 2);
     this.cameras.main.centerOn(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2);
   }
 
@@ -785,6 +808,7 @@ export class GameScene extends Phaser.Scene {
       mark?.setVisible(false);
       gizmo?.clear();
       gizmo?.setVisible(false);
+      this.layoutOutMark();
       return;
     }
     const d = this.displayTile(st);
@@ -794,6 +818,7 @@ export class GameScene extends Phaser.Scene {
       this.addActor(mark);
       mark.setTexture(this.crosshairTexture(this.crosshairPhase ? "crosshair-b" : "crosshair-main"));
       this.applyCrosshairSprite(mark);
+      mark.setTint(0xff3a3a);
       mark.setPosition(cx, cy);
       mark.setDepth(depth);
       mark.setVisible(true);
@@ -810,27 +835,35 @@ export class GameScene extends Phaser.Scene {
   layoutOutMark() {
     const g = this.outMark;
     const sprite = this.outMarkSprite;
-    if (!g && !sprite) return;
+    const label = this.outName;
     const out = this.outCreatureState();
-    const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
-    if (!out || !tgt || tgt.dead || !tgt.wild) {
+    if (!out || out.dead) {
       g?.clear();
       g?.setVisible(false);
       sprite?.setVisible(false);
+      label?.setVisible(false);
       return;
     }
     const d = this.displayTile(out);
     const { x: cx, y: cy } = this.tileCrosshairPoint(d);
     const depth = Math.round(d.y) * 10 + 7;
-    g?.clear();
-    g?.setVisible(false);
-    if (sprite) {
-      this.addActor(sprite);
-      sprite.setTexture(this.crosshairTexture("crosshair-a"));
-      this.applyCrosshairSprite(sprite);
-      sprite.setPosition(cx, cy);
-      sprite.setDepth(depth);
-      sprite.setVisible(true);
+    if (g) {
+      this.addActor(g);
+      g.clear();
+      g.setVisible(true);
+      g.setDepth(depth);
+      g.lineStyle(3, 0x22e060, 0.95);
+      g.strokeEllipse(cx, cy + 8, 26, 14);
+      g.lineStyle(1, 0x9cffb8, 0.85);
+      g.strokeCircle(cx, cy, 17);
+    }
+    sprite?.setVisible(false);
+    if (label) {
+      this.addActor(label);
+      label.setText(out.name || "Pokémon");
+      label.setPosition(cx, cy - 22);
+      label.setDepth(depth + 2);
+      label.setVisible(true);
     }
   }
 
@@ -857,25 +890,34 @@ export class GameScene extends Phaser.Scene {
     const d = this.displayTile(st);
     const x = d.x * TILE + TILE / 2;
     const y = d.y * TILE - 4;
-    const txt = this.add
-      .text(x, y, `-${dmg}`, {
-        fontFamily: "Tahoma, Verdana, Arial, sans-serif",
-        fontSize: "11px",
-        fontStyle: "bold",
-        color: "#ff5a4a",
-        stroke: "#000000",
-        strokeThickness: 2,
-        resolution: 2,
-      })
-      .setOrigin(0.5, 1);
+    const own = this.isOwnCreature(st);
+    const color = own ? "#ff6a4a" : "#ffe14a";
+    let txt;
+    if (this.cache.bitmapFont.exists("otpfont")) {
+      txt = this.add.bitmapText(x, y, "otpfont", `-${dmg}`, 16);
+      txt.setOrigin(0.5, 1);
+      txt.setTint(own ? 0xff5a4a : 0xffe14a);
+    } else {
+      txt = this.add
+        .text(x, y, `-${dmg}`, {
+          fontFamily: "MonaKo, Times OTP, Times, serif",
+          fontSize: "14px",
+          fontStyle: "bold",
+          color,
+          stroke: "#000000",
+          strokeThickness: 4,
+          resolution: 2,
+        })
+        .setOrigin(0.5, 1);
+    }
     txt.setScale(ui);
     txt.setDepth(2000);
     this.addActor(txt);
     this.tweens.add({
       targets: txt,
-      y: y - 18,
+      y: y - 22,
       alpha: 0,
-      duration: 620,
+      duration: 720,
       ease: "Cubic.easeOut",
       onComplete: () => txt.destroy(),
     });
@@ -1011,14 +1053,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const item = this.hud?.selectedItem;
-    if (item === "pokeball" || CATCH_BALL_ITEMS.includes(item)) {
+    const catching = item === "pokeball" || CATCH_BALL_ITEMS.includes(item);
+    if (catching && who && who.wild && who.dead) {
       if (this.catchBusy) return;
-      if (who && who.wild && who.dead) {
-        this.net.send({ t: "use", item, id: who.id });
-        this.hud.selectItem(null);
-      } else if (who && who.wild && !who.dead) {
-        this.hud.log("Derrote o Pokémon antes de capturar.", "combate");
-      }
+      this.net.send({ t: "use", item, id: who.id });
+      this.hud.selectItem(null);
       return;
     }
     if (item === "small_potion" || item === "great_potion") {
@@ -1038,10 +1077,10 @@ export class GameScene extends Phaser.Scene {
       this.net.send({ t: "target", id: who.id });
       return;
     }
-    if (this.isOwnCreature(who)) {
-      this.net.send({ t: "look", x: tx, y: ty });
+    if (this.isOwnCreature(who) && who.id !== this.youId) {
       return;
     }
+    if (catching) return;
     this.clearTarget();
     this.net.send({ t: "walkTo", x: tx, y: ty });
   }
@@ -1087,6 +1126,7 @@ export class GameScene extends Phaser.Scene {
     this.layoutAll();
     this.lockCamera();
     this.layoutTarget();
+    this.layoutOutMark();
     if (!this.live) return;
     if (isTyping() || isChatWasdMode()) {
       this.input.keyboard.enabled = false;
@@ -1112,10 +1152,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   tickAutoCombat() {
-    if (this.hud?.selectedItem || this.catchBusy) return;
+    if (this.catchBusy) return;
     const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
     if (!tgt || !tgt.wild || tgt.dead) {
-      if (this.hud) this.hud.combatMoveSlot = 1;
       return;
     }
     const out = this.outCreatureState();
@@ -1131,9 +1170,9 @@ export class GameScene extends Phaser.Scene {
     const partyOut =
       this.hud?.party?.out != null ? this.hud.party.slots?.[this.hud.party.out] : null;
     const maxMoves = partyOut?.barMoves?.length || 4;
-    const slot = Math.min(Math.max(1, this.hud?.combatMoveSlot || 1), maxMoves);
-    this.nextAutoAtk = now + 1000;
-    this.hud.combatMoveSlot = (slot % maxMoves) + 1;
+    const slot = Math.min(Math.max(1, this.hud?.combatMoveSlot || this.hud?.lastMoveSlot || 1), maxMoves);
+    this.nextAutoAtk = now + ATK_MS;
+    if (this.hud) this.hud.lastMoveSlot = slot;
     if (this.targetId !== tgt.id) {
       this.net.send({ t: "target", id: tgt.id });
     }
