@@ -229,7 +229,7 @@ export class WindowManager {
 
   decorate(el, def) {
     if (DOCKED.has(def.id)) return;
-    if (def.mini) el.classList.add("miniwindow");
+    if (def.mini && def.id !== "status") el.classList.add("miniwindow");
     const head = el.querySelector(".win-head") || el.querySelector("header");
     if (!head) return;
     head.classList.add("win-head");

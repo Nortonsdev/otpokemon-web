@@ -126,7 +126,7 @@
           </div>
         </aside>
 
-        <aside id="hud-pokeinfo" class="ot-window miniwindow player-info" data-win="status" aria-label="Player Info">
+        <aside id="hud-pokeinfo" class="ot-window player-info" data-win="status" aria-label="Player Info">
           <header class="win-head" aria-hidden="true"><span class="win-title">Player Info</span></header>
           <div class="win-body pi-body">
             <div class="pi-wrap">
@@ -136,30 +136,22 @@
                 <div class="pi-row hp" id="player-hp-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/hp.png" alt="" />
                   <div class="pi-bar"><div id="player-hp-fill" class="pi-fill"></div></div>
-                  <span id="player-hp-pct" class="pi-pct">100%</span>
+                  <span id="player-hp-pct" class="pi-pct">HP 100%</span>
                 </div>
                 <div class="pi-row exp" id="player-xp-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/exp.png" alt="" />
                   <div class="pi-bar"><div id="hud-xp-fill" class="pi-fill"></div></div>
-                  <span id="hud-xp-pct" class="pi-pct">0%</span>
+                  <span id="hud-xp-pct" class="pi-pct">EXP 0%</span>
                 </div>
                 <div class="pi-row fish" id="player-fish-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/fish.png" alt="" />
                   <div class="pi-bar"><div id="hud-fish-fill" class="pi-fill"></div></div>
-                  <span id="hud-fish-pct" class="pi-pct">0%</span>
+                  <span id="hud-fish-pct" class="pi-pct">FISH 0%</span>
                 </div>
                 <div class="pi-row stm" id="player-stm-row">
                   <img class="pi-ico" src="/assets/hud/playerinfo/stm.png" alt="" />
                   <div class="pi-bar"><div id="hud-stm-fill" class="pi-fill"></div></div>
-                  <span id="hud-stm-pct" class="pi-pct">100%</span>
-                </div>
-                <div class="pi-footer">
-                  <div id="player-party-balls" class="pi-balls"></div>
-                  <div class="pi-chips">
-                    <span class="pi-chip" title="Troféus"><img src="/assets/hud/playerinfo/trophy.png" alt="" /><b id="hud-trophies">0</b></span>
-                    <span class="pi-chip" title="Pokébolas"><img src="/assets/hud/playerinfo/pokeballs.png" alt="" /><b id="hud-balls">0</b></span>
-                    <span class="pi-chip" title="Capacidade"><img src="/assets/hud/playerinfo/backpack.png" alt="" /><b id="hud-cap">400</b></span>
-                  </div>
+                  <span id="hud-stm-pct" class="pi-pct">STM</span>
                 </div>
               </div>
               <div class="pi-portrait-col">
@@ -167,6 +159,14 @@
                   <img id="player-portrait" class="pi-portrait" src="/assets/human/portrait.png" alt="" />
                 </div>
                 <span class="pi-lv">Lv <b id="status-level">1</b></span>
+              </div>
+              <div class="pi-footer">
+                <div id="player-party-balls" class="pi-balls" aria-hidden="true"></div>
+                <div class="pi-chips">
+                  <span class="pi-chip" title="Troféus"><img src="/assets/hud/playerinfo/trophy.png" alt="" /><b id="hud-trophies">0</b></span>
+                  <span class="pi-chip" title="Pokébolas"><img src="/assets/hud/playerinfo/pokeballs.png" alt="" /><b id="hud-balls">0</b></span>
+                  <span class="pi-chip" title="Capacidade"><img src="/assets/hud/playerinfo/backpack.png" alt="" /><b id="hud-cap">400</b></span>
+                </div>
               </div>
             </div>
           </div>

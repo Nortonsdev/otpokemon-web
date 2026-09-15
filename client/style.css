@@ -599,38 +599,33 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   opacity: 0;
   pointer-events: none;
 }
-.player-info.miniwindow {
-  width: 253px;
-  padding: 0;
-  border: none !important;
-  border-width: 0 !important;
-  border-image: none !important;
-  background: transparent !important;
-  overflow: visible;
-}
-html.mw-ready .player-info.miniwindow {
-  border-image: none !important;
-  background: transparent !important;
-}
-.player-info.miniwindow > .win-body {
-  border: none !important;
-  border-image: none !important;
+.player-info > .win-body {
+  border: 0;
   background: transparent !important;
   padding: 0 !important;
 }
-.player-info.miniwindow:not(.win-min):not(.win-strip) > .win-head {
+.player-info:not(.win-min) > .win-head {
   display: none !important;
 }
-.player-info.miniwindow .mw-icon,
-.player-info.miniwindow .win-tools {
+.player-info .win-tools,
+.player-info .mw-icon {
   display: none !important;
 }
-.player-info.miniwindow .pi-body {
+.player-info .pi-body {
   cursor: move;
+  padding: 0;
+  overflow: visible;
+  width: 253px;
+  min-height: 128px;
+  border: 0;
+  background: transparent;
 }
-.player-info.miniwindow.win-min > .win-head,
-.player-info.miniwindow.win-strip > .win-head {
-  top: 0;
+.player-info.win-min > .win-head {
+  display: flex !important;
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
   height: 22px;
   min-height: 22px;
   padding: 0 8px;
@@ -640,23 +635,16 @@ html.mw-ready .player-info.miniwindow {
   border-radius: 3px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
 }
-.player-info.miniwindow.win-min .win-title,
-.player-info.miniwindow.win-strip .win-title {
-  display: block !important;
+.player-info.win-min .win-title {
   opacity: 1 !important;
   pointer-events: none;
   color: #f3f6fa;
   font-size: 10px;
   font-weight: 700;
 }
-.miniwindow > .win-body.pi-body,
-.player-info.miniwindow .pi-body {
-  padding: 0;
-  overflow: visible;
-  width: 253px;
-  min-height: 112px;
-  border: 0;
-  background: transparent;
+.player-info.win-min {
+  width: auto;
+  min-width: 120px;
 }
 .win-title { flex: 1; text-transform: capitalize; }
 .win-stages { font-size: 9px; color: #687896; font-weight: 500; }
@@ -1048,24 +1036,20 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .battle-hp > span { display: block; height: 100%; background: var(--ot-hp); border-radius: 2px; }
 
 /* ── RIGHT COLUMN ── */
-#hud-pokeinfo { top: 28px; right: 6px; width: 253px; }
-.pi-body { padding: 0; overflow: visible; width: 253px; min-height: 112px; }
+#hud-pokeinfo {
+  top: 28px;
+  right: 6px;
+  width: 253px;
+  overflow: visible;
+  background: transparent;
+}
+.pi-body { padding: 0; overflow: visible; width: 253px; min-height: 128px; }
 .pi-wrap {
   position: relative;
   width: 253px;
-  min-height: 112px;
+  min-height: 128px;
   background: url(/assets/hud/playerinfo/HealthInfo.png) no-repeat 0 0;
   background-size: 253px 103px;
-}
-.pi-wrap::after {
-  content: "";
-  position: absolute;
-  left: 74px;
-  top: 62px;
-  width: 118px;
-  height: 20px;
-  background: #121a1e;
-  z-index: 0;
 }
 .pi-panel-glow { display: none; }
 .pi-panel {
@@ -1092,7 +1076,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 }
 .pi-row {
   display: grid;
-  grid-template-columns: 11px 1fr 26px;
+  grid-template-columns: 11px 1fr 38px;
   gap: 3px;
   align-items: center;
   height: 9px;
@@ -1138,23 +1122,27 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .pi-pct {
   text-align: right;
   color: #dce4f0;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 600;
   line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 .pi-footer {
+  position: absolute;
+  left: 6px;
+  right: 0;
+  top: 104px;
   display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 2px;
+  align-items: flex-start;
+  gap: 0;
+  margin: 0;
   min-width: 0;
+  z-index: 5;
+  pointer-events: none;
 }
 .pi-balls {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 10px;
-  flex: none;
+  display: none;
 }
 .pi-ball {
   width: 8px;
@@ -1180,11 +1168,12 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   color: #f0f4fa;
   font-size: 8px;
   font-weight: 700;
-  padding: 1px 6px 2px;
-  background: rgba(10, 14, 18, 0.92);
-  border: 1px solid #c42830;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  padding: 2px 7px 3px;
+  background: rgba(8, 12, 16, 0.88);
+  border: 1.5px solid #e83840;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65), 0 2px 5px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
 }
 .pi-chip img {
   width: 10px;
@@ -1205,7 +1194,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   border-radius: 50%;
   padding: 0;
   overflow: hidden;
-  background: #0a0c12;
+  background: transparent;
   box-shadow: none;
 }
 .pi-portrait {
@@ -1215,7 +1204,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   object-fit: cover;
   object-position: 50% 18%;
   image-rendering: pixelated;
-  background: #0a0c12;
+  background: transparent;
   display: block;
   transform: scale(1.18);
 }
