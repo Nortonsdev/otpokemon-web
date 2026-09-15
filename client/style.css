@@ -1211,24 +1211,33 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   background-size: contain !important;
 }
 #hud-inv.inv-otp.miniwindow > .win-body {
-  height: 200px;
-  max-height: 200px;
+  height: auto;
+  min-height: 133px;
+  max-height: none;
   overflow: hidden;
   padding: 0;
   background: var(--otp-inv-bg) !important;
 }
 .inv-otp-panel {
-  position: relative;
   width: 192px;
-  height: 200px;
   margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 8px 0 10px;
   box-sizing: border-box;
   image-rendering: pixelated;
   background: var(--otp-inv-bg);
 }
 .inv-otp-grid {
-  position: absolute;
-  inset: 0;
+  display: grid;
+  width: 117px;
+  grid-template-columns: repeat(3, 39px);
+  grid-template-rows: repeat(3, 39px);
+  grid-template-areas:
+    "pokebag coins badges"
+    "bag portrait order"
+    "catch ball pokedex";
   pointer-events: none;
 }
 .inv-otp-slot {
@@ -1240,7 +1249,11 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   cursor: pointer;
   line-height: 0;
   image-rendering: pixelated;
-  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 39px;
+  height: 39px;
 }
 .inv-otp-slot img,
 .inv-otp-ball img {
@@ -1256,36 +1269,19 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .inv-otp-slot:hover img {
   filter: brightness(1.12);
 }
-.inv-otp-pos-oldrod {
-  left: 30px;
-  top: 5px;
-}
-.inv-otp-pos-bike {
-  left: 88px;
-  top: 5px;
-}
-.inv-otp-pos-pokebag {
-  left: 30px;
-  top: 43px;
-}
-.inv-otp-pos-coins {
-  left: 69px;
-  top: 43px;
-}
-.inv-otp-pos-badges {
-  left: 108px;
-  top: 43px;
-}
-.inv-otp-pos-bag {
-  left: 30px;
-  top: 82px;
-}
+.inv-otp-area-pokebag { grid-area: pokebag; }
+.inv-otp-area-coins { grid-area: coins; }
+.inv-otp-area-badges { grid-area: badges; }
+.inv-otp-area-bag { grid-area: bag; }
+.inv-otp-area-portrait { grid-area: portrait; }
+.inv-otp-area-order { grid-area: order; }
+.inv-otp-area-catch { grid-area: catch; }
+.inv-otp-area-ball { grid-area: ball; }
+.inv-otp-area-pokedex { grid-area: pokedex; }
 .inv-otp-portrait {
-  position: absolute;
-  left: 69px;
-  top: 82px;
   width: 32px;
   height: 32px;
+  margin: auto;
   background:
     linear-gradient(145deg, var(--otp-inv-card-sheen) 0%, transparent 55%),
     var(--otp-inv-card);
@@ -1303,74 +1299,13 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   display: block;
   image-rendering: pixelated;
 }
-.inv-otp-pos-order {
-  left: 108px;
-  top: 82px;
-}
-.inv-otp-pos-catch {
-  left: 30px;
-  top: 121px;
-}
 .inv-otp-ball {
-  position: absolute;
-  left: 69px;
-  top: 121px;
-  width: 34px;
-  height: 34px;
-  pointer-events: none;
-}
-.inv-otp-pos-pokedex {
-  left: 108px;
-  top: 121px;
-}
-.inv-otp-rail {
-  position: absolute;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  pointer-events: none;
-}
-.inv-otp-rail-left {
-  left: 2px;
-  top: 36px;
   align-items: center;
-}
-.inv-otp-side-slot {
-  display: block;
-  line-height: 0;
-  opacity: 0.95;
-}
-.inv-otp-side-slot img {
-  display: block;
-  width: 32px;
-  height: 32px;
-  image-rendering: pixelated;
-}
-.inv-otp-rail-right {
-  right: 2px;
-  top: 8px;
-  align-items: flex-end;
-}
-.inv-otp-rail-btn {
-  pointer-events: auto;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  line-height: 0;
-  opacity: 0.92;
-  image-rendering: pixelated;
-}
-.inv-otp-rail-btn:hover {
-  opacity: 1;
-  filter: brightness(1.1);
-}
-.inv-otp-rail-btn img {
-  display: block;
-  width: 32px;
-  height: 32px;
-  image-rendering: pixelated;
+  justify-content: center;
+  width: 39px;
+  height: 39px;
+  pointer-events: none;
 }
 
 .item-box-win {

@@ -152,9 +152,6 @@ export class Hud {
         }
       });
     });
-    invRoot?.querySelectorAll(".inv-otp-rail-btn").forEach((btn) => {
-      btn.addEventListener("mousedown", (e) => e.stopPropagation());
-    });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         this.selectItem(null);
