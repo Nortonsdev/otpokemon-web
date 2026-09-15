@@ -16,6 +16,8 @@ import { isChatWasdMode } from "./ui/chatToolbar.js";
 import { speciesAssetSlug } from "../../shared/kantoDex.js";
 
 const TILE = 32;
+const CROSSHAIR_KEYS = ["crosshair-main", "crosshair-a", "crosshair-b"];
+const CROSSHAIR_PX = 32;
 /** 64×64 (2×2 tile) meadow sheets — keep in sync with tools/extract_otp207_sprites.py exports. */
 const LARGE_MONS = new Set([
   "blastoise",
@@ -118,6 +120,8 @@ export class GameScene extends Phaser.Scene {
     this.targetPulse = null;
     this.glow = null;
     this.outMark = null;
+    this.outMarkSprite = null;
+    this.crosshairPhase = false;
     this.nextAutoAtk = 0;
     this.catchBusy = false;
   }
@@ -158,6 +162,9 @@ export class GameScene extends Phaser.Scene {
       this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
     this.load.image("attacked", "/assets/fx/attacked.png");
+    this.load.image("crosshair-main", "/assets/ui/crosshair/crosshair-main.png");
+    this.load.image("crosshair-a", "/assets/ui/crosshair/crosshair-a.png");
+    this.load.image("crosshair-b", "/assets/ui/crosshair/crosshair-b.png");
     this.load.image("ball-pokeball", "/assets/items/pokeball.png");
     this.load.image("ball-premierball", "/assets/items/premierball.png");
     this.load.image("ball-ultraball", "/assets/items/ultraball.png");
@@ -184,6 +191,7 @@ export class GameScene extends Phaser.Scene {
     this.actorLayer.setDepth(100);
     this.ensurePlaceholder();
     this.ensureAttackedTexture();
+    this.tuneCrosshairTextures();
     this.keys = this.input.keyboard.addKeys(
       "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,C,TAB,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
     );
@@ -203,11 +211,10 @@ export class GameScene extends Phaser.Scene {
       this.onPointer(p);
     });
     this.targetId = null;
-    this.targetMark = this.add.image(0, 0, "attacked");
-    this.targetMark.setOrigin(0.5, 0.82);
+    const targetTex = this.crosshairTexture("crosshair-main");
+    this.targetMark = this.add.image(0, 0, targetTex);
+    this.applyCrosshairSprite(this.targetMark);
     this.targetMark.setVisible(false);
-    this.targetMark.setAlpha(0.7);
-    this.targetMark.setScale(0.92);
     this.targetGizmo = this.add.graphics();
     this.targetGizmo.setVisible(false);
     this.glow = this.add.graphics();
@@ -218,18 +225,24 @@ export class GameScene extends Phaser.Scene {
     this.outMark = this.add.graphics();
     this.outMark.setVisible(false);
     this.actorLayer.add(this.outMark);
+    const outTex = this.crosshairTexture("crosshair-a");
+    this.outMarkSprite = this.add.image(0, 0, outTex);
+    this.applyCrosshairSprite(this.outMarkSprite);
+    this.outMarkSprite.setVisible(false);
+    this.actorLayer.add(this.outMarkSprite);
 
     this.targetPulse = this.tweens.add({
       targets: this.targetMark,
-      props: {
-        alpha: { from: 0.62, to: 0.78 },
-        scaleX: { from: 0.86, to: 0.98 },
-        scaleY: { from: 0.72, to: 0.84 },
-      },
-      duration: 720,
+      alpha: { from: 0.82, to: 1 },
+      duration: 480,
       yoyo: true,
       repeat: -1,
       ease: "Sine.InOut",
+      onRepeat: () => {
+        this.crosshairPhase = !this.crosshairPhase;
+        const key = this.crosshairPhase ? "crosshair-b" : "crosshair-main";
+        if (this.targetMark?.visible) this.targetMark.setTexture(this.crosshairTexture(key));
+      },
     });
     this.cameras.main.setRoundPixels(false);
     this.cameras.main.setBackgroundColor(0x111111);
@@ -270,18 +283,24 @@ export class GameScene extends Phaser.Scene {
     this.targetMark?.setVisible(false);
     this.targetGizmo?.clear();
     this.targetGizmo?.setVisible(false);
+    this.outMarkSprite?.setVisible(false);
     this.glow?.clear();
   }
 
   clearActorLayer() {
     if (!this.actorLayer) return;
-    const keep = new Set([this.glow, this.targetMark, this.targetGizmo].filter(Boolean));
+    const keep = new Set(
+      [this.glow, this.targetMark, this.targetGizmo, this.outMarkSprite].filter(Boolean)
+    );
     for (const child of [...(this.actorLayer.list || [])]) {
       if (!keep.has(child)) child.destroy();
     }
     if (this.glow && this.glow.displayList !== this.actorLayer) this.actorLayer.add(this.glow);
     if (this.targetMark && this.targetMark.displayList !== this.actorLayer) this.actorLayer.add(this.targetMark);
     if (this.targetGizmo && this.targetGizmo.displayList !== this.actorLayer) this.actorLayer.add(this.targetGizmo);
+    if (this.outMarkSprite && this.outMarkSprite.displayList !== this.actorLayer) {
+      this.actorLayer.add(this.outMarkSprite);
+    }
   }
 
   ensurePlaceholder() {
@@ -317,6 +336,31 @@ export class GameScene extends Phaser.Scene {
     g.destroy();
   }
 
+  tuneCrosshairTextures() {
+    for (const key of CROSSHAIR_KEYS) {
+      if (!this.textures.exists(key)) continue;
+      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+  }
+
+  crosshairTexture(key) {
+    return this.textureLooksValid(key) ? key : "attacked";
+  }
+
+  applyCrosshairSprite(sprite) {
+    if (!sprite) return;
+    sprite.setOrigin(0.5, 0.5);
+    sprite.setDisplaySize(CROSSHAIR_PX, CROSSHAIR_PX);
+    sprite.setAlpha(0.95);
+  }
+
+  tileCrosshairPoint(d) {
+    return {
+      x: d.x * TILE + TILE / 2,
+      y: d.y * TILE + TILE / 2,
+    };
+  }
+
   isOwnCreature(st) {
     if (!st) return false;
     if (st.id === this.youId) return true;
@@ -339,6 +383,7 @@ export class GameScene extends Phaser.Scene {
     this.targetMark?.setVisible(false);
     this.targetGizmo?.clear();
     this.targetGizmo?.setVisible(false);
+    this.outMarkSprite?.setVisible(false);
   }
 
   logMissingSprite(key) {
@@ -743,39 +788,20 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     const d = this.displayTile(st);
-    const cx = d.x * TILE + TILE / 2;
-    const feetY = d.y * TILE + TILE - 2;
+    const { x: cx, y: cy } = this.tileCrosshairPoint(d);
     const depth = Math.round(d.y) * 10 + 8;
     if (mark) {
       this.addActor(mark);
-      if (this.textures.exists("attacked")) mark.setTexture("attacked");
-      mark.setOrigin(0.5, 0.82);
-      mark.setPosition(cx, feetY);
+      mark.setTexture(this.crosshairTexture(this.crosshairPhase ? "crosshair-b" : "crosshair-main"));
+      this.applyCrosshairSprite(mark);
+      mark.setPosition(cx, cy);
       mark.setDepth(depth);
       mark.setVisible(true);
       mark.setActive(true);
     }
     if (gizmo) {
-      this.addActor(gizmo);
       gizmo.clear();
-      gizmo.setVisible(true);
-      gizmo.setDepth(depth);
-      const pulse = 0.66 + 0.08 * Math.sin((this.now() || 0) / 180);
-      gizmo.lineStyle(2, 0xff2a22, pulse);
-      gizmo.strokeEllipse(cx, feetY - 5, 26, 11);
-      const x0 = cx - 13;
-      const x1 = cx + 13;
-      const y0 = feetY - 11;
-      const y1 = feetY + 1;
-      const arm = 6;
-      gizmo.lineBetween(x0, y0, x0 + arm, y0);
-      gizmo.lineBetween(x0, y0, x0, y0 + arm);
-      gizmo.lineBetween(x1, y0, x1 - arm, y0);
-      gizmo.lineBetween(x1, y0, x1, y0 + arm);
-      gizmo.lineBetween(x0, y1, x0 + arm, y1);
-      gizmo.lineBetween(x0, y1, x0, y1 - arm);
-      gizmo.lineBetween(x1, y1, x1 - arm, y1);
-      gizmo.lineBetween(x1, y1, x1, y1 - arm);
+      gizmo.setVisible(false);
     }
     this.layoutOutMark();
     this.actorLayer?.queueDepthSort?.();
@@ -783,24 +809,29 @@ export class GameScene extends Phaser.Scene {
 
   layoutOutMark() {
     const g = this.outMark;
-    if (!g) return;
+    const sprite = this.outMarkSprite;
+    if (!g && !sprite) return;
     const out = this.outCreatureState();
     const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
     if (!out || !tgt || tgt.dead || !tgt.wild) {
-      g.clear();
-      g.setVisible(false);
+      g?.clear();
+      g?.setVisible(false);
+      sprite?.setVisible(false);
       return;
     }
     const d = this.displayTile(out);
-    const cx = d.x * TILE + TILE / 2;
-    const feetY = d.y * TILE + TILE - 2;
+    const { x: cx, y: cy } = this.tileCrosshairPoint(d);
     const depth = Math.round(d.y) * 10 + 7;
-    g.clear();
-    g.setVisible(true);
-    g.setDepth(depth);
-    const pulse = 0.55 + 0.12 * Math.sin((this.now() || 0) / 160);
-    g.lineStyle(2, 0x44ff66, pulse);
-    g.strokeEllipse(cx, feetY - 5, 24, 10);
+    g?.clear();
+    g?.setVisible(false);
+    if (sprite) {
+      this.addActor(sprite);
+      sprite.setTexture(this.crosshairTexture("crosshair-a"));
+      this.applyCrosshairSprite(sprite);
+      sprite.setPosition(cx, cy);
+      sprite.setDepth(depth);
+      sprite.setVisible(true);
+    }
   }
 
   animateMove(msg) {

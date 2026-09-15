@@ -175,7 +175,9 @@ export class Hud {
   selectItem(item) {
     if (item && !this.lootBag.find((i) => i.item === item && i.count > 0)) item = null;
     this.selectedItem = item || null;
-    document.body.classList.toggle("use-with", !!this.selectedItem);
+    const useWith = !!this.selectedItem;
+    document.body.classList.toggle("use-with", useWith);
+    document.getElementById("game")?.classList.toggle("use-with-aim", useWith);
     this.renderItemWindows();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
@@ -488,7 +490,7 @@ export class Hud {
     const hpFill = document.getElementById("player-hp-fill");
     hpFill.style.width = `${hpPct}%`;
     hpFill.style.background = hpColorCss(hpRatio);
-    document.getElementById("player-hp-pct").textContent = `${hpPct}%`;
+    document.getElementById("player-hp-pct").textContent = `HP ${hpPct}%`;
     const hpRow = document.getElementById("player-hp-row");
     if (hpRow) {
       const tip = `Health ${hpPct}% (${hp}/${hpMax})`;
@@ -498,7 +500,7 @@ export class Hud {
 
     const xpPct = progress.expPercent;
     document.getElementById("hud-xp-fill").style.width = `${xpPct}%`;
-    document.getElementById("hud-xp-pct").textContent = `${xpPct}%`;
+    document.getElementById("hud-xp-pct").textContent = `EXP ${xpPct}%`;
     const xpRow = document.getElementById("player-xp-row");
     if (xpRow) {
       const tip =
@@ -511,11 +513,12 @@ export class Hud {
 
     const fishPct = this.you?.fishPct ?? 31;
     document.getElementById("hud-fish-fill").style.width = `${fishPct}%`;
-    document.getElementById("hud-fish-pct").textContent = `${fishPct}%`;
+    document.getElementById("hud-fish-pct").textContent = `FISH ${fishPct}%`;
 
     const stmPct = progress.stmPercent;
     document.getElementById("hud-stm-fill").style.width = `${stmPct}%`;
-    document.getElementById("hud-stm-pct").textContent = `${stmPct}%`;
+    document.getElementById("hud-stm-pct").textContent =
+      stmPct >= 100 ? "STM" : `STM ${stmPct}%`;
     const stmRow = document.getElementById("player-stm-row");
     if (stmRow) {
       const tip = `Stamina ${stmPct}% (${staminaClock(progress.staminaMinutes)})`;

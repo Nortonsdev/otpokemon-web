@@ -576,7 +576,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   background-size: 198px 319px;
 }
 .player-info {
-  width: 220px;
+  width: 253px;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -599,29 +599,52 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   opacity: 0;
   pointer-events: none;
 }
-.player-info.miniwindow {
-  width: 228px;
-  background: transparent;
+.player-info > .win-body {
+  border: 0;
+  background: transparent !important;
+  padding: 0 !important;
 }
-.player-info.miniwindow > .win-head {
-  left: 0;
-  right: 0;
-  top: -23px;
-  height: 23px;
-  padding: 0 4px 0 6px;
+.player-info:not(.win-min) > .win-head {
+  display: none !important;
 }
-.player-info.miniwindow .win-title {
-  opacity: 1;
-  pointer-events: none;
+.player-info .win-tools,
+.player-info .mw-icon {
+  display: none !important;
 }
-.miniwindow > .win-body.pi-body,
-.player-info.miniwindow .pi-body {
+.player-info .pi-body {
+  cursor: move;
   padding: 0;
   overflow: visible;
-  width: 220px;
-  height: 98px;
+  width: 253px;
+  min-height: 128px;
   border: 0;
   background: transparent;
+}
+.player-info.win-min > .win-head {
+  display: flex !important;
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 8px;
+  cursor: pointer;
+  background: rgba(14, 18, 22, 0.94);
+  border: 1px solid #c42830;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.player-info.win-min .win-title {
+  opacity: 1 !important;
+  pointer-events: none;
+  color: #f3f6fa;
+  font-size: 10px;
+  font-weight: 700;
+}
+.player-info.win-min {
+  width: auto;
+  min-width: 120px;
 }
 .win-title { flex: 1; text-transform: capitalize; }
 .win-stages { font-size: 9px; color: #687896; font-weight: 500; }
@@ -654,7 +677,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   border-radius: 0;
   backdrop-filter: none;
 }
-html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win) {
+html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win):not(.player-info) {
   border-color: transparent;
   border-image-source: var(--mw-bg);
   border-image-slice: 23 4 4 4 fill;
@@ -747,7 +770,7 @@ html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win) {
   border: 4px solid #2a2c2e;
   background: #2a2c2e;
 }
-html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win) > .win-body {
+html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win):not(.player-info) > .win-body {
   border-color: transparent;
   border-image-source: var(--mw-fg);
   border-image-slice: 4 fill;
@@ -1013,26 +1036,20 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .battle-hp > span { display: block; height: 100%; background: var(--ot-hp); border-radius: 2px; }
 
 /* ── RIGHT COLUMN ── */
-#hud-pokeinfo { top: 28px; right: 6px; width: 228px; }
-.pi-body { padding: 0; overflow: visible; width: 220px; height: 98px; }
+#hud-pokeinfo {
+  top: 28px;
+  right: 6px;
+  width: 253px;
+  overflow: visible;
+  background: transparent;
+}
+.pi-body { padding: 0; overflow: visible; width: 253px; min-height: 128px; }
 .pi-wrap {
   position: relative;
   width: 253px;
-  height: 112px;
-  transform: scale(0.87);
-  transform-origin: top left;
+  min-height: 128px;
   background: url(/assets/hud/playerinfo/HealthInfo.png) no-repeat 0 0;
   background-size: 253px 103px;
-}
-.pi-wrap::after {
-  content: "";
-  position: absolute;
-  left: 74px;
-  top: 62px;
-  width: 118px;
-  height: 20px;
-  background: #121a1e;
-  z-index: 0;
 }
 .pi-panel-glow { display: none; }
 .pi-panel {
@@ -1059,7 +1076,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 }
 .pi-row {
   display: grid;
-  grid-template-columns: 11px 1fr 26px;
+  grid-template-columns: 11px 1fr 38px;
   gap: 3px;
   align-items: center;
   height: 9px;
@@ -1105,23 +1122,27 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .pi-pct {
   text-align: right;
   color: #dce4f0;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 600;
   line-height: 1;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 .pi-footer {
+  position: absolute;
+  left: 6px;
+  right: 0;
+  top: 104px;
   display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 2px;
+  align-items: flex-start;
+  gap: 0;
+  margin: 0;
   min-width: 0;
+  z-index: 5;
+  pointer-events: none;
 }
 .pi-balls {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 10px;
-  flex: none;
+  display: none;
 }
 .pi-ball {
   width: 8px;
@@ -1136,16 +1157,23 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .pi-ball.faint { background: #4a5056; }
 .pi-chips {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .pi-chip {
   display: flex;
   align-items: center;
-  gap: 2px;
-  color: #dce4f0;
+  gap: 3px;
+  color: #f0f4fa;
   font-size: 8px;
   font-weight: 700;
+  padding: 2px 7px 3px;
+  background: rgba(8, 12, 16, 0.88);
+  border: 1.5px solid #e83840;
+  border-radius: 5px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.65), 0 2px 5px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
 }
 .pi-chip img {
   width: 10px;
@@ -1166,7 +1194,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   border-radius: 50%;
   padding: 0;
   overflow: hidden;
-  background: #0a0c12;
+  background: transparent;
   box-shadow: none;
 }
 .pi-portrait {
@@ -1176,7 +1204,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   object-fit: cover;
   object-position: 50% 18%;
   image-rendering: pixelated;
-  background: #0a0c12;
+  background: transparent;
   display: block;
   transform: scale(1.18);
 }
@@ -1493,7 +1521,11 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 }
 .bag-cell.has-item { cursor: pointer; }
 .bag-cell.use-with, .hot-slot.use-with { outline: 1px solid #d4a848; border-color: #d4a848; }
-body.use-with, body.use-with * { cursor: crosshair !important; }
+body.use-with,
+body.use-with * {
+  cursor: url("/assets/ui/crosshair/crosshair-main.png") 16 16, crosshair !important;
+}
+#game.use-with-aim { cursor: url("/assets/ui/crosshair/crosshair-main.png") 16 16, crosshair !important; }
 .bag-count {
   position: absolute; right: 2px; bottom: 0; font-size: 8px; color: #fff;
   text-shadow: 0 0 3px #000, 0 1px 2px #000;
@@ -1928,6 +1960,6 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 body.in-game #world-scrim { display: none; }
 
 @media (max-width: 900px) {
-  #hud-pokeinfo { width: 228px; }
+  #hud-pokeinfo { width: 253px; }
   .hud-bottom-stack { width: calc(100vw - 12px); }
 }
