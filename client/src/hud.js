@@ -153,9 +153,6 @@ export class Hud {
         }
       });
     });
-    invRoot?.querySelectorAll(".inv-otp-rail-btn").forEach((btn) => {
-      btn.addEventListener("mousedown", (e) => e.stopPropagation());
-    });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         this.selectItem(null);
@@ -771,8 +768,9 @@ export class Hud {
   layoutItemBoxGrid(grid, winId) {
     const totalRows = itemBoxRowCount(winId);
     const compactRows = Math.min(ITEM_BOX_COMPACT_ROWS, totalRows);
-    grid.style.setProperty("--item-box-rows-total", String(totalRows));
-    grid.style.setProperty("--item-box-rows-compact", String(compactRows));
+    const scrollHost = grid.closest(".item-box-scroll") || grid;
+    scrollHost.style.setProperty("--item-box-rows-total", String(totalRows));
+    scrollHost.style.setProperty("--item-box-rows-compact", String(compactRows));
   }
 
   renderItemWindows() {
