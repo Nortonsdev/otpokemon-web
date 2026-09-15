@@ -9,7 +9,6 @@ import {
 
 const PREVIEW_MAP = buildLegacyMap();
 import { LOOK_NAME, STEP_MS } from "../../server/species.js";
-import { hpColorHex, hpPercent } from "./hpColor.js";
 import { playCatchSequence } from "./catchVfx.js";
 import { CATCH_BALL_ITEMS } from "./ballIcons.js";
 import { pokemonPlateText, speciesAssetSlug } from "../../shared/kantoDex.js";
@@ -53,12 +52,8 @@ function creatureSize(tex) {
 const NAMEPLATE_SCREEN_PX = 5.875;
 const NAMEPLATE_SCREEN_PX_MAX = 6.5;
 const NAMEPLATE_SCREEN_STROKE = 1.125;
-/** Largura/altura da barra de HP em px de tela (com uiScale na layout). */
-const BAR_W = 16;
-const BAR_H = 2;
-const BAR_PAD = 1;
-/** Nameplates e barras de HP no mundo (sprites). HUD fora do canvas não usa isto. */
-const WORLD_CREATURE_OVERLAYS = false;
+/** Nomes flutuantes no mundo (canvas). Barras de HP no mundo estão desligadas; HUD fora do canvas não usa isto. */
+const WORLD_CREATURE_NAMEPLATES = true;
 
 function nameplateFillColor(kind) {
   if (kind === "npc") return "#00d4e8";
@@ -88,11 +83,6 @@ function nameplateNameBottomY(spriteY, st, size) {
   const playerOrNpc = st?.kind === "player" || st?.kind === "npc";
   if (playerOrNpc || size > TILE) return spriteY + 6;
   return spriteY - 3;
-}
-
-/** Topo da barra de HP para wilds: colada sob os pés do sprite (origin 0,0). */
-function wildHpBarTopY(spriteY, size) {
-  return spriteY + size;
 }
 
 function tileWorld(x, y, size) {
@@ -148,7 +138,6 @@ export class GameScene extends Phaser.Scene {
     this.hud = hud;
     this.sprites = new Map();
     this.plates = new Map();
-    this.hpBars = new Map();
     this.state = new Map();
     this.youId = null;
     this.mapData = null;
@@ -308,10 +297,8 @@ export class GameScene extends Phaser.Scene {
   clearWorld() {
     for (const s of this.sprites.values()) s.destroy();
     for (const p of this.plates.values()) p.destroy();
-    for (const bar of this.hpBars.values()) this.destroyHpBar(bar);
     this.sprites.clear();
     this.plates.clear();
-    this.hpBars.clear();
     this.state.clear();
     this.groundLayer.removeAll(true);
     this.clearActorLayer();
@@ -587,7 +574,7 @@ export class GameScene extends Phaser.Scene {
       walkMs: 0,
     });
     this.setHpBar(c.id, c.hp, c.hpMax);
-    if (WORLD_CREATURE_OVERLAYS) {
+    if (WORLD_CREATURE_NAMEPLATES) {
       const plateY = nameplateNameBottomY(pos.y, c, size);
       const plate = this.add
         .text(pos.x + size / 2, plateY, c.plate || c.name, nameplateTextStyle(c.kind))
@@ -595,22 +582,6 @@ export class GameScene extends Phaser.Scene {
       plate.setDepth(c.y * 10 + 10);
       this.addActor(plate);
       this.plates.set(c.id, plate);
-      const cx = pos.x + size / 2;
-      const outline = this.add
-        .rectangle(cx, plateY, BAR_W + BAR_PAD * 2, BAR_H + BAR_PAD * 2, 0x000000)
-        .setOrigin(0.5, 0);
-      const track = this.add.rectangle(cx, plateY + BAR_PAD, BAR_W, BAR_H, 0x1a1a1a).setOrigin(0.5, 0);
-      const fg = this.add
-        .rectangle(cx - BAR_W / 2, plateY + BAR_PAD, BAR_W, BAR_H, c.kind === "npc" ? 0x00d4e8 : 0x2fc24a)
-        .setOrigin(0, 0);
-      outline.setDepth(c.y * 10 + 11);
-      track.setDepth(c.y * 10 + 12);
-      fg.setDepth(c.y * 10 + 13);
-      this.addActor(outline);
-      this.addActor(track);
-      this.addActor(fg);
-      this.hpBars.set(c.id, { outline, track, fg });
-      this.setHpBar(c.id, c.hp, c.hpMax);
       this.refreshPlate(c.id);
     }
     if (c.dead) this.applyCorpseLook(c.id);
@@ -619,27 +590,9 @@ export class GameScene extends Phaser.Scene {
   despawn(id) {
     this.sprites.get(id)?.destroy();
     this.plates.get(id)?.destroy();
-    this.destroyHpBar(this.hpBars.get(id));
     this.sprites.delete(id);
     this.plates.delete(id);
-    this.hpBars.delete(id);
     this.state.delete(id);
-  }
-
-  destroyHpBar(bar) {
-    if (!bar) return;
-    bar.outline?.destroy();
-    bar.track?.destroy();
-    bar.bg?.destroy();
-    bar.fg?.destroy();
-  }
-
-  setHpBarVisible(bar, visible) {
-    if (!bar) return;
-    bar.outline?.setVisible(visible);
-    bar.track?.setVisible(visible);
-    bar.bg?.setVisible(visible);
-    bar.fg?.setVisible(visible);
   }
 
   uiScale() {
@@ -662,69 +615,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   layoutNameplate(id, spriteX, spriteY, depth) {
-    if (!WORLD_CREATURE_OVERLAYS) return;
+    if (!WORLD_CREATURE_NAMEPLATES) return;
     const sprite = this.sprites.get(id);
     const plate = this.plates.get(id);
     if (!sprite || !plate) return;
     const st = this.state.get(id);
     const size = st?.spriteSize || creatureSize(sprite.texture.key);
-    const ui = this.uiScale();
     this.applyNameplateScreenScale(plate);
     const cx = spriteX + size / 2;
     const nameBottom = nameplateNameBottomY(spriteY, st, size);
     plate.setPosition(Math.round(cx), Math.round(nameBottom));
     plate.setDepth(depth + 1);
-    const bar = this.hpBars.get(id);
-    if (!bar) return;
-    const wild = isWildCreature(st);
-    if (wild) plate.setVisible(false);
-    else plate.setVisible(true);
-
-    const nameGap = Math.max(1, Math.round(1 * ui));
-    const barBlockH = (BAR_H + BAR_PAD * 2) * ui;
-    const z = Math.max(0.25, this.cameras.main?.zoom || 1);
-    const textH = Math.max(1, Math.round(NAMEPLATE_SCREEN_PX / z));
-    const playerStack = st?.kind === "player";
-    let barTop;
-    if (wild) barTop = wildHpBarTopY(spriteY, size);
-    else if (playerStack) barTop = nameBottom - textH - nameGap - barBlockH;
-    else barTop = nameBottom + nameGap;
-    const innerTop = barTop + BAR_PAD * ui;
-    const outW = BAR_W + BAR_PAD * 2;
-    const outH = BAR_H + BAR_PAD * 2;
-    for (const part of [bar.outline, bar.track, bar.fg]) part?.setScale(ui);
-    bar.outline?.setSize(outW, outH);
-    bar.outline?.setOrigin(0.5, 0);
-    bar.outline?.setPosition(cx, barTop);
-    bar.outline?.setDepth(depth + 2);
-    bar.track?.setSize(BAR_W, BAR_H);
-    bar.track?.setOrigin(0.5, 0);
-    bar.track?.setPosition(cx, innerTop);
-    bar.track?.setDepth(depth + 3);
-    bar.fg.height = BAR_H;
-    bar.fg.setOrigin(0, 0);
-    bar.fg.setPosition(cx - (BAR_W * ui) / 2, innerTop);
-    bar.fg.setDepth(depth + 4);
-    this.setHpBar(id, st?.hp, st?.hpMax);
+    if (isWildCreature(st)) plate.setVisible(false);
   }
 
+  /** Atualiza HP no estado da criatura (HUD/alvo); sem barra no mundo. */
   setHpBar(id, hp, hpMax) {
     const st = this.state.get(id);
-    if (st) {
-      if (hp != null) st.hp = hp;
-      if (hpMax != null) st.hpMax = hpMax;
-    }
-    const bar = this.hpBars.get(id);
-    if (!bar) return;
-    const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
-    const ratio = hpPercent(hp ?? st?.hp ?? 0, max);
-    bar.fg.width = BAR_W * ratio;
-    if (st?.kind === "npc") bar.fg.setFillStyle(0x00d4e8);
-    else bar.fg.setFillStyle(hpColorHex(ratio));
+    if (!st) return;
+    if (hp != null) st.hp = hp;
+    if (hpMax != null) st.hpMax = hpMax;
   }
 
   refreshPlate(id) {
-    if (!WORLD_CREATURE_OVERLAYS) return;
+    if (!WORLD_CREATURE_NAMEPLATES) return;
     const st = this.state.get(id);
     const plate = this.plates.get(id);
     if (!st || !plate) return;
@@ -765,7 +679,6 @@ export class GameScene extends Phaser.Scene {
     sprite.setScale(1);
     const plate = this.plates.get(id);
     plate?.setVisible(false);
-    this.setHpBarVisible(this.hpBars.get(id), false);
   }
 
   layoutCreature(id) {
@@ -789,7 +702,6 @@ export class GameScene extends Phaser.Scene {
         d.y * TILE + (foot * TILE) / 2 + (size > TILE ? 4 : 0)
       );
       this.plates.get(id)?.setVisible(false);
-      this.setHpBarVisible(this.hpBars.get(id), false);
       sprite.setDepth(depth);
       return;
     }
@@ -815,7 +727,7 @@ export class GameScene extends Phaser.Scene {
       }
       sprite.setPosition(px, py);
       if (hasAnimFrames(sprite.texture)) sprite.setFrame(frameIndex(st.dir, walking, st.phase));
-      if (WORLD_CREATURE_OVERLAYS) this.layoutNameplate(id, px, py, depth);
+      if (WORLD_CREATURE_NAMEPLATES) this.layoutNameplate(id, px, py, depth);
       sprite.setDepth(depth);
   }
 
