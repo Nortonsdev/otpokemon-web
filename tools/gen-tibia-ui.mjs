@@ -255,6 +255,18 @@ function drawChatLog(img, ox, oy, rgb = [210, 210, 214]) {
   for (let i = 0; i < 3; i++) fillRect(img, ox + 5, oy + 4 + i * 3, 6, 1, [80, 84, 88]);
 }
 
+/** OTClient-style speech bubble (hide/show chat). */
+function drawChatBubble(img, ox, oy, rgb = [210, 210, 214]) {
+  fillRect(img, ox + 3, oy + 3, 10, 7, rgb);
+  bevel(img, ox + 3, oy + 3, 10, 7, [235, 237, 242], [110, 112, 116]);
+  px(img, ox + 5, oy + 6, 50, 52, 56);
+  px(img, ox + 8, oy + 6, 50, 52, 56);
+  px(img, ox + 5, oy + 7, 50, 52, 56);
+  px(img, ox + 8, oy + 7, 50, 52, 56);
+  fillRect(img, ox + 5, oy + 10, 3, 2, rgb);
+  px(img, ox + 4, oy + 11, rgb[0], rgb[1], rgb[2]);
+}
+
 mkdirSync(OUT, { recursive: true });
 
 const atlas = canvas(364, 309, [0, 0, 0, 0]);
@@ -271,13 +283,14 @@ drawIconWrench(icons, 48, 0);
 fillRect(icons, 62, 2, 8, 8, [180, 184, 190]);
 save(icons, "miniwindow_icons.png");
 
-const chatIcons = canvas(96, 16, [0, 0, 0, 0]);
+const chatIcons = canvas(112, 16, [0, 0, 0, 0]);
 drawChatChannel(chatIcons, 0, 0);
 drawChatFilter(chatIcons, 16, 0);
 drawChatWasd(chatIcons, 32, 0);
 drawChatKeyboard(chatIcons, 48, 0);
 drawChatClear(chatIcons, 64, 0);
 drawChatLog(chatIcons, 80, 0);
+drawChatBubble(chatIcons, 96, 0);
 save(chatIcons, "chat_console_icons.png");
 
 function iconButton(draw) {

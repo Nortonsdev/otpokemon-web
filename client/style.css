@@ -1845,6 +1845,7 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 .chat-ico-wasd { background-position: -32px 0 !important; }
 .chat-ico-keyboard { background-position: -48px 0 !important; }
 .chat-ico-clear { background-position: -64px 0 !important; }
+.chat-ico-bubble { background-position: -96px 0 !important; }
 .chat-hide-btn {
   flex: none;
   margin: 0 0 0 1px !important;

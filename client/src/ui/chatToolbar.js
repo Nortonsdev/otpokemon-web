@@ -90,10 +90,10 @@ function syncWasdButton() {
   btn.classList.toggle("chat-ico-wasd", !chat);
   btn.classList.toggle("chat-ico-keyboard", chat);
   btn.title = chat
-    ? "Modo chat — WASD digita no campo (clique para WASD no mapa)"
-    : "Modo WASD — movimento no mapa (clique para digitar com WASD)";
+    ? "Disable chat mode, allow to walk using ASDW"
+    : "Enable chat mode — WASD types in chat input";
   btn.setAttribute("aria-pressed", chat ? "true" : "false");
-  btn.setAttribute("aria-label", chat ? "Modo chat" : "Modo WASD");
+  btn.setAttribute("aria-label", chat ? "Chat mode on" : "Chat mode off (WASD walks)");
 }
 
 function syncFilterPanel() {

@@ -31,7 +31,7 @@ export function applyChatHidden() {
   if (btn) {
     btn.classList.toggle("on", hidden);
     btn.setAttribute("aria-pressed", hidden ? "true" : "false");
-    btn.title = hidden ? "Mostrar chat — Hide ON (Ctrl+Shift+C)" : "Ocultar chat (Ctrl+Shift+C)";
+    btn.title = hidden ? "Mostrar chat (Ctrl+Shift+C)" : "Ocultar chat (Ctrl+Shift+C)";
     btn.setAttribute("aria-label", hidden ? "Mostrar chat" : "Ocultar chat");
   }
   el.classList.toggle("chat-strip", hidden);

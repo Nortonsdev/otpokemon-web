@@ -40,6 +40,7 @@ import { playerProgressFields } from "./otpProgress.js";
 import { isSafeZone, isCombatSafeZone } from "../shared/safeZone.js";
 import { habitatExport } from "../shared/editor/mapRuntime.ts";
 import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
+import { isChatStaff, normalizeChatRole } from "../shared/chatRole.js";
 import {
   isKantoSlug,
   officialSpeciesName,
@@ -438,7 +439,7 @@ export class World {
       walkTo: null,
       mount: null,
       charName,
-      chatRole: rec.chatRole || "player",
+      chatRole: normalizeChatRole(rec.chatRole),
       lootBag: normalizeLootBag(rec.lootBag),
       catchBox: (rec.catchBox || []).map((p) => this.ensureMon(p)),
       party: (rec.party || []).map((p) => this.ensureMon(p)),
@@ -485,7 +486,7 @@ export class World {
       catchBox: this.catchBoxPayload(player),
       gold: player.gold,
       hud: player.hud || rec.hud || null,
-      chatRole: player.chatRole || "player",
+      chatRole: normalizeChatRole(player.chatRole),
     });
     this.broadcastArea({ t: "appear", creature: this.publicCreature(player) }, client.ws);
     if (player.outId) {
@@ -940,8 +941,7 @@ export class World {
     if (!Number.isFinite(mid)) return;
     const entry = this.chatByMid.get(mid);
     if (!entry) return;
-    const role = player.chatRole || "player";
-    const staff = role === "admin" || role === "mod";
+    const staff = isChatStaff(player.chatRole);
     if (entry.playerId !== player.id && !staff) {
       const client = this.clientOf(player);
       if (client) this.err(client, "Sem permissão para apagar esta mensagem.");

@@ -280,6 +280,14 @@
             <button type="button" data-ch="combate">Combate</button>
             <span class="chat-tabs-spacer" aria-hidden="true"></span>
             <div class="chat-console-tools" role="toolbar" aria-label="Ferramentas do chat">
+              <button
+                type="button"
+                id="chat-hide-toggle"
+                class="chat-tool chat-ico-bubble chat-hide-btn"
+                title="Ocultar chat (Ctrl+Shift+C)"
+                aria-label="Ocultar chat"
+                aria-pressed="false"
+              ></button>
               <div class="chat-tool-wrap">
                 <button
                   type="button"
@@ -316,8 +324,8 @@
                 type="button"
                 id="chat-wasd-toggle"
                 class="chat-tool chat-ico-wasd"
-                title="Modo WASD — movimento no mapa (clique para digitar com WASD)"
-                aria-label="Modo WASD"
+                title="Enable chat mode — WASD types in chat input"
+                aria-label="Chat mode vs WASD"
                 aria-pressed="false"
               ></button>
               <button
@@ -326,14 +334,6 @@
                 class="chat-tool chat-ico-clear"
                 title="Limpar chat (só neste cliente)"
                 aria-label="Limpar chat local"
-              ></button>
-              <button
-                type="button"
-                id="chat-hide-toggle"
-                class="mw-tool mw-min chat-hide-btn"
-                title="Ocultar chat (Ctrl+Shift+C)"
-                aria-label="Ocultar chat"
-                aria-pressed="false"
               ></button>
             </div>
           </div>

@@ -13,3 +13,4 @@ items.otb
 .DS_Store
 /tmp/
 **/__pycache__/
+.vite/

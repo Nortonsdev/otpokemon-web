@@ -8,6 +8,7 @@ import { isCombatSafeZone } from "../../shared/safeZone.js";
 import { attackSlotCount, moveSheetCss } from "../../shared/attackBar.js";
 import { attackMoveIconStyle } from "./attackBarUi.js";
 import { pokemonPlateText } from "../../shared/kantoDex.js";
+import { isChatStaff, normalizeChatRole } from "../../shared/chatRole.js";
 import {
   ITEM_BOX_COLS,
   ITEM_BOX_COMPACT_ROWS,
@@ -82,7 +83,7 @@ export class Hud {
     this.combatMoveSlot = 1;
     this.outCreatureId = null;
     this.orderBarOpen = false;
-    this.chatRole = "player";
+    this.chatRole = "user";
     this.chatLineSeq = 0;
     this.chatHiddenKeys = new Set();
   }
@@ -203,9 +204,8 @@ export class Hud {
     return "sistema";
   }
 
-  canDeleteForAll(line) {
-    const role = this.chatRole || "player";
-    return role === "admin" || role === "mod";
+  canDeleteForAll() {
+    return isChatStaff(this.chatRole);
   }
 
   hideLineLocal(line) {
@@ -214,7 +214,7 @@ export class Hud {
   }
 
   deleteLine(line) {
-    if (line.mid != null && this.canDeleteForAll(line)) {
+    if (line.mid != null && this.canDeleteForAll()) {
       this.net.send({ t: "chatDel", mid: line.mid });
       return;
     }
@@ -239,7 +239,7 @@ export class Hud {
       menu.classList.add("hidden");
     });
     menu.appendChild(hideBtn);
-    if (line.mid != null && this.canDeleteForAll(line)) {
+    if (line.mid != null && this.canDeleteForAll()) {
       const allBtn = document.createElement("button");
       allBtn.type = "button";
       allBtn.className = "danger";
@@ -329,7 +329,7 @@ export class Hud {
       this.mapData = msg.map;
       this.mapSpawn = msg.map?.spawn || null;
       if (msg.hud) this.windows.merge(msg.hud);
-      if (msg.chatRole) this.chatRole = msg.chatRole;
+      if (msg.chatRole) this.chatRole = normalizeChatRole(msg.chatRole);
       if (this.bound) this.windows.applyAll();
       this.render();
       this.drawMinimap();
