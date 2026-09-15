@@ -1,6 +1,12 @@
 /**
  * Gera learnsets Kanto (PokéAPI), estágios evolutivos e sprite sheet de ícones de moves.
  * Saída: shared/data/*.json + client/public/assets/hud/wiki-tm-sheet.png
+ *
+ * Sheet OTP wiki (tiles reais): copie o PNG para
+ *   /workspace/wiki-tm-sheet.png
+ *   ou /workspace/refs/moves/wiki-tm-sheet.png
+ * e rode este script — ele substitui o placeholder e exige moveSheet.json alinhado
+ * à ordem dos tiles do sheet (hoje: índice alfabético por nome PokéAPI quando não há wiki).
  */
 import fs from "node:fs";
 import path from "node:path";
