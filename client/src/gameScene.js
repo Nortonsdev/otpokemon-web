@@ -1045,6 +1045,9 @@ export class GameScene extends Phaser.Scene {
     if (Phaser.Input.Keyboard.JustDown(k.THREE)) return 3;
     if (Phaser.Input.Keyboard.JustDown(k.FOUR)) return 4;
     if (Phaser.Input.Keyboard.JustDown(k.FIVE)) return 5;
+    if (Phaser.Input.Keyboard.JustDown(k.SIX)) return 6;
+    if (Phaser.Input.Keyboard.JustDown(k.SEVEN)) return 7;
+    if (Phaser.Input.Keyboard.JustDown(k.EIGHT)) return 8;
     return null;
   }
 
@@ -1078,7 +1081,10 @@ export class GameScene extends Phaser.Scene {
   tickAutoCombat() {
     if (this.hud?.selectedItem || this.catchBusy) return;
     const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
-    if (!tgt || !tgt.wild || tgt.dead) return;
+    if (!tgt || !tgt.wild || tgt.dead) {
+      if (this.hud) this.hud.combatMoveSlot = 1;
+      return;
+    }
     const out = this.outCreatureState();
     const you = this.state.get(this.youId);
     if (!out || !you) return;
@@ -1089,7 +1095,15 @@ export class GameScene extends Phaser.Scene {
     }
     const now = Date.now();
     if (now < this.nextAutoAtk || now < (this.hud?.moveCdUntil || 0)) return;
-    this.nextAutoAtk = now + 1050;
-    this.net.send({ t: "attack", id: tgt.id });
+    const partyOut =
+      this.hud?.party?.out != null ? this.hud.party.slots?.[this.hud.party.out] : null;
+    const maxMoves = partyOut?.barMoves?.length || 4;
+    const slot = Math.min(Math.max(1, this.hud?.combatMoveSlot || 1), maxMoves);
+    this.nextAutoAtk = now + 1000;
+    this.hud.combatMoveSlot = (slot % maxMoves) + 1;
+    if (this.targetId !== tgt.id) {
+      this.net.send({ t: "target", id: tgt.id });
+    }
+    this.net.send({ t: "move", n: slot });
   }
 }

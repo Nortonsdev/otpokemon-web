@@ -48,6 +48,7 @@ import {
   speciesDexId,
   SHINY_RATE,
 } from "../shared/kantoDex.js";
+import { ensureBarMoves, barMoveAt } from "../shared/attackBar.js";
 
 const CATCH_CAP = ITEM_BOX_SLOTS.catch;
 const BAG_SLOT_CAP = ITEM_BOX_SLOTS.bag;
@@ -335,6 +336,7 @@ export class World {
     };
     applyRubyHealth(mon);
     if (opts.hp != null) mon.hp = Math.max(0, Math.min(opts.hp, mon.hpMax));
+    ensureBarMoves(mon);
     return mon;
   }
 
@@ -351,6 +353,7 @@ export class World {
     delete mon.ivs;
     delete mon.evs;
     applyRubyHealth(mon);
+    ensureBarMoves(mon);
     return mon;
   }
 
@@ -609,6 +612,12 @@ export class World {
               dexId: speciesDexId(p.species, p.shiny),
               gender: p.gender || (String(p.uid || "a").charCodeAt(0) % 2 ? "m" : "f"),
               ball: i === player.outSlot ? "discharged" : p.ball || "charged",
+              barMoves: (p.barMoves || []).map((m) => ({
+                name: m.name,
+                power: m.power,
+                type: m.type,
+                tile: m.tile,
+              })),
             }
           : null
       );
@@ -1192,14 +1201,13 @@ export class World {
   }
 
   useMove(player, n) {
-    if (n < 1 || n > 10) return;
+    if (n < 1 || n > 8) return;
     const poke = this.outPokemon(player);
     if (!poke) {
       this.sys(player, "Você precisa ter um Pokémon fora.");
       return;
     }
-    const spec = SPECIES[poke.species];
-    const move = spec.moves[n - 1];
+    const move = barMoveAt(poke, n);
     if (!move) return;
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
     if (!target || this.isForbiddenTarget(player, target) || target.id === poke.id) {

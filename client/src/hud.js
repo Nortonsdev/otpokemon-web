@@ -4,6 +4,8 @@ import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
 import { isCombatSafeZone } from "../../shared/safeZone.js";
+import { attackSlotCount, moveSheetCss } from "../../shared/attackBar.js";
+import { attackMoveIconStyle } from "./attackBarUi.js";
 import { pokemonPlateText } from "../../shared/kantoDex.js";
 import {
   ITEM_BOX_COLS,
@@ -76,6 +78,7 @@ export class Hud {
     this.minimapZoom = 1;
     this.catchStats = Object.fromEntries(CATCH_BALL_ITEMS.map((k) => [k, { ok: 0, fail: 0 }]));
     this.moveCdUntil = 0;
+    this.combatMoveSlot = 1;
     this.outCreatureId = null;
     this.orderBarOpen = false;
   }
@@ -452,12 +455,13 @@ export class Hud {
   }
 
   tryUseMove(n) {
-    if (!n || n < 1 || n > 5) return;
     const outIdx = this.party.out;
     if (outIdx == null) return;
     const out = this.party.slots?.[outIdx];
-    if (!out || n > moveCount(out.species)) return;
+    const max = out?.barMoves?.length || attackSlotCount(out?.species);
+    if (!out || !n || n < 1 || n > max) return;
     if (Date.now() < this.moveCdUntil) return;
+    this.combatMoveSlot = (n % max) + 1;
     this.net.send({ t: "move", n });
   }
 
@@ -835,25 +839,37 @@ export class Hud {
   renderAttackBar(out) {
     const bar = document.getElementById("attack-bar");
     if (!bar) return;
-    const hasOut = out != null && this.party.out != null;
+    const hasOut =
+      out != null &&
+      this.party.out != null &&
+      this.outCreatureId != null;
     bar.classList.toggle("hidden", !hasOut);
     bar.setAttribute("aria-hidden", hasOut ? "false" : "true");
     bar.innerHTML = "";
     if (!hasOut) return;
 
-    const known = moveCount(out.species);
+    const moves = out.barMoves || [];
+    const slotCount = moves.length || attackSlotCount(out.species);
+    const sheet = moveSheetCss();
+    bar.style.setProperty("--move-sheet-w", `${sheet.width}px`);
+    bar.style.setProperty("--move-sheet-h", `${sheet.height}px`);
+    bar.style.setProperty("--move-tile", `${sheet.tile}px`);
+
     const now = Date.now();
     const cdLeft = Math.max(0, this.moveCdUntil - now);
     const cdPct = cdLeft > 0 ? cdLeft / 1000 : 0;
 
-    for (let n = 1; n <= 5; n++) {
+    for (let n = 1; n <= slotCount; n++) {
       const btn = document.createElement("button");
       btn.type = "button";
-      const on = n <= known;
+      const move = moves[n - 1];
+      const on = !!move;
       btn.className = "attack-slot" + (on ? " on" : " off");
-      btn.title = on ? `Ataque ${n}` : "Sem ataque";
-      const moveIcon = `/assets/hud/moves/${n}_${on ? "on" : "off"}.png`;
-      btn.innerHTML = `<img src="${moveIcon}" alt="" /><span class="attack-key">${n}</span>`;
+      btn.title = on ? `${move.name} (${n})` : "Sem ataque";
+      const iconStyle = on ? attackMoveIconStyle(move.name) : "";
+      btn.innerHTML = on
+        ? `<span class="attack-move-icon" style="${iconStyle}" aria-hidden="true"></span><span class="attack-key">${n}</span>`
+        : `<span class="attack-move-icon empty" aria-hidden="true"></span><span class="attack-key">${n}</span>`;
       if (on && cdPct > 0) {
         btn.innerHTML += `<span class="attack-cd" style="--cd:${cdPct}"></span>`;
       }
@@ -876,7 +892,7 @@ export class Hud {
   renderHotbar(out) {
     const bar = document.getElementById("hotbar");
     if (!bar) return;
-    const known = out ? moveCount(out.species) : 0;
+    const known = barMoveCount(out);
     bar.innerHTML = "";
     const now = Date.now();
     const cdLeft = Math.max(0, this.moveCdUntil - now);
@@ -949,6 +965,7 @@ function portraitUrl(p) {
   return `/assets/pokemon/${key}/portrait.png`;
 }
 
-function moveCount(species) {
-  return SPECIES[species]?.moves?.length || 0;
+function barMoveCount(out) {
+  if (!out) return 0;
+  return out.barMoves?.length || attackSlotCount(out.species);
 }
