@@ -12,8 +12,9 @@ import {
   applyHouseToTile,
   applyZoneToTile,
   applySpawnToTile,
+  applyPokeZoneToTile,
+  applyPzPadToTile,
   tileIsEmpty,
-  ZONE_SPAWN,
   type OtbmMap,
   type OtbmTile,
 } from "../../../shared/editor/otbm.ts";
@@ -47,12 +48,25 @@ type Tool =
   | "spawn"
   | "pvp"
   | "nopvp"
-  | "protection";
+  | "protection"
+  | "pokezone"
+  | "pz";
 
-type MetaStamp = "house" | "spawn" | "pvp" | "nopvp" | "protection";
-const META_TOOLS: MetaStamp[] = ["house", "spawn", "pvp", "nopvp", "protection"];
+type MetaStamp = "house" | "spawn" | "pvp" | "nopvp" | "protection" | "pokezone" | "pz";
+const META_TOOLS: MetaStamp[] = ["house", "spawn", "pvp", "nopvp", "protection", "pokezone", "pz"];
 function isMetaStamp(t: string | null | undefined): t is MetaStamp {
   return META_TOOLS.includes(t as MetaStamp);
+}
+
+function metaLabel(kind: MetaStamp, houseId?: number, pokeZoneId?: number, pzId?: number): string {
+  if (kind === "protection") return "SAFE";
+  if (kind === "nopvp") return "non-PVP";
+  if (kind === "pvp") return "PVP";
+  if (kind === "house") return `HOUSETILE ${houseId ?? 1}`;
+  if (kind === "pokezone") return `PokeZone ${pokeZoneId ?? 1}`;
+  if (kind === "pz") return `PZ ${pzId ?? 1}`;
+  if (kind === "spawn") return "spawn";
+  return kind;
 }
 
 const ICONS: Record<string, string> = {
@@ -73,6 +87,8 @@ const ICONS: Record<string, string> = {
   pvp: `<path d="M4 4l8 8M12 4L4 12"/><path d="M3 7l4-4M9 13l4 0"/>`,
   nopvp: `<path d="M8 2l5 2v4c0 3.2-2.2 5.5-5 6.5C5.2 13.5 3 11.2 3 8V4z"/>`,
   protection: `<circle cx="8" cy="8" r="5"/><path d="M8 5v6M5 8h6"/>`,
+  pokezone: `<path d="M8 2.2l5.2 3v5.6L8 13.8 2.8 10.8V5.2z"/>`,
+  pz: `<rect x="3.2" y="3.2" width="9.6" height="9.6" rx="1.2"/><rect x="5.4" y="5.4" width="5.2" height="5.2" rx="0.6"/>`,
   layers: `<path d="M8 3l6 3-6 3-6-3z"/><path d="M3 9l5 2.5L13 9"/><path d="M3 12l5 2.5 5-2.5"/>`,
   grid: `<rect x="3" y="3" width="10" height="10"/><path d="M8 3v10M3 8h10"/>`,
   chevronUp: `<path d="M4 10l4-4 4 4"/>`,
@@ -185,6 +201,8 @@ class EditorApp {
     setRuntimeCell(this.runtime, x, y, t?.items.map((i) => i.id) ?? [], this.catalog ?? undefined);
     if (this.runtime.flags?.[y]) this.runtime.flags[y][x] = t?.flags || 0;
     if (this.runtime.houses?.[y]) this.runtime.houses[y][x] = t?.houseId || 0;
+    if (this.runtime.pokeZoneIds?.[y]) this.runtime.pokeZoneIds[y][x] = t?.pokeZoneId || 0;
+    if (this.runtime.pzIds?.[y]) this.runtime.pzIds[y][x] = t?.pzId || 0;
   }
 
   setTileItems(x: number, y: number, items: number[]) {
@@ -198,6 +216,18 @@ class EditorApp {
     const el = document.getElementById("house-id") as HTMLInputElement | null;
     const n = Number(el?.value || this.houseId);
     return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+  }
+
+  currentPzId() {
+    const el = document.getElementById("pz-id") as HTMLInputElement | null;
+    const n = Number(el?.value || 1);
+    return Number.isFinite(n) && n >= 1 ? Math.min(4095, Math.floor(n)) : 1;
+  }
+
+  currentPokeZoneId() {
+    const el = document.getElementById("pokezone-id") as HTMLInputElement | null;
+    const n = Number(el?.value || 1);
+    return Number.isFinite(n) && n >= 1 ? Math.min(4095, Math.floor(n)) : 1;
   }
 
   currentSpawnDexId() {
@@ -303,7 +333,9 @@ class EditorApp {
           <div class="tools">
             <button class="tool-btn zone-pvp" data-tool="pvp" title="PVP">${icon("pvp")}</button>
             <button class="tool-btn zone-nopvp" data-tool="nopvp" title="non-PVP">${icon("nopvp")}</button>
-            <button class="tool-btn zone-safe" data-tool="protection" title="SAFE — save / non-combat (OTBM PZ)">${icon("protection")}</button>
+            <button class="tool-btn zone-safe" data-tool="protection" title="SAFE — save / non-combat (OTBM protection zone)">${icon("protection")}</button>
+            <button class="tool-btn zone-pokezone" data-tool="pokezone" title="PokeZone — habitat de wilds (K)">${icon("pokezone")}</button>
+            <button class="tool-btn zone-pz" data-tool="pz" title="PZ — pad de spawn/movimento dentro da PokeZone (Z)">${icon("pz")}</button>
           </div>
           <div class="tools">
             <button class="tool-btn" data-act="undo" title="Desfazer">${icon("undo")}</button>
@@ -323,6 +355,8 @@ class EditorApp {
           <button type="button" id="btn-grid" class="active" title="Grade">${icon("grid")}</button>
           <input class="house-id" id="house-id" type="number" min="1" value="1" title="House ID" />
           <input class="spawn-id" id="spawn-dex" list="kanto-dex" value="0025" title="Espécie NNNN ou NNNN-1 (Pikachu=0025)" />
+          <input class="pokezone-id" id="pokezone-id" type="number" min="1" max="4095" value="1" title="PokeZone ID" />
+          <input class="pz-id" id="pz-id" type="number" min="1" max="4095" value="1" title="PZ pad ID" />
         </aside>
         <datalist id="kanto-dex">${kantoSpawnOptions()}</datalist>
 
@@ -473,8 +507,7 @@ class EditorApp {
     if (isMetaStamp(tool) && this.selection) {
       this.applyMetaToSelection(tool, false);
       this.selection = null;
-      const label = tool === "protection" ? "SAFE" : tool === "house" ? `HOUSETILE ${this.currentHouseId()}` : tool;
-      this.msg(`Área: ${label}`);
+      this.msg(`Área: ${metaLabel(tool, this.currentHouseId(), this.currentPokeZoneId(), this.currentPzId())}`);
     }
   }
 
@@ -888,6 +921,8 @@ class EditorApp {
         if (e.key === "s" || e.key === "S") this.setTool("protection");
         if (e.key === "p" || e.key === "P") this.setTool("pvp");
         if (e.key === "n" || e.key === "N") this.setTool("nopvp");
+        if (e.key === "k" || e.key === "K") this.setTool("pokezone");
+        if (e.key === "z" || e.key === "Z") this.setTool("pz");
         if (e.key === "g" || e.key === "G") this.toggleGrid();
         if (e.key === "+" || e.key === "=") this.setZoom(this.zoom * 1.1);
         if (e.key === "-" || e.key === "_") this.setZoom(this.zoom * 0.9);
@@ -915,7 +950,7 @@ class EditorApp {
     });
     this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     this.canvas.addEventListener("mousedown", (e) => {
-      if (this.tool === "pan" || this.spacePan || e.button === 1 || (e.button === 2 && this.tool !== "house" && this.tool !== "pvp" && this.tool !== "nopvp" && this.tool !== "protection" && this.tool !== "spawn")) {
+      if (this.tool === "pan" || this.spacePan || e.button === 1 || (e.button === 2 && this.tool !== "house" && this.tool !== "pvp" && this.tool !== "nopvp" && this.tool !== "protection" && this.tool !== "spawn" && this.tool !== "pokezone" && this.tool !== "pz")) {
         this.panning = true;
         this.lastX = e.clientX;
         this.lastY = e.clientY;
@@ -1002,7 +1037,7 @@ class EditorApp {
     this.draw();
     this.updateMinimap();
     this.setStatus();
-    this.msg(meta ? `Área ${meta === "protection" ? "SAFE" : meta}.` : "Seleção preenchida.");
+    this.msg(meta ? `Área ${metaLabel(meta, this.currentHouseId(), this.currentPokeZoneId(), this.currentPzId())}.` : "Seleção preenchida.");
   }
 
   paintMetaAt(x: number, y: number, clear: boolean, kind: MetaStamp | null = this.effectiveMeta()) {
@@ -1021,12 +1056,19 @@ class EditorApp {
           this.msg("ID inválido — use NNNN ou NNNN-1 (Kanto #1–151).");
           return;
         }
-        applySpawnToTile(t, dexId);
+        const pzId = t.pzId || this.currentPzId();
+        applySpawnToTile(t, dexId, pzId);
         const parsed = parseSpeciesDexId(dexId)!;
-        this.msg(`Spawn ${parsed.id} ${parsed.name}`);
+        this.msg(`Spawn ${parsed.id} ${parsed.name} → PZ ${pzId}`);
       }
+    } else if (kind === "pokezone") {
+      applyPokeZoneToTile(t, clear ? null : this.currentPokeZoneId());
+      this.msg(clear ? "PokeZone removida." : `PokeZone ${this.currentPokeZoneId()}`);
+    } else if (kind === "pz") {
+      applyPzPadToTile(t, clear ? null : this.currentPzId(), this.currentPokeZoneId());
+      this.msg(clear ? "PZ removida." : `PZ ${this.currentPzId()} ⊆ PokeZone ${t.pokeZoneId || this.currentPokeZoneId()}`);
     } else {
-      applyZoneToTile(t, clear ? null : kind);
+      applyZoneToTile(t, clear ? null : (kind as "pvp" | "nopvp" | "protection"));
       const label = kind === "protection" ? "SAFE" : kind === "nopvp" ? "non-PVP" : "PVP";
       this.msg(clear ? `${label} removida.` : `${label} (OTBM flag)`);
     }

@@ -1,5 +1,5 @@
 import type { OtbmMap, OtbmTile } from "../../../shared/editor/otbm.ts";
-import { tileKey, zoneKindFromTile } from "../../../shared/editor/otbm.ts";
+import { tileKey, zoneKindFromTile, tileHasPokeZone, tileHasPzPad, ZONE_SPAWN } from "../../../shared/editor/otbm.ts";
 import type { RuntimeMap } from "../../../shared/editor/mapRuntime.ts";
 import { BUILTIN_TILE_IDS, TILE_SIZE, groundTextureName } from "../../../shared/editor/tileCatalog.ts";
 import type { Rect } from "../../../shared/editor/brushes.ts";
@@ -28,8 +28,12 @@ const ZONE_FILL: Record<string, string> = {
   protection: "rgba(46, 196, 102, 0.32)",
   nopvp: "rgba(232, 180, 48, 0.32)",
   pvp: "rgba(214, 64, 64, 0.32)",
-  spawn: "rgba(196, 92, 214, 0.28)",
+  spawn: "rgba(196, 92, 214, 0.22)",
 };
+const POKEZONE_FILL = "rgba(42, 156, 214, 0.28)";
+const POKEZONE_STROKE = "rgba(90, 196, 240, 0.7)";
+const PZ_PAD_FILL = "rgba(255, 132, 36, 0.38)";
+const PZ_PAD_STROKE = "rgba(255, 186, 92, 0.95)";
 
 export function screenToTile(
   canvas: HTMLCanvasElement,
@@ -93,9 +97,25 @@ export function drawEditorMap(state: DrawState) {
       }
       if (state.showZones) {
         const kind = zoneKindFromTile(t);
-        if (kind && ZONE_FILL[kind]) {
+        if (kind && kind !== "spawn" && ZONE_FILL[kind]) {
           ctx.fillStyle = ZONE_FILL[kind];
           ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        }
+        if (tileHasPokeZone(t)) {
+          ctx.fillStyle = POKEZONE_FILL;
+          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = POKEZONE_STROKE;
+          ctx.lineWidth = 1 / Math.max(zoom, 0.25);
+          ctx.strokeRect(px + 0.5, py + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+        }
+        if (tileHasPzPad(t)) {
+          ctx.fillStyle = PZ_PAD_FILL;
+          ctx.fillRect(px + 3, py + 3, TILE_SIZE - 6, TILE_SIZE - 6);
+          ctx.strokeStyle = PZ_PAD_STROKE;
+          ctx.lineWidth = 1.5 / Math.max(zoom, 0.25);
+          ctx.setLineDash([3 / Math.max(zoom, 0.25), 2 / Math.max(zoom, 0.25)]);
+          ctx.strokeRect(px + 3.5, py + 3.5, TILE_SIZE - 7, TILE_SIZE - 7);
+          ctx.setLineDash([]);
         }
       }
       if (state.showGrid) {
@@ -128,7 +148,7 @@ export function drawEditorMap(state: DrawState) {
     for (const [key, tile] of map.tiles) {
       void key;
       if (tile.z !== floor) continue;
-      if (!tile.spawnMonster && !tile.zones?.includes(4)) continue;
+      if (!tile.spawnMonster && !tile.zones?.includes(ZONE_SPAWN)) continue;
       const cx = tile.x * TILE_SIZE + 16;
       const cy = tile.y * TILE_SIZE + 16;
       ctx.beginPath();
@@ -157,8 +177,11 @@ export function tileOverlayHint(tile: OtbmTile | undefined): string {
   const bits: string[] = [];
   if (tile?.houseId) bits.push(`house ${tile.houseId}`);
   const kind = zoneKindFromTile(tile);
-  if (kind) bits.push(kind);
+  if (kind && kind !== "spawn") bits.push(kind);
+  if (tileHasPokeZone(tile)) bits.push(`pokezone ${tile?.pokeZoneId || 1}`);
+  if (tileHasPzPad(tile)) bits.push(`pz ${tile?.pzId || 1}`);
   if (tile?.spawnMonster?.dexId) bits.push(tile.spawnMonster.dexId);
+  if (tile?.spawnMonster?.pzId) bits.push(`spawn→pz ${tile.spawnMonster.pzId}`);
   return bits.join(" · ");
 }
 
@@ -194,7 +217,11 @@ export function drawMinimap(mm: CanvasRenderingContext2D, runtime: RuntimeMap, v
             ? "#e8b430"
             : flags & 0x0010
               ? "#d64040"
-              : colors[name] || "#2d5a27";
+              : runtime.pzIds?.[y]?.[x]
+                ? "#ff8c28"
+                : runtime.pokeZoneIds?.[y]?.[x]
+                  ? "#2a9cd6"
+                  : colors[name] || "#2d5a27";
       mm.fillRect(x * sx, y * sy, Math.max(1, sx * stepX), Math.max(1, sy * stepY));
     }
   }

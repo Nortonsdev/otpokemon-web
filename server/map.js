@@ -23,6 +23,10 @@ export const MAP = new Proxy(
       if (prop === "cells") return r.cells;
       if (prop === "flags") return r.flags;
       if (prop === "houses") return r.houses;
+      if (prop === "pokeZoneIds") return r.pokeZoneIds;
+      if (prop === "pzIds") return r.pzIds;
+      if (prop === "pokeZones") return r.pokeZones;
+      if (prop === "pzPads") return r.pzPads;
       if (prop === "wildSpawns") return r.wildSpawns;
       if (prop === "tile") return r.tile;
       if (prop === "spawn") return r.spawn;
@@ -146,4 +150,47 @@ export function isNoPvpZone(x, y) {
 
 export function isPvpZone(x, y) {
   return (tileFlags(x, y) & TILESTATE_PVPZONE) !== 0;
+}
+
+export function pokeZoneIdAt(x, y) {
+  const r = runtime();
+  if (!inBounds(x, y) || !r.pokeZoneIds) return 0;
+  return r.pokeZoneIds[y]?.[x] || 0;
+}
+
+export function pzIdAt(x, y) {
+  const r = runtime();
+  if (!inBounds(x, y) || !r.pzIds) return 0;
+  return r.pzIds[y]?.[x] || 0;
+}
+
+export function isPokeZone(x, y) {
+  return pokeZoneIdAt(x, y) > 0;
+}
+
+export function isPzPad(x, y) {
+  return pzIdAt(x, y) > 0;
+}
+
+export function tilesForPz(pzId) {
+  const id = Number(pzId) || 0;
+  if (id < 1) return [];
+  const r = runtime();
+  const pad = r.pzPads?.find((p) => p.id === id);
+  if (pad?.tiles?.length) return pad.tiles;
+  const tiles = [];
+  const grid = r.pzIds;
+  if (!grid) return tiles;
+  for (let y = 0; y < r.h; y++) {
+    for (let x = 0; x < r.w; x++) {
+      if (grid[y]?.[x] === id) tiles.push({ x, y });
+    }
+  }
+  return tiles;
+}
+
+/** Wilds bound to a PZ may only step onto tiles of that pad. Unbound wilds (meadow) unrestricted. */
+export function wildMayStep(creature, x, y) {
+  if (!creature?.wild || !creature.pzId) return true;
+  return pzIdAt(x, y) === creature.pzId;
 }

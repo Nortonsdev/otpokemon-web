@@ -78,13 +78,94 @@ export const PZ_FLAG = TILESTATE_PROTECTIONZONE
 
 const ZONE_FLAG_MASK = TILESTATE_PROTECTIONZONE | TILESTATE_NOPVPZONE | TILESTATE_PVPZONE
 
-/** YATME OTBM_TILE_ZONE ids (also mirrored in TILESTATE flags). */
+/** YATME OTBM_TILE_ZONE ids (combat kinds also mirrored in TILESTATE flags). */
 export const ZONE_PVP = 1
 export const ZONE_NOPVP = 2
 export const ZONE_PROTECTION = 3
 export const ZONE_SPAWN = 4
+/** Habitat where wilds may exist/wander. No TILESTATE bit — RME-safe extra zone id. */
+export const ZONE_POKEZONE = 5
+/** Spawn/movement pad inside a PokeZone (PZ ⊆ PokeZone). Distinct from TILESTATE PZ/SAFE. */
+export const ZONE_PZ_PAD = 6
+
+/**
+ * Instance ids packed into the same OTBM_TILE_ZONE u16 list (unknown ids are ignored by RME).
+ * pokeZone 1 → 0x1001; pz pad 1 → 0x2001. Max id 4095.
+ */
+export const ZONE_POKEZONE_ID_BASE = 0x1000
+export const ZONE_PZ_ID_BASE = 0x2000
+export const ZONE_HABITAT_ID_MAX = 0x0fff
 
 export type ZoneKind = "pvp" | "nopvp" | "protection" | "spawn"
+
+export function clampHabitatId(id: number): number {
+  const n = Math.floor(Number(id) || 0)
+  if (n < 1) return 1
+  return Math.min(ZONE_HABITAT_ID_MAX, n)
+}
+
+function isPackedPokeZoneId(z: number): boolean {
+  return z > ZONE_POKEZONE_ID_BASE && z < ZONE_PZ_ID_BASE
+}
+
+function isPackedPzId(z: number): boolean {
+  return z > ZONE_PZ_ID_BASE && z <= ZONE_PZ_ID_BASE + ZONE_HABITAT_ID_MAX
+}
+
+export function pokeZoneIdFromZones(zones: number[] | undefined | null): number | undefined {
+  if (!zones?.length) return undefined
+  for (const z of zones) {
+    if (isPackedPokeZoneId(z)) return z - ZONE_POKEZONE_ID_BASE
+  }
+  return undefined
+}
+
+export function pzIdFromZones(zones: number[] | undefined | null): number | undefined {
+  if (!zones?.length) return undefined
+  for (const z of zones) {
+    if (isPackedPzId(z)) return z - ZONE_PZ_ID_BASE
+  }
+  return undefined
+}
+
+export function tileHasPokeZone(tile: OtbmTile | undefined | null): boolean {
+  if (!tile) return false
+  return Boolean(tile.pokeZoneId) || Boolean(tile.zones?.includes(ZONE_POKEZONE)) || pokeZoneIdFromZones(tile.zones) != null
+}
+
+export function tileHasPzPad(tile: OtbmTile | undefined | null): boolean {
+  if (!tile) return false
+  return Boolean(tile.pzId) || Boolean(tile.zones?.includes(ZONE_PZ_PAD)) || pzIdFromZones(tile.zones) != null
+}
+
+/** Rebuild ZONE_POKEZONE / ZONE_PZ_PAD + packed ids from tile.pokeZoneId / tile.pzId. */
+export function syncHabitatZones(tile: OtbmTile): void {
+  const next = (tile.zones || []).filter(
+    (id) => id !== ZONE_POKEZONE && id !== ZONE_PZ_PAD && !isPackedPokeZoneId(id) && !isPackedPzId(id),
+  )
+  if (tile.pokeZoneId && tile.pokeZoneId >= 1) {
+    next.push(ZONE_POKEZONE)
+    next.push(ZONE_POKEZONE_ID_BASE + tile.pokeZoneId)
+  }
+  if (tile.pzId && tile.pzId >= 1) {
+    next.push(ZONE_PZ_PAD)
+    next.push(ZONE_PZ_ID_BASE + tile.pzId)
+  }
+  tile.zones = next.length ? next : undefined
+}
+
+export function hydrateHabitatFromZones(tile: OtbmTile): void {
+  const packedPoke = pokeZoneIdFromZones(tile.zones)
+  const packedPz = pzIdFromZones(tile.zones)
+  if (packedPoke) tile.pokeZoneId = packedPoke
+  else if (tile.zones?.includes(ZONE_POKEZONE)) tile.pokeZoneId = tile.pokeZoneId || 1
+  else delete tile.pokeZoneId
+  if (packedPz) tile.pzId = packedPz
+  else if (tile.zones?.includes(ZONE_PZ_PAD)) tile.pzId = tile.pzId || 1
+  else delete tile.pzId
+  if (tile.pzId && !tile.pokeZoneId) tile.pokeZoneId = 1
+  if (tile.pokeZoneId || tile.pzId) syncHabitatZones(tile)
+}
 
 export function flagsForZone(kind: ZoneKind | null): number {
   if (kind === "protection") return TILESTATE_PROTECTIONZONE
@@ -111,7 +192,7 @@ export function zoneKindFromTile(tile: OtbmTile | undefined | null): ZoneKind | 
   return null
 }
 
-/** Paint or clear a Remere-compatible zone. Spawn is orthogonal to PVP/PZ flags. */
+/** Paint or clear a Remere-compatible zone. Spawn/habitat are orthogonal to PVP/SAFE flags. */
 export function applyZoneToTile(tile: OtbmTile, kind: ZoneKind | null): void {
   const keepSpawn = (tile.zones || []).includes(ZONE_SPAWN) || Boolean(tile.spawnMonster)
   if (kind === "spawn") {
@@ -126,6 +207,7 @@ export function applyZoneToTile(tile: OtbmTile, kind: ZoneKind | null): void {
   }
   if (keepSpawn) next.add(ZONE_SPAWN)
   tile.zones = next.size ? [...next] : undefined
+  syncHabitatZones(tile)
 }
 
 export function applyHouseToTile(tile: OtbmTile, houseId: number | null): void {
@@ -133,12 +215,37 @@ export function applyHouseToTile(tile: OtbmTile, houseId: number | null): void {
   else tile.houseId = houseId >>> 0
 }
 
-/** Paint or clear a wild spawn. `dexId` is `NNNN` / `NNNN-1`; `true` keeps the current ID. */
-export function applySpawnToTile(tile: OtbmTile, dexId: string | true | null): void {
+/** Paint habitat. Clearing a PokeZone also clears the PZ pad on that sqm (PZ ⊆ PokeZone). */
+export function applyPokeZoneToTile(tile: OtbmTile, pokeZoneId: number | null): void {
+  if (pokeZoneId == null || pokeZoneId < 1) {
+    delete tile.pokeZoneId
+    delete tile.pzId
+    syncHabitatZones(tile)
+    return
+  }
+  tile.pokeZoneId = clampHabitatId(pokeZoneId)
+  syncHabitatZones(tile)
+}
+
+/** Paint a PZ pad. Tiles without a PokeZone inherit `pokeZoneId` (default 1) so PZ ⊆ PokeZone. */
+export function applyPzPadToTile(tile: OtbmTile, pzId: number | null, pokeZoneId?: number): void {
+  if (pzId == null || pzId < 1) {
+    delete tile.pzId
+    syncHabitatZones(tile)
+    return
+  }
+  tile.pzId = clampHabitatId(pzId)
+  if (!tile.pokeZoneId) tile.pokeZoneId = clampHabitatId(pokeZoneId || 1)
+  syncHabitatZones(tile)
+}
+
+/** Paint or clear a wild spawn. `dexId` is `NNNN` / `NNNN-1`; `true` keeps the current ID. `pzId` binds wander. */
+export function applySpawnToTile(tile: OtbmTile, dexId: string | true | null, pzId?: number | null): void {
   if (dexId == null || dexId === "") {
     delete tile.spawnMonster
     const next = (tile.zones || []).filter((id) => id !== ZONE_SPAWN)
     tile.zones = next.length ? next : undefined
+    syncHabitatZones(tile)
     return
   }
   let id: string | undefined
@@ -148,10 +255,21 @@ export function applySpawnToTile(tile: OtbmTile, dexId: string | true | null): v
     if (!parsed) return
     id = parsed.id
   }
-  tile.spawnMonster = { radius: tile.spawnMonster?.radius || 3, ...(id ? { dexId: id } : {}) }
+  const linked =
+    pzId === null
+      ? undefined
+      : pzId != null && pzId >= 1
+        ? clampHabitatId(pzId)
+        : tile.spawnMonster?.pzId || tile.pzId
+  tile.spawnMonster = {
+    radius: tile.spawnMonster?.radius || 3,
+    ...(id ? { dexId: id } : {}),
+    ...(linked ? { pzId: linked } : {}),
+  }
   const next = new Set(tile.zones || [])
   next.add(ZONE_SPAWN)
   tile.zones = [...next]
+  syncHabitatZones(tile)
 }
 
 export function tileIsEmpty(tile: OtbmTile): boolean {
@@ -160,6 +278,8 @@ export function tileIsEmpty(tile: OtbmTile): boolean {
     !tile.houseId &&
     !tile.flags &&
     !tile.zones?.length &&
+    !tile.pokeZoneId &&
+    !tile.pzId &&
     !tile.spawnMonster &&
     !tile.monsters?.length &&
     !tile.npc &&
@@ -228,10 +348,14 @@ export interface OtbmTile {
   houseId?: number
   items: OtbmItem[]
   zones?: number[]
+  /** PokeZone habitat id (packed into `zones` as ZONE_POKEZONE + 0x1000+id). */
+  pokeZoneId?: number
+  /** PZ pad id (packed into `zones` as ZONE_PZ_PAD + 0x2000+id). */
+  pzId?: number
   monsters?: TileCreature[]
   npc?: TileCreature
-  /** Wild spawn. `dexId` is capt form `NNNN` / `NNNN-1` (Kanto #1–151). */
-  spawnMonster?: { radius: number; dexId?: string }
+  /** Wild spawn. `dexId` is capt form `NNNN` / `NNNN-1` (Kanto #1–151). `pzId` = wander pad. */
+  spawnMonster?: { radius: number; dexId?: string; pzId?: number }
   spawnNpc?: { radius: number }
   /** Number of items that were stored as inline OTBM_ATTR_ITEM in the original file */
   inlineItemCount?: number
@@ -274,6 +398,8 @@ export function cloneOtbmMap(map: OtbmMap): OtbmMap {
       ...tile,
       items: tile.items.map(deepCloneItem),
       zones: tile.zones ? [...tile.zones] : undefined,
+      pokeZoneId: tile.pokeZoneId,
+      pzId: tile.pzId,
       monsters: tile.monsters?.map((m) => ({ ...m })),
       npc: tile.npc ? { ...tile.npc } : undefined,
       spawnMonster: tile.spawnMonster ? { ...tile.spawnMonster } : undefined,
@@ -676,16 +802,35 @@ function parseTile(
         zones.push(child.readU16())
       }
       tile.zones = zones
-      if (zones.includes(ZONE_SPAWN)) {
-        tile.spawnMonster = tile.spawnMonster || { radius: 3 }
-        if (child.canRead()) {
-          try {
-            const parsed = parseSpeciesDexId(child.readString())
-            if (parsed) tile.spawnMonster = { radius: tile.spawnMonster.radius || 3, dexId: parsed.id }
-          } catch {
-            /* leftover bytes from other editors */
+      hydrateHabitatFromZones(tile)
+      while (child.canRead()) {
+        try {
+          const extra = child.readString()
+          if (/^pz:\d+$/i.test(extra)) {
+            const n = Number(extra.slice(3))
+            if (Number.isInteger(n) && n >= 1) {
+              tile.spawnMonster = tile.spawnMonster || { radius: 3 }
+              tile.spawnMonster.pzId = clampHabitatId(n)
+            }
+            continue
           }
+          const parsed = parseSpeciesDexId(extra)
+          if (parsed) {
+            tile.spawnMonster = {
+              radius: tile.spawnMonster?.radius || 3,
+              dexId: parsed.id,
+              ...(tile.spawnMonster?.pzId ? { pzId: tile.spawnMonster.pzId } : {}),
+            }
+          }
+        } catch {
+          break
         }
+      }
+      if (zones.includes(ZONE_SPAWN) && !tile.spawnMonster) {
+        tile.spawnMonster = { radius: 3 }
+      }
+      if (tile.spawnMonster && !tile.spawnMonster.pzId && tile.pzId) {
+        tile.spawnMonster.pzId = tile.pzId
       }
     }
   }
@@ -1086,6 +1231,7 @@ function serializeTile(writer: BinaryWriter, tile: OtbmTile, saveVersion: number
     serializeItem(writer, tile.items[i], saveVersion)
   }
 
+  if (tile.pokeZoneId || tile.pzId) syncHabitatZones(tile)
   if (tile.zones && tile.zones.length > 0) {
     writer.startNode(OTBM_TILE_ZONE)
     writer.writeU16(tile.zones.length)
@@ -1094,6 +1240,8 @@ function serializeTile(writer: BinaryWriter, tile: OtbmTile, saveVersion: number
     }
     const dexId = tile.spawnMonster?.dexId && parseSpeciesDexId(tile.spawnMonster.dexId)?.id
     if (dexId) writer.writeString(dexId)
+    const spawnPz = tile.spawnMonster?.pzId
+    if (spawnPz && spawnPz >= 1) writer.writeString(`pz:${spawnPz >>> 0}`)
     writer.endNode()
   }
 

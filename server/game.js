@@ -26,12 +26,15 @@ import {
   isProtectionZone,
   isPvpZone,
   meadowWildSpots,
+  tilesForPz,
   tileName,
   walkable,
+  wildMayStep,
 } from "./map.js";
 import { loadSave, saveNow } from "./persist.js";
 import { playerProgressFields } from "./otpProgress.js";
 import { isSafeZone, isCombatSafeZone } from "../shared/safeZone.js";
+import { habitatExport } from "../shared/editor/mapRuntime.ts";
 import { ITEM_BOX_SLOTS } from "../shared/itemBoxCaps.js";
 import {
   isKantoSlug,
@@ -438,6 +441,9 @@ export class World {
         cells: MAP.cells,
         flags: MAP.flags,
         houses: MAP.houses,
+        pokeZoneIds: MAP.pokeZoneIds,
+        pzIds: MAP.pzIds,
+        ...habitatExport(MAP),
         spawn: currentSpawn(),
       },
       you: this.publicCreature(player),
@@ -694,7 +700,7 @@ export class World {
     const d = DELTA[dir];
     const nx = creature.x + d.x;
     const ny = creature.y + d.y;
-    if (!walkable(nx, ny, { surf: creature.mount?.ability === "surf" }) || this.occupant(nx, ny)) {
+    if (!walkable(nx, ny, { surf: creature.mount?.ability === "surf" }) || this.occupant(nx, ny) || !wildMayStep(creature, nx, ny)) {
       this.broadcastArea({ t: "turn", id: creature.id, dir });
       if (creature.kind === "player") this.snapshotPlayer(creature);
       return;
@@ -1408,12 +1414,24 @@ export class World {
     for (const spot of MAP.wildSpawns || []) {
       const parsed = parseSpeciesDexId(spot.dexId);
       if (!parsed || !SPECIES[parsed.slug]) continue;
+      const dest = this.resolveWildSpawnTile(spot);
       const taken = [...this.creatures.values()].some(
-        (c) => c.wild && !c.dead && c.x === spot.x && c.y === spot.y
+        (c) => c.wild && !c.dead && c.x === dest.x && c.y === dest.y
       );
       if (taken) continue;
-      this.spawnWildAt(parsed.slug, spot.x, spot.y, parsed.shiny);
+      this.spawnWildAt(parsed.slug, dest.x, dest.y, parsed.shiny, spot.pzId);
     }
+  }
+
+  resolveWildSpawnTile(spot) {
+    if (!spot?.pzId) return spot;
+    const tiles = tilesForPz(spot.pzId);
+    if (!tiles.length) return spot;
+    if (tiles.some((t) => t.x === spot.x && t.y === spot.y)) return spot;
+    const free = tiles.filter(
+      (s) => walkable(s.x, s.y) && !this.occupant(s.x, s.y) && !isProtectionZone(s.x, s.y) && !(MAP.houses?.[s.y]?.[s.x])
+    );
+    return free[0] || tiles[0];
   }
 
   spawnWild(species = "caterpie", spots = MAP.wildSpawns) {
@@ -1425,16 +1443,17 @@ export class World {
     );
     if (!free.length) return;
     const spot = free[randomInt(0, free.length)];
-    this.spawnWildAt(key, spot.x, spot.y, null);
+    this.spawnWildAt(key, spot.x, spot.y, null, spot.pzId);
   }
 
-  spawnWildAt(species, x, y, shinyForced) {
+  spawnWildAt(species, x, y, shinyForced, pzId) {
     const key = String(species || "").toLowerCase();
     if (!isKantoSlug(key) || !SPECIES[key]) return;
     if (!walkable(x, y) || this.occupant(x, y) || isProtectionZone(x, y) || MAP.houses?.[y]?.[x]) return;
     const spec = SPECIES[key];
     const shiny = shinyForced == null ? randomInt(1, SHINY_RATE + 1) === 1 : !!shinyForced;
     const sample = this.makeMon(key, 2, { shiny });
+    const linkedPz = Number(pzId) > 0 ? Number(pzId) : 0;
     const wild = {
       id: cid(),
       kind: "wild",
@@ -1454,6 +1473,7 @@ export class World {
       baseHp: spec.baseStats.hp,
       baseStats: { ...spec.baseStats },
       busyUntil: 0,
+      ...(linkedPz ? { pzId: linkedPz } : {}),
     };
     this.creatures.set(wild.id, wild);
     this.occupy(wild);
