@@ -1,256 +1,927 @@
 import Phaser from "phaser";
+import { buildLegacyMap, SPAWN } from "../../shared/mapLegacy.ts";
+import {
+  groundTextureName,
+  isGroundTexture,
+  itemKindForId,
+  textureNameForItemId,
+} from "../../shared/editor/tileCatalog.ts";
+
+const PREVIEW_MAP = buildLegacyMap();
+import { LOOK_NAME, STEP_MS } from "../../server/species.js";
+import { playCatchSequence } from "./catchVfx.js";
+import { CATCH_BALL_ITEMS } from "./ballIcons.js";
+import { isChatHidden, showChatPanel } from "./ui/chatDock.js";
+import { isChatWasdMode } from "./ui/chatToolbar.js";
+import { speciesAssetSlug } from "../../shared/kantoDex.js";
+import { preloadOtpFonts, registerOtpBitmapFonts } from "./ui/otpBitmapFont.js";
+import { ATK_MS } from "../../server/species.js";
 
 const TILE = 32;
+const CROSSHAIR_KEYS = ["crosshair-main", "crosshair-a", "crosshair-b"];
+const CROSSHAIR_PX = 32;
+/** 64×64 (2×2 tile) meadow sheets — keep in sync with tools/extract_otp207_sprites.py exports. */
+const LARGE_MONS = new Set([
+  "blastoise",
+  "bulbasaur",
+  "charizard",
+  "pidgeot",
+  "rapidash",
+  "squirtle",
+  "venusaur",
+  "wartortle",
+]);
+
+/** Non-square OTP sheets (frame width × height). */
+const MON_FRAME_SIZE = {
+  charmeleon: { w: 64, h: 32 },
+};
+
 const SPRITE_COL = [0, 1, 1, 2, 2, 3, 3, 0];
-const LOOK = { 1: "bulbasaur", 4: "charmander", 7: "squirtle", 10: "caterpie" };
+
+function monFrameSize(name) {
+  if (MON_FRAME_SIZE[name]) return MON_FRAME_SIZE[name];
+  const side = LARGE_MONS.has(name) ? 64 : 32;
+  return { w: side, h: side };
+}
+
+function monFrame(name) {
+  return monFrameSize(name).w;
+}
+
+function creatureSize(tex) {
+  if (tex === "human" || LARGE_MONS.has(tex)) return 64;
+  return 32;
+}
 
 function tileWorld(x, y, size) {
-  if (size > TILE) return { x: x * TILE - (size - TILE), y: y * TILE - (size - TILE) };
+  if (size > TILE) {
+    return { x: x * TILE - (size - TILE), y: y * TILE - (size - TILE) };
+  }
   return { x: x * TILE, y: y * TILE };
 }
 
+function creatureFootprint(size) {
+  return size > TILE ? 2 : 1;
+}
+
+function facingDir(dir) {
+  return dir ?? 4;
+}
+
 function frameIndex(dir, moving, phase) {
-  const col = SPRITE_COL[dir] ?? 2;
+  const col = SPRITE_COL[facingDir(dir)] ?? 2;
   const row = moving ? (phase === 0 ? 1 : 2) : 0;
   return row * 4 + col;
 }
 
+function isTyping() {
+  const el = document.activeElement;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+}
+
+function groundTexture(cell) {
+  return groundTextureName(cell);
+}
+
+function texTint(name) {
+  if (name === "human") return 0x4a90d9;
+  if (name === "charizard") return 0xe07020;
+  if (name === "caterpie") return 0x70c040;
+  if (name === "rapidash") return 0xe8a040;
+  let h = 0;
+  for (const ch of String(name || "")) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
+  return 0x404040 + (h % 0xbfbfbf);
+}
+
+function hasAnimFrames(texture) {
+  return (texture?.frameTotal || 0) > 1;
+}
+
 export class GameScene extends Phaser.Scene {
-  constructor(net, hud, payload) {
+  constructor(net, hud) {
     super("game");
     this.net = net;
     this.hud = hud;
-    this.payload = payload;
     this.sprites = new Map();
-    this.plates = new Map();
-    this.hpBars = new Map();
     this.state = new Map();
     this.youId = null;
     this.mapData = null;
     this.keys = null;
     this.roofSprites = [];
     this.groundLayer = null;
-    this.wallLayer = null;
-    this.roofLayer = null;
-    this.creatureLayer = null;
+    this.actorLayer = null;
+    this.missingSpriteLog = new Set();
+    this.live = false;
+    this.pendingWorld = null;
+    this.targetId = null;
+    this.targetMark = null;
+    this.targetGizmo = null;
+    this.targetPulse = null;
+    this.glow = null;
+    this.outMark = null;
+    this.outMarkSprite = null;
+    this.crosshairPhase = false;
+    this.nextAutoAtk = 0;
+    this.catchBusy = false;
+  }
+
+  ballTextureKey(item) {
+    const key = `ball-${item || "premierball"}`;
+    if (this.textures.exists(key)) return key;
+    return this.textures.exists("ball-premierball") ? "ball-premierball" : "ball-pokeball";
+  }
+
+  outCreatureState() {
+    for (const [, st] of this.state) {
+      if (st.masterId === this.youId && !st.dead) return st;
+    }
+    return null;
   }
 
   preload() {
     this.load.image("grass", "/assets/tiles/grass.png");
     this.load.image("path", "/assets/tiles/path.png");
+    this.load.image("stone", "/assets/tiles/stone.png");
     this.load.image("wall", "/assets/tiles/wall.png");
     this.load.image("roof", "/assets/tiles/roof.png");
+    this.load.image("flower", "/assets/tiles/flower.png");
+    this.load.image("rose", "/assets/tiles/rose.png");
+    this.load.image("gold", "/assets/tiles/gold.png");
+    this.load.image("water", "/assets/tiles/water.png");
+    this.load.image("wood", "/assets/tiles/wood.png");
+    this.load.image("cave", "/assets/tiles/cave.png");
+    this.load.image("marble", "/assets/tiles/marble.png");
     this.load.spritesheet("human", "/assets/human/sheet.png", { frameWidth: 64, frameHeight: 64 });
-    for (const name of Object.values(LOOK)) {
+    for (const name of Object.values(LOOK_NAME)) {
+      const { w: fw, h: fh } = monFrameSize(name);
       this.load.spritesheet(name, `/assets/pokemon/${name}/sheet.png`, {
-        frameWidth: 32,
-        frameHeight: 32,
+        frameWidth: fw,
+        frameHeight: fh,
       });
+      this.load.image(`${name}-corpse`, `/assets/pokemon/${name}/corpse.png`);
     }
+    this.load.image("attacked", "/assets/fx/attacked.png");
+    this.load.image("crosshair-main", "/assets/ui/crosshair/crosshair-main.png");
+    this.load.image("crosshair-a", "/assets/ui/crosshair/crosshair-a.png");
+    this.load.image("crosshair-b", "/assets/ui/crosshair/crosshair-b.png");
+    this.load.image("ball-pokeball", "/assets/items/pokeball.png");
+    this.load.image("ball-premierball", "/assets/items/premierball.png");
+    this.load.image("ball-ultraball", "/assets/items/ultraball.png");
+    this.load.image("ball-masterball", "/assets/items/masterball.png");
+    this.load.audio("catching", "/assets/sfx/catching.ogg");
+    this.load.audio("catch_fail", "/assets/sfx/catch_fail.ogg");
+    this.load.audio("catch_sucess", "/assets/sfx/catch_sucess.ogg");
+    preloadOtpFonts(this);
+    this.load.on("loaderror", (file) => {
+      const key = file?.key || file?.src || "unknown";
+      if (this.missingSpriteLog.has(`load:${key}`)) return;
+      this.missingSpriteLog.add(`load:${key}`);
+      console.warn(`[otpokemon] sprite failed to load: ${file?.url || file?.src || key}`);
+    });
   }
 
   create() {
+    // Phaser Layers composite as a group and paint over non-layer objects
+    // regardless of child depth. Ground stays in a low layer; everything that
+    // must y-sort with CHAR/pokes (walls, roofs, items, creatures) lives in
+    // actorLayer so they are not buried under tiles.
     this.groundLayer = this.add.layer();
-    this.wallLayer = this.add.layer();
-    this.creatureLayer = this.add.layer();
-    this.roofLayer = this.add.layer();
-    this.keys = this.input.keyboard.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,C,SHIFT");
+    this.actorLayer = this.add.layer();
+    this.groundLayer.setDepth(0);
+    this.actorLayer.setDepth(100);
+    this.ensurePlaceholder();
+    this.ensureAttackedTexture();
+    this.tuneCrosshairTextures();
+    this.keys = this.input.keyboard.addKeys(
+      "W,A,S,D,UP,DOWN,LEFT,RIGHT,ESC,ENTER,SHIFT,C,TAB,ONE,TWO,THREE,FOUR,FIVE,SIX,SEVEN,EIGHT,NINE,ZERO"
+    );
+    this.input.keyboard.enabled = false;
+    this.input.keyboard.clearCaptures?.();
     this.input.mouse?.disableContextMenu();
-    document.getElementById("game")?.addEventListener("contextmenu", (e) => e.preventDefault());
-    this.input.on("pointerdown", (p) => this.onPointer(p));
-    this.enterWorld(this.payload);
+    const onRight = (e) => {
+      if (!this.live) return;
+      if (e.target?.closest?.(".ot-window, .panel, input, button, select, textarea")) return;
+      e.preventDefault();
+      this.handleWorldClick(e.clientX, e.clientY, "right");
+    };
+    document.getElementById("game")?.addEventListener("contextmenu", onRight);
+    document.addEventListener("contextmenu", onRight, true);
+    this.input.on("pointerdown", (p) => {
+      const t = p.event?.target;
+      const canvas = this.game?.canvas;
+      const onCanvas = canvas && t && (t === canvas || canvas.contains?.(t));
+      if (
+        !onCanvas &&
+        t?.closest?.(
+          ".attack-bar, #attack-bar, .attack-slot, .ot-window, .chat-dock, .otp-top-btn, .hud-top-icons, input, textarea, select, button"
+        )
+      ) {
+        return;
+      }
+      document.getElementById("chat-input")?.blur();
+      this.onPointer(p);
+    });
+    this.targetId = null;
+    const targetTex = this.crosshairTexture("crosshair-main");
+    this.targetMark = this.add.image(0, 0, targetTex);
+    this.applyCrosshairSprite(this.targetMark);
+    this.targetMark.setVisible(false);
+    this.targetGizmo = this.add.graphics();
+    this.targetGizmo.setVisible(false);
+    this.glow = this.add.graphics();
+    this.actorLayer.add(this.targetMark);
+    this.actorLayer.add(this.targetGizmo);
+    this.actorLayer.add(this.glow);
+    this.targetPulse?.stop();
+    this.outMark = this.add.graphics();
+    this.outMark.setVisible(false);
+    this.actorLayer.add(this.outMark);
+    const outTex = this.crosshairTexture("crosshair-a");
+    this.outMarkSprite = this.add.image(0, 0, outTex);
+    this.applyCrosshairSprite(this.outMarkSprite);
+    this.outMarkSprite.setVisible(false);
+    this.actorLayer.add(this.outMarkSprite);
+    this.outName = this.add.text(0, 0, "", {
+      fontFamily: "MonaKo, Times OTP, Times, serif",
+      fontSize: "10px",
+      color: "#3cff6a",
+      stroke: "#041008",
+      strokeThickness: 3,
+      resolution: 2,
+    });
+    this.outName.setOrigin(0.5, 1);
+    this.outName.setVisible(false);
+    this.actorLayer.add(this.outName);
+    registerOtpBitmapFonts(this);
+
+    this.targetPulse = this.tweens.add({
+      targets: this.targetMark,
+      alpha: { from: 0.82, to: 1 },
+      duration: 480,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+      onRepeat: () => {
+        this.crosshairPhase = !this.crosshairPhase;
+        const key = this.crosshairPhase ? "crosshair-b" : "crosshair-main";
+        if (this.targetMark?.visible) this.targetMark.setTexture(this.crosshairTexture(key));
+      },
+    });
+    this.cameras.main.setRoundPixels(false);
+    this.cameras.main.setBackgroundColor(0x111111);
+    if (this.pendingWorld) {
+      const payload = this.pendingWorld;
+      this.pendingWorld = null;
+      this.enterWorld(payload);
+    }
+  }
+
+  now() {
+    return this.time?.now ?? 0;
+  }
+
+  displayTile(st) {
+    if (!st) return { x: 0, y: 0 };
+    if (!st.moving || !st.walkMs) return { x: st.x, y: st.y };
+    const t = Math.max(0, Math.min(1, (this.now() - st.walkStart) / st.walkMs));
+    if (t >= 1) {
+      st.moving = false;
+      return { x: st.x, y: st.y };
+    }
+    return {
+      x: st.fromX + (st.x - st.fromX) * t,
+      y: st.fromY + (st.y - st.fromY) * t,
+    };
+  }
+
+  clearWorld() {
+    for (const s of this.sprites.values()) s.destroy();
+    this.sprites.clear();
+    this.state.clear();
+    this.groundLayer.removeAll(true);
+    this.clearActorLayer();
+    this.roofSprites = [];
+    this.youId = null;
+    this.targetId = null;
+    this.targetMark?.setVisible(false);
+    this.targetGizmo?.clear();
+    this.targetGizmo?.setVisible(false);
+    this.outMark?.clear();
+    this.outMarkSprite?.setVisible(false);
+    this.outName?.setVisible(false);
+    this.glow?.clear();
+  }
+
+  clearActorLayer() {
+    if (!this.actorLayer) return;
+    const keep = new Set(
+      [this.glow, this.targetMark, this.targetGizmo, this.outMark, this.outMarkSprite, this.outName].filter(Boolean)
+    );
+    for (const child of [...(this.actorLayer.list || [])]) {
+      if (!keep.has(child)) child.destroy();
+    }
+    if (this.glow && this.glow.displayList !== this.actorLayer) this.actorLayer.add(this.glow);
+    if (this.targetMark && this.targetMark.displayList !== this.actorLayer) this.actorLayer.add(this.targetMark);
+    if (this.targetGizmo && this.targetGizmo.displayList !== this.actorLayer) this.actorLayer.add(this.targetGizmo);
+    if (this.outMark && this.outMark.displayList !== this.actorLayer) this.actorLayer.add(this.outMark);
+    if (this.outMarkSprite && this.outMarkSprite.displayList !== this.actorLayer) {
+      this.actorLayer.add(this.outMarkSprite);
+    }
+    if (this.outName && this.outName.displayList !== this.actorLayer) this.actorLayer.add(this.outName);
+  }
+
+  ensurePlaceholder() {
+    if (this.textures.exists("missing-creature")) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x1a1a1a, 0.92);
+    g.fillRect(1, 1, 30, 30);
+    g.lineStyle(2, 0xffe066, 1);
+    g.strokeRect(1, 1, 30, 30);
+    g.fillStyle(0xffe066, 1);
+    g.fillCircle(16, 11, 5);
+    g.fillRect(12, 16, 8, 12);
+    g.generateTexture("missing-creature", 32, 32);
+    g.destroy();
+  }
+
+  ensureAttackedTexture() {
+    if (this.textureLooksValid("attacked")) return;
+    this.logMissingSprite("attacked");
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.lineStyle(2, 0xe02820, 0.9);
+    g.strokeEllipse(16, 23, 24, 12);
+    g.lineStyle(2, 0xe02820, 1);
+    g.strokeLineShape(new Phaser.Geom.Line(4, 16, 11, 16));
+    g.strokeLineShape(new Phaser.Geom.Line(4, 16, 4, 23));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 16, 21, 16));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 16, 28, 23));
+    g.strokeLineShape(new Phaser.Geom.Line(4, 30, 11, 30));
+    g.strokeLineShape(new Phaser.Geom.Line(4, 30, 4, 23));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 30, 21, 30));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 30, 28, 23));
+    g.generateTexture("attacked", 32, 32);
+    g.destroy();
+  }
+
+  tuneCrosshairTextures() {
+    for (const key of CROSSHAIR_KEYS) {
+      if (!this.textures.exists(key)) continue;
+      this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    }
+  }
+
+  crosshairTexture(key) {
+    return this.textureLooksValid(key) ? key : "attacked";
+  }
+
+  applyCrosshairSprite(sprite) {
+    if (!sprite) return;
+    sprite.setOrigin(0.5, 0.5);
+    sprite.setDisplaySize(CROSSHAIR_PX, CROSSHAIR_PX);
+    sprite.setAlpha(0.95);
+    if (typeof sprite.disableInteractive === "function") sprite.disableInteractive();
+  }
+
+  tileCrosshairPoint(d) {
+    return {
+      x: d.x * TILE + TILE / 2,
+      y: d.y * TILE + TILE / 2,
+    };
+  }
+
+  isOwnCreature(st) {
+    if (!st) return false;
+    if (st.id === this.youId) return true;
+    if (st.masterId != null && st.masterId === this.youId) return true;
+    return false;
+  }
+
+  isValidTarget(st) {
+    if (!st) return false;
+    if (st.dead) return false;
+    if (st.kind === "npc" || st.canTarget === false) return false;
+    if (this.isOwnCreature(st)) return false;
+    return true;
+  }
+
+  clearTarget(send = true) {
+    if (send && this.live && this.targetId != null) this.net.send({ t: "target", id: null });
+    this.targetId = null;
+    this.hud?.setTarget(null);
+    this.targetMark?.setVisible(false);
+    this.targetGizmo?.clear();
+    this.targetGizmo?.setVisible(false);
+  }
+
+  logMissingSprite(key) {
+    if (this.missingSpriteLog.has(key)) return;
+    this.missingSpriteLog.add(key);
+    console.warn(`[otpokemon] missing map sprite "${key}" — drawing placeholder`);
+  }
+
+  textureLooksValid(key) {
+    if (!key || !this.textures.exists(key)) return false;
+    const tex = this.textures.get(key);
+    if (!tex || tex.key === "__MISSING") return false;
+    try {
+      const src = tex.getSourceImage();
+      return !!(src && src.width >= 8 && src.height >= 8);
+    } catch {
+      return false;
+    }
+  }
+
+  resolveTexture(c) {
+    const key = this.textureFor(c);
+    if (this.textureLooksValid(key)) return key;
+    this.logMissingSprite(key);
+    this.ensurePlaceholder();
+    return "missing-creature";
+  }
+
+  addActor(obj) {
+    if (obj && this.actorLayer && obj.displayList !== this.actorLayer) this.actorLayer.add(obj);
+    return obj;
+  }
+
+  enterPreview() {
+    if (!this.groundLayer) return;
+    this.live = false;
+    if (this.input?.keyboard) this.input.keyboard.enabled = false;
+    this.clearWorld();
+    this.mapData = {
+      w: PREVIEW_MAP.w,
+      h: PREVIEW_MAP.h,
+      z: PREVIEW_MAP.z,
+      ground: PREVIEW_MAP.ground,
+      walls: PREVIEW_MAP.walls,
+      roofs: PREVIEW_MAP.roofs,
+      items: PREVIEW_MAP.items,
+      cells: PREVIEW_MAP.cells,
+    };
+    this.drawMap();
+    this.cameras.main.stopFollow();
+    this.cameras.main.setZoom(2);
+    this.cameras.main.setRoundPixels(false);
+    this.cameras.main.centerOn(SPAWN.x * TILE + TILE / 2, SPAWN.y * TILE + TILE / 2);
   }
 
   enterWorld(payload) {
-    this.payload = payload;
+    if (!this.groundLayer || !this.actorLayer) {
+      this.pendingWorld = payload;
+      return;
+    }
+    this.pendingWorld = null;
+    this.live = true;
+    if (this.input?.keyboard) this.input.keyboard.enabled = true;
+    this.clearWorld();
     this.mapData = payload.map;
     this.youId = payload.you.id;
-    for (const s of this.sprites.values()) s.destroy();
-    for (const p of this.plates.values()) p.destroy();
-    for (const bar of this.hpBars.values()) {
-      bar.bg.destroy();
-      bar.fg.destroy();
-    }
-    this.sprites.clear();
-    this.plates.clear();
-    this.hpBars.clear();
-    this.state.clear();
-    this.groundLayer.removeAll(true);
-    this.wallLayer.removeAll(true);
-    this.roofLayer.removeAll(true);
-    this.roofSprites = [];
     this.drawMap();
-    for (const c of payload.creatures) this.spawn(c);
-    this.cameras.main.setZoom(2);
-    const you = this.sprites.get(this.youId);
-    if (you) this.cameras.main.startFollow(you, true, 0.15, 0.15);
+    for (const c of payload.creatures || []) this.spawn(c);
+    const out = (payload.creatures || []).find((c) => c.masterId === payload.you.id);
+    if (out) this.hud.outCreatureId = out.id;
+    this.cameras.main.stopFollow();
+    this.cameras.main.setZoom(this.hud?.worldZoom || 2);
+    this.cameras.main.setRoundPixels(false);
+    this.layoutAll();
+    this.lockCamera();
     this.updateRoofs();
+    this.hud?.renderAttackBar?.(this.hud.outMon?.());
   }
 
   drawMap() {
-    const { w, h, ground, walls, roofs } = this.mapData;
+    const { w, h, ground, walls, roofs, items, cells } = this.mapData;
+    const useCells = Array.isArray(cells) && cells.length === h;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const g = this.add.image(x * TILE, y * TILE, ground[y][x] === 1 ? "path" : "grass").setOrigin(0, 0);
-        g.setDepth(y);
-        this.groundLayer.add(g);
-        if (walls[y][x]) {
-          const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
-          wall.setDepth(y * 10 + 5);
-          this.wallLayer.add(wall);
+        const stack = useCells ? cells[y]?.[x]?.items : null;
+        let drewGround = false;
+        if (stack?.length) {
+          for (const id of stack) {
+            const tex = textureNameForItemId(id);
+            if (!tex || !this.textureLooksValid(tex)) continue;
+            if (tex === "wall") {
+              const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
+              wall.setDepth(y * 10 + 5);
+              this.addActor(wall);
+              continue;
+            }
+            if (tex === "roof") {
+              const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
+              roof.setDepth(y * 10 + 8);
+              roof.tileX = x;
+              roof.tileY = y;
+              this.addActor(roof);
+              this.roofSprites.push(roof);
+              continue;
+            }
+            const spr = this.add.image(x * TILE, y * TILE, tex).setOrigin(0, 0);
+            spr.setDepth(y);
+            if (!drewGround && isGroundTexture(tex)) {
+              this.groundLayer.add(spr);
+              drewGround = true;
+            } else {
+              spr.setDepth(y * 10 + 2);
+              this.addActor(spr);
+            }
+          }
         }
-        if (roofs[y][x]) {
-          const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
-          roof.setDepth(y * 10 + 8);
-          roof.tileX = x;
-          roof.tileY = y;
-          this.roofLayer.add(roof);
-          this.roofSprites.push(roof);
+        if (!drewGround) {
+          const g = this.add.image(x * TILE, y * TILE, groundTexture(ground[y][x])).setOrigin(0, 0);
+          g.setDepth(y);
+          this.groundLayer.add(g);
         }
+        if (!stack?.length) {
+          if (walls[y][x]) {
+            const wall = this.add.image(x * TILE - 32, y * TILE - 32, "wall").setOrigin(0, 0);
+            wall.setDepth(y * 10 + 5);
+            this.addActor(wall);
+          }
+          if (roofs[y][x]) {
+            const roof = this.add.image(x * TILE - 32, y * TILE - 32, "roof").setOrigin(0, 0);
+            roof.setDepth(y * 10 + 8);
+            roof.tileX = x;
+            roof.tileY = y;
+            this.addActor(roof);
+            this.roofSprites.push(roof);
+          }
+        }
+      }
+    }
+    if (!useCells) {
+      for (const it of items || []) {
+        const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
+        spr.setDepth(it.y * 10 + 2);
+        this.addActor(spr);
+      }
+    } else {
+      for (const it of items || []) {
+        const stack = cells[it.y]?.[it.x]?.items || [];
+        const already = it.itemId
+          ? stack.includes(it.itemId)
+          : stack.some((id) => itemKindForId(id) === it.kind);
+        if (already) continue;
+        const spr = this.add.image(it.x * TILE, it.y * TILE, it.kind).setOrigin(0, 0);
+        spr.setDepth(it.y * 10 + 2);
+        this.addActor(spr);
       }
     }
   }
 
   textureFor(c) {
-    if (c.kind === "player") return "human";
-    return LOOK[c.look] || "caterpie";
+    if (c.kind === "player" || c.kind === "npc") {
+      if (c.mount?.look != null) return LOOK_NAME[c.mount.look] || "charizard";
+      if (c.kind === "npc" && c.look != null && c.look !== 128) {
+        return LOOK_NAME[c.look] || "caterpie";
+      }
+      return "human";
+    }
+    return speciesAssetSlug(c.species || LOOK_NAME[c.look] || "caterpie");
   }
 
   spawn(c) {
     if (this.sprites.has(c.id)) this.despawn(c.id);
-    const tex = this.textureFor(c);
-    const size = tex === "human" ? 64 : 32;
+    const want = this.textureFor(c);
+    const tex = this.resolveTexture(c);
+    const size = creatureSize(want);
     const pos = tileWorld(c.x, c.y, size);
-    const sprite = this.add.sprite(pos.x, pos.y, tex, frameIndex(c.dir || 4, false, 0));
+    const frame = hasAnimFrames(this.textures.get(tex)) ? frameIndex(c.dir, false, 0) : 0;
+    const sprite = this.add.sprite(pos.x, pos.y, tex, frame);
     sprite.setOrigin(0, 0);
-    sprite.setDepth(c.y * 10 + 6);
-    this.creatureLayer.add(sprite);
-    const plate = this.add
-      .text(pos.x + size / 2, pos.y - 2, c.plate || c.name, {
-        fontFamily: "Trebuchet MS",
-        fontSize: "10px",
-        color: "#fff",
-        backgroundColor: "#00000088",
-      })
-      .setOrigin(0.5, 1);
-    plate.setDepth(c.y * 10 + 7);
-    this.sprites.set(c.id, sprite);
-    this.plates.set(c.id, plate);
-    this.state.set(c.id, { ...c, moving: false, phase: 0 });
-    if (c.kind === "pokemon" || c.kind === "wild") {
-      const cx = pos.x + size / 2;
-      const barY = pos.y + 2;
-      const bg = this.add.rectangle(cx, barY, 28, 4, 0x1a1a1a).setOrigin(0.5, 0.5);
-      bg.setStrokeStyle(1, 0x000000, 0.9);
-      bg.setDepth(c.y * 10 + 8);
-      const fg = this.add.rectangle(cx - 13, barY, 26, 2, 0x3dcc4a).setOrigin(0, 0.5);
-      fg.setDepth(c.y * 10 + 9);
-      this.hpBars.set(c.id, { bg, fg });
-      this.setHpBar(c.id, c.hp, c.hpMax);
+    sprite.setVisible(true);
+    sprite.setActive(true);
+    sprite.setDepth(c.y * 10 + 9);
+    this.addActor(sprite);
+    if (tex === "missing-creature") {
+      sprite.setDisplaySize(size, size);
+      sprite.setTint(texTint(want));
     }
+    if (c.shiny && !c.dead) sprite.setTint(0xffe066);
+    this.sprites.set(c.id, sprite);
+    this.state.set(c.id, {
+      ...c,
+      spriteSize: size,
+      moving: false,
+      phase: 0,
+      fromX: c.x,
+      fromY: c.y,
+      walkStart: 0,
+      walkMs: 0,
+    });
+    this.syncCreatureHp(c.id, c.hp, c.hpMax);
+    if (c.dead) this.applyCorpseLook(c.id);
   }
 
   despawn(id) {
     this.sprites.get(id)?.destroy();
-    this.plates.get(id)?.destroy();
-    const bar = this.hpBars.get(id);
-    bar?.bg.destroy();
-    bar?.fg.destroy();
     this.sprites.delete(id);
-    this.plates.delete(id);
-    this.hpBars.delete(id);
     this.state.delete(id);
   }
 
-  layoutNameplate(id, spriteX, spriteY, depth) {
-    const sprite = this.sprites.get(id);
-    const plate = this.plates.get(id);
-    if (!sprite || !plate) return;
-    const size = sprite.texture.key === "human" ? 64 : 32;
-    const cx = spriteX + size / 2;
-    plate.setPosition(cx, spriteY - 2);
-    plate.setDepth(depth + 1);
-    const bar = this.hpBars.get(id);
-    if (!bar) return;
-    const barY = spriteY + 2;
-    bar.bg.setPosition(cx, barY);
-    bar.bg.setDepth(depth + 2);
-    bar.fg.setPosition(cx - 13, barY);
-    bar.fg.setDepth(depth + 3);
+  uiScale() {
+    const z = this.cameras.main?.zoom || 1;
+    return z > 0 ? 1 / z : 1;
   }
 
-  setHpBar(id, hp, hpMax) {
+  /** Atualiza HP no estado da criatura (HUD/alvo); sem overlay no mundo. */
+  syncCreatureHp(id, hp, hpMax) {
     const st = this.state.get(id);
-    if (st) {
-      if (hp != null) st.hp = hp;
-      if (hpMax != null) st.hpMax = hpMax;
-    }
-    const bar = this.hpBars.get(id);
-    if (!bar) return;
-    const max = Math.max(1, hpMax ?? st?.hpMax ?? 1);
-    const ratio = Math.max(0, Math.min(1, (hp ?? st?.hp ?? 0) / max));
-    bar.fg.width = 26 * ratio;
-    if (ratio > 0.5) bar.fg.setFillStyle(0x3dcc4a);
-    else if (ratio > 0.2) bar.fg.setFillStyle(0xe0c040);
-    else bar.fg.setFillStyle(0xcc3d3d);
+    if (!st) return;
+    if (hp != null) st.hp = hp;
+    if (hpMax != null) st.hpMax = hpMax;
   }
 
-  place(id, x, y, dir, moving) {
+  applyCorpseLook(id) {
+    const st = this.state.get(id);
+    const sprite = this.sprites.get(id);
+    if (!st || !sprite || sprite.texture.key === "human") return;
+    st.dead = true;
+    st.moving = false;
+    st.hp = 0;
+    const name = speciesAssetSlug(st.species || LOOK_NAME[st.look] || "caterpie");
+    const corpseKey = `${name}-corpse`;
+    if (this.textures.exists(corpseKey)) sprite.setTexture(corpseKey, 0);
+    sprite.setOrigin(0.5, 0.5);
+    sprite.setAngle(0);
+    sprite.clearTint();
+    sprite.setScale(1);
+  }
+
+  layoutCreature(id) {
     const st = this.state.get(id);
     const sprite = this.sprites.get(id);
     if (!st || !sprite) return;
-    const tex = sprite.texture.key;
-    const size = tex === "human" ? 64 : 32;
-    const pos = tileWorld(x, y, size);
-    sprite.setPosition(pos.x, pos.y);
-    sprite.setFrame(frameIndex(dir, moving, st.phase));
-    sprite.setDepth(y * 10 + 6);
-    this.layoutNameplate(id, pos.x, pos.y, y * 10 + 6);
+    const d = this.displayTile(st);
+    const size = st.spriteSize || creatureSize(sprite.texture.key);
+    const pos = tileWorld(d.x, d.y, size);
+    const walking = st.moving && !st.dead;
+    const depth = Math.round(d.y) * 10 + 9;
+    const ability = st.mount?.ability;
+    const placeholder = sprite.texture.key === "missing-creature";
+    if (st.dead) {
+      sprite.setOrigin(0.5, 0.5);
+      sprite.setAngle(0);
+      sprite.setScale(1);
+      const foot = creatureFootprint(size);
+      sprite.setPosition(
+        d.x * TILE + (foot * TILE) / 2,
+        d.y * TILE + (foot * TILE) / 2 + (size > TILE ? 4 : 0)
+      );
+      sprite.setDepth(depth);
+      return;
+    }
+    sprite.setVisible(true);
+      sprite.setOrigin(0, 0);
+      sprite.setAngle(0);
+      sprite.clearTint();
+      if (st.shiny) sprite.setTint(0xffe066);
+      else if (placeholder) sprite.setTint(texTint(this.textureFor(st)));
+      let px = pos.x;
+      let py = pos.y;
+      if (ability === "fly") {
+        py -= 10;
+        sprite.setScale(1);
+      } else if (ability === "hide") {
+        sprite.setScale(0.55);
+        py += 10;
+      } else if (ability === "ride") {
+        sprite.setScale(1.12);
+        py -= 2;
+      } else {
+        sprite.setScale(1);
+      }
+      sprite.setPosition(px, py);
+      if (hasAnimFrames(sprite.texture)) sprite.setFrame(frameIndex(st.dir, walking, st.phase));
+      sprite.setDepth(depth);
+  }
+
+  layoutAll() {
+    for (const id of this.sprites.keys()) this.layoutCreature(id);
+    this.layoutGlow();
+  }
+
+  lockCamera() {
+    if (!this.live) return;
+    const st = this.state.get(this.youId);
+    if (!st) return;
+    const d = this.displayTile(st);
+    this.cameras.main.setZoom(this.hud?.worldZoom || this.cameras.main.zoom || 2);
+    this.cameras.main.centerOn(d.x * TILE + TILE / 2, d.y * TILE + TILE / 2);
+  }
+
+  layoutGlow() {
+    if (!this.glow) return;
+    this.glow.clear();
+    const st = this.state.get(this.youId);
+    if (!this.live || !st) return;
+    const d = this.displayTile(st);
+    const cx = d.x * TILE + TILE / 2;
+    const cy = d.y * TILE + TILE / 2;
+    this.glow.setDepth(Math.round(d.y) * 10 + 5);
+    this.glow.fillStyle(0xfff3c4, 0.16);
+    this.glow.fillCircle(cx, cy, 38);
+    this.glow.fillStyle(0xffe08a, 0.1);
+    this.glow.fillCircle(cx, cy, 22);
   }
 
   handleNet(msg) {
-    if (msg.t === "appear") this.spawn(msg.creature);
+    if (!this.live && msg.t !== "map") return;
+    if (msg.t === "appear") {
+      this.spawn(msg.creature);
+      if (msg.creature?.masterId === this.youId) {
+        this.hud.outCreatureId = msg.creature.id;
+        this.flashRelease(msg.creature.id);
+      }
+    }
     if (msg.t === "disappear") this.despawn(msg.id);
     if (msg.t === "turn") {
       const st = this.state.get(msg.id);
       if (!st) return;
       st.dir = msg.dir;
-      this.sprites.get(msg.id)?.setFrame(frameIndex(msg.dir, false, 0));
     }
     if (msg.t === "moved") this.animateMove(msg);
     if (msg.t === "fx") {
       this.flash(msg.to);
-      if (msg.hp != null) this.setHpBar(msg.to, msg.hp, msg.hpMax);
+      this.flash(msg.from);
+      this.playStrike(msg.from, msg.to);
+      if (msg.hp != null) this.syncCreatureHp(msg.to, msg.hp, msg.hpMax);
+      if (msg.dmg != null) this.floatDamage(msg.to, msg.dmg);
+      if (msg.hp === 0 && msg.to === this.targetId) this.clearTarget();
+    }
+    if (msg.t === "outfit" && msg.creature) this.spawn(msg.creature);
+    if (msg.t === "down") {
+      const st = this.state.get(msg.id);
+      if (st) {
+        st.dead = true;
+        st.hp = 0;
+        st.moving = false;
+        if (msg.x != null) st.x = msg.x;
+        if (msg.y != null) st.y = msg.y;
+      }
+      this.applyCorpseLook(msg.id);
+      if (msg.id === this.targetId) this.clearTarget();
+    }
+    if (msg.t === "target") {
+      if (msg.id == null) this.clearTarget(false);
+      else if (this.isValidTarget(this.state.get(msg.id))) this.setTarget(msg.id);
+      else this.clearTarget(false);
+    }
+    if (msg.t === "disappear" && msg.id === this.targetId) this.clearTarget(false);
+    if (msg.t === "catchAttempt") {
+      this.catchBusy = true;
+      playCatchSequence(this, msg);
+      this.time.delayedCall(3400, () => {
+        this.catchBusy = false;
+      });
+    }
+  }
+
+  flashRelease(id) {
+    const s = this.sprites.get(id);
+    if (!s) return;
+    const g = this.add.graphics();
+    g.setDepth(s.depth + 2);
+    this.addActor(g);
+    const cx = s.x + (s.displayWidth || TILE) / 2;
+    const cy = s.y + (s.displayHeight || TILE) / 2;
+    g.fillStyle(0xffffff, 0.75);
+    g.fillCircle(cx, cy, 22);
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 280,
+      onComplete: () => g.destroy(),
+    });
+  }
+
+  setTarget(id) {
+    const st = id != null ? this.state.get(id) : null;
+    if (!this.isValidTarget(st)) {
+      this.clearTarget(false);
+      return;
+    }
+    this.targetId = st.id;
+    this.hud?.setTarget(st);
+    this.layoutTarget();
+  }
+
+  layoutTarget() {
+    const mark = this.targetMark;
+    const gizmo = this.targetGizmo;
+    const st = this.targetId != null ? this.state.get(this.targetId) : null;
+    if (!this.isValidTarget(st)) {
+      mark?.setVisible(false);
+      gizmo?.clear();
+      gizmo?.setVisible(false);
+      this.layoutOutMark();
+      return;
+    }
+    const d = this.displayTile(st);
+    const { x: cx, y: cy } = this.tileCrosshairPoint(d);
+    const depth = Math.round(d.y) * 10 + 8;
+    if (mark) {
+      this.addActor(mark);
+      mark.setTexture(this.crosshairTexture(this.crosshairPhase ? "crosshair-b" : "crosshair-main"));
+      this.applyCrosshairSprite(mark);
+      mark.setTint(0xff3a3a);
+      mark.setPosition(cx, cy);
+      mark.setDepth(depth);
+      mark.setVisible(true);
+      mark.setActive(true);
+    }
+    if (gizmo) {
+      gizmo.clear();
+      gizmo.setVisible(false);
+    }
+    this.layoutOutMark();
+    this.actorLayer?.queueDepthSort?.();
+  }
+
+  layoutOutMark() {
+    const g = this.outMark;
+    const sprite = this.outMarkSprite;
+    const label = this.outName;
+    const out = this.outCreatureState();
+    if (!out || out.dead) {
+      g?.clear();
+      g?.setVisible(false);
+      sprite?.setVisible(false);
+      label?.setVisible(false);
+      return;
+    }
+    const d = this.displayTile(out);
+    const { x: cx, y: cy } = this.tileCrosshairPoint(d);
+    const depth = Math.round(d.y) * 10 + 7;
+    if (g) {
+      this.addActor(g);
+      g.clear();
+      g.setVisible(true);
+      g.setDepth(depth);
+      g.lineStyle(3, 0x22e060, 0.95);
+      g.strokeEllipse(cx, cy + 8, 26, 14);
+      g.lineStyle(1, 0x9cffb8, 0.85);
+      g.strokeCircle(cx, cy, 17);
+    }
+    sprite?.setVisible(false);
+    if (label) {
+      this.addActor(label);
+      label.setText(out.name || "Pokémon");
+      label.setPosition(cx, cy - 22);
+      label.setDepth(depth + 2);
+      label.setVisible(true);
     }
   }
 
   animateMove(msg) {
     const st = this.state.get(msg.id);
-    const sprite = this.sprites.get(msg.id);
-    if (!st || !sprite) return;
+    if (!st) return;
+    const disp = this.displayTile(st);
+    st.fromX = disp.x;
+    st.fromY = disp.y;
     st.dir = msg.dir;
     st.x = msg.x;
     st.y = msg.y;
     st.moving = true;
+    st.walkStart = this.now();
+    st.walkMs = Math.max(80, msg.ms || STEP_MS);
     st.phase = st.phase ? 0 : 1;
-    const pos = tileWorld(msg.x, msg.y, sprite.texture.key === "human" ? 64 : 32);
-    this.tweens.killTweensOf(sprite);
+    if (msg.id === this.youId) this.updateRoofs();
+  }
+
+  floatDamage(id, dmg) {
+    const st = this.state.get(id);
+    if (!st || dmg == null || dmg <= 0) return;
+    const ui = this.uiScale();
+    const d = this.displayTile(st);
+    const x = d.x * TILE + TILE / 2;
+    const y = d.y * TILE - 4;
+    const own = this.isOwnCreature(st);
+    const color = own ? "#ff6a4a" : "#ffe14a";
+    const txt = this.add
+      .text(x, y, `-${dmg}`, {
+        fontFamily: "MonaKo, Times OTP, Times, serif",
+        fontSize: "16px",
+        fontStyle: "bold",
+        color,
+        stroke: "#000000",
+        strokeThickness: 5,
+        resolution: 2,
+      })
+      .setOrigin(0.5, 1);
+    txt.setScale(ui);
+    txt.setDepth(2000);
+    this.addActor(txt);
     this.tweens.add({
-      targets: sprite,
-      x: pos.x,
-      y: pos.y,
-      duration: msg.ms || 200,
-      onUpdate: () => {
-        sprite.setFrame(frameIndex(st.dir, true, st.phase));
-        sprite.setDepth(Math.round(st.y) * 10 + 6);
-        this.layoutNameplate(msg.id, sprite.x, sprite.y, sprite.depth);
-      },
-      onComplete: () => {
-        st.moving = false;
-        sprite.setFrame(frameIndex(st.dir, false, 0));
-        this.place(msg.id, msg.x, msg.y, st.dir, false);
-        if (msg.id === this.youId) this.updateRoofs();
-      },
+      targets: txt,
+      y: y - 22,
+      alpha: 0,
+      duration: 720,
+      ease: "Cubic.easeOut",
+      onComplete: () => txt.destroy(),
     });
   }
 
@@ -258,6 +929,46 @@ export class GameScene extends Phaser.Scene {
     const s = this.sprites.get(id);
     if (!s) return;
     this.tweens.add({ targets: s, alpha: 0.3, yoyo: true, duration: 80, repeat: 1 });
+  }
+
+  playStrike(fromId, toId) {
+    const a = this.state.get(fromId);
+    const b = this.state.get(toId);
+    if (!a || !b) return;
+    const da = this.displayTile(a);
+    const db = this.displayTile(b);
+    const x0 = da.x * TILE + TILE / 2;
+    const y0 = da.y * TILE + TILE / 2;
+    const x1 = db.x * TILE + TILE / 2;
+    const y1 = db.y * TILE + TILE / 2;
+    const dot = this.add.image(x0, y0, "attacked").setDepth(Math.round(db.y) * 10 + 15);
+    dot.setDisplaySize(12, 12);
+    dot.setAlpha(0.85);
+    this.addActor(dot);
+    this.tweens.add({
+      targets: dot,
+      x: x1,
+      y: y1 - 4,
+      alpha: 0.2,
+      duration: 160,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        dot.destroy();
+        const g = this.add.graphics();
+        g.setDepth(Math.round(db.y) * 10 + 14);
+        this.addActor(g);
+        g.fillStyle(0xffe8a0, 0.85);
+        g.fillCircle(x1, y1, 4);
+        g.fillStyle(0xff4040, 0.55);
+        g.fillCircle(x1, y1, 7);
+        this.tweens.add({
+          targets: g,
+          alpha: 0,
+          duration: 180,
+          onComplete: () => g.destroy(),
+        });
+      },
+    });
   }
 
   updateRoofs() {
@@ -271,40 +982,114 @@ export class GameScene extends Phaser.Scene {
   }
 
   creatureAt(worldX, worldY) {
-    let best = null;
-    let bestDepth = -Infinity;
-    for (const [id, sprite] of this.sprites) {
-      if (id === this.youId) continue;
-      const b = sprite.getBounds();
-      if (Phaser.Geom.Rectangle.Contains(b, worldX, worldY)) {
-        if (sprite.depth >= bestDepth) {
-          best = this.state.get(id);
-          bestDepth = sprite.depth;
-        }
-      }
-    }
-    if (best) return best;
     const tx = Math.floor(worldX / TILE);
     const ty = Math.floor(worldY / TILE);
+    let best = null;
+    let bestDepth = -Infinity;
+    let own = null;
+    let ownDepth = -Infinity;
+    const consider = (st, depth) => {
+      if (!st || st.id === this.youId) return;
+      if (this.isOwnCreature(st)) {
+        if (depth >= ownDepth) {
+          own = st;
+          ownDepth = depth;
+        }
+        return;
+      }
+      if (depth >= bestDepth) {
+        best = st;
+        bestDepth = depth;
+      }
+    };
     for (const [, st] of this.state) {
-      if (st.id !== this.youId && st.x === tx && st.y === ty) return st;
+      const d = this.displayTile(st);
+      const onTile =
+        (Math.floor(d.x + 0.001) === tx && Math.floor(d.y + 0.001) === ty) ||
+        (st.x === tx && st.y === ty);
+      if (!onTile) continue;
+      consider(st, Math.round(d.y) * 10);
     }
-    return null;
+    if (best) return best;
+    for (const [id, sprite] of this.sprites) {
+      const st = this.state.get(id);
+      if (!st || id === this.youId) continue;
+      const b = sprite.getBounds();
+      if (!Phaser.Geom.Rectangle.Contains(b, worldX, worldY)) continue;
+      consider(st, sprite.depth);
+    }
+    return best || own;
   }
 
-  onPointer(pointer) {
-    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-    const tx = Math.floor(world.x / TILE);
-    const ty = Math.floor(world.y / TILE);
-    if (pointer.rightButtonDown()) {
-      const who = this.creatureAt(world.x, world.y);
-      if (who) this.net.send({ t: "attack", id: who.id });
+  handleWorldClick(clientX, clientY, button) {
+    if (!this.live) return;
+    const canvas = this.game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    const px = ((clientX - rect.left) / rect.width) * this.scale.width;
+    const py = ((clientY - rect.top) / rect.height) * this.scale.height;
+    const world = this.cameras.main.getWorldPoint(px, py);
+    this.applyClick(world.x, world.y, button === "right");
+  }
+
+  applyClick(worldX, worldY, right) {
+    if (right) {
+      const now = Date.now();
+      if (now - (this.lastRightAt || 0) < 80) return;
+      this.lastRightAt = now;
+    }
+    const tx = Math.floor(worldX / TILE);
+    const ty = Math.floor(worldY / TILE);
+    const who = this.creatureAt(worldX, worldY);
+    if (who?.kind === "npc") {
+      if (right) this.net.send({ t: "look", x: tx, y: ty });
+      else this.hud?.openNpcDialog(who);
+      return;
+    }
+    if (right) {
+      if (this.isOwnCreature(who)) {
+        this.net.send({ t: "look", x: tx, y: ty });
+        return;
+      }
+      if (this.isValidTarget(who) && !who.dead) this.net.send({ t: "attack", id: who.id });
       else this.net.send({ t: "look", x: tx, y: ty });
       return;
     }
-    if (pointer.leftButtonDown()) {
-      this.net.send({ t: "walkTo", x: tx, y: ty });
+    const item = this.hud?.selectedItem;
+    const catching = item === "pokeball" || CATCH_BALL_ITEMS.includes(item);
+    // Catch is corpse-only. Live targets always go to selection/combat — never
+    // let use-with/crosshair swallow the attack bar or auto-combat.
+    if (catching && who && who.wild && who.dead) {
+      if (this.catchBusy) return;
+      this.net.send({ t: "use", item, id: who.id });
+      this.hud.selectItem(null);
+      return;
     }
+    if (
+      (item === "small_potion" || item === "great_potion") &&
+      who &&
+      this.isOwnCreature(who) &&
+      who.id !== this.youId
+    ) {
+      this.net.send({ t: "use", item, id: who.id });
+      return;
+    }
+    if (this.isValidTarget(who)) {
+      this.setTarget(who.id);
+      this.net.send({ t: "target", id: who.id });
+      return;
+    }
+    if (this.isOwnCreature(who) && who.id !== this.youId) {
+      return;
+    }
+    this.clearTarget();
+    this.net.send({ t: "walkTo", x: tx, y: ty });
+  }
+
+  onPointer(pointer) {
+    if (!this.live) return;
+    const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const right = pointer.button === 2 || pointer.rightButtonDown();
+    this.applyClick(world.x, world.y, right);
   }
 
   currentDir() {
@@ -324,9 +1109,66 @@ export class GameScene extends Phaser.Scene {
     return null;
   }
 
+  moveKey() {
+    const k = this.keys;
+    if (Phaser.Input.Keyboard.JustDown(k.ONE)) return 1;
+    if (Phaser.Input.Keyboard.JustDown(k.TWO)) return 2;
+    if (Phaser.Input.Keyboard.JustDown(k.THREE)) return 3;
+    if (Phaser.Input.Keyboard.JustDown(k.FOUR)) return 4;
+    if (Phaser.Input.Keyboard.JustDown(k.FIVE)) return 5;
+    if (Phaser.Input.Keyboard.JustDown(k.SIX)) return 6;
+    if (Phaser.Input.Keyboard.JustDown(k.SEVEN)) return 7;
+    if (Phaser.Input.Keyboard.JustDown(k.EIGHT)) return 8;
+    return null;
+  }
+
   update() {
+    this.layoutAll();
+    this.lockCamera();
+    this.layoutTarget();
+    this.layoutOutMark();
+    if (!this.live) return;
+    if (isTyping() || isChatWasdMode()) {
+      this.input.keyboard.enabled = false;
+      if (isChatWasdMode()) return;
+      return;
+    }
+    this.input.keyboard.enabled = true;
+    if (this.keys.ENTER && Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
+      if (isChatHidden()) showChatPanel();
+      document.getElementById("chat-input")?.focus();
+      return;
+    }
     const dir = this.currentDir();
     if (dir != null) this.net.send({ t: "walk", dir });
-    if (Phaser.Input.Keyboard.JustDown(this.keys.C)) this.net.send({ t: "catch" });
+    if (this.keys.ESC && Phaser.Input.Keyboard.JustDown(this.keys.ESC)) {
+      this.hud?.selectItem(null);
+      this.clearTarget();
+      document.getElementById("chat-input")?.blur();
+    }
+    const move = this.moveKey();
+    if (move != null) this.hud?.tryUseMove(move);
+    this.tickAutoCombat();
+  }
+
+  tickAutoCombat() {
+    if (this.catchBusy) return;
+    const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
+    if (!tgt || !tgt.wild || tgt.dead) {
+      return;
+    }
+    const out = this.outCreatureState();
+    if (!out) return;
+    const now = Date.now();
+    if (now < this.nextAutoAtk || now < (this.hud?.moveCdUntil || 0)) return;
+    const partyOut = this.hud?.outMon?.();
+    const maxMoves = partyOut?.barMoves?.length || 4;
+    const slot = Math.min(Math.max(1, this.hud?.combatMoveSlot || this.hud?.lastMoveSlot || 1), maxMoves);
+    this.nextAutoAtk = now + ATK_MS;
+    if (this.targetId !== tgt.id) {
+      this.net.send({ t: "target", id: tgt.id });
+    }
+    if (this.hud?.tryUseMove) this.hud.tryUseMove(slot);
+    else this.net.send({ t: "move", n: slot });
   }
 }

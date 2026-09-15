@@ -4,19 +4,32 @@
   "private": true,
   "description": "Browser Pokémon MMORPG milestone: Huntera tiles + human look, Ruby sprites, server-authoritative",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "concurrently -k -n server,client -c blue,green \"npm:start:server\" \"npm:start:client\"",
-    "start:server": "node server/index.js",
+    "start:server": "node --import tsx server/index.js",
     "start:client": "vite --host 0.0.0.0 --port 5173",
-    "build": "vite build",
+    "build:balls": "python3 tools/build_ball_inventory_icons.py",
+    "build": "vite build && node tools/bundle-api.mjs",
+    "build:vercel": "npm run build",
+    "build:all": "npm run build:balls && vite build && node tools/bundle-api.mjs",
+    "bundle:api": "node tools/bundle-api.mjs",
+    "build:attack-data": "node tools/build_attack_data.mjs",
+    "test": "node --import tsx tools/test-otbm.mjs && node tools/test-kanto.mjs && node tools/test-combat-bar.mjs && node tools/bundle-api.mjs && node tools/test-api-bundle.mjs && node --import tsx tools/test-walk-collision.mjs",
     "test:smoke": "node tools/smoketest.mjs"
   },
   "dependencies": {
     "phaser": "^3.80.1",
+    "three": "^0.170.0",
     "ws": "^8.18.2"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
-    "vite": "^6.0.7"
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.7",
+    "esbuild": "^0.25.9"
   }
 }

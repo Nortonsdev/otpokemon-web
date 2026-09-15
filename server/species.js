@@ -1,5 +1,12 @@
+import { KANTO_BY_SLUG } from "../shared/kantoDex.js";
+
 export const TILE = 32;
 export const STEP_MS = 200;
+/** Passo idle dos wilds (~50% da velocidade do jogador). */
+export const WILD_STEP_MS = STEP_MS * 2;
+/** Passo do wild sob hit de combate (mais lento que o STEP_MS normal). */
+export const WILD_COMBAT_STEP_MS = 480;
+export const ATK_MS = 1000;
 export const PLAYER_HP = 150;
 export const PARTY_CAP = 6;
 
@@ -36,18 +43,15 @@ export function behind(x, y, dir) {
   return { x: x + d.x, y: y + d.y };
 }
 
-/** Pokemon::getMaxHealth — IVs counted twice; integer /100 as in src/pokemon.cpp. */
-export function getMaxHealth(baseStats, ivHp, evHp, level) {
-  const hp =
-    Math.floor(((2 * baseStats.hp + ivHp + ivHp + Math.floor(evHp / 30)) * level) / 100) +
-    level +
-    10;
+/** Milestone HP: level + base only (no IVs / EVs / nature). */
+export function getMaxHealth(baseStats, level) {
+  const hp = Math.floor((2 * (baseStats.hp || baseStats) * level) / 100) + level + 10;
   return Math.max(1, hp);
 }
 
 export function applyRubyHealth(mon) {
   const base = mon.baseStats || { hp: mon.baseHp };
-  const max = getMaxHealth(base, mon.ivs?.hp ?? 1, mon.evs?.hp ?? 0, mon.level);
+  const max = getMaxHealth(base, mon.level);
   const prevMax = mon.hpMax;
   if (prevMax && prevMax !== max && mon.hp != null) {
     if (mon.hp >= prevMax) mon.hp = max;
@@ -61,55 +65,75 @@ export function applyRubyHealth(mon) {
   return mon;
 }
 
+/** `look` = OTP pokemondata.lua looktype (not National Dex #). */
+function mon(slug, look, types, hp, atk, def, spa, spd, spe, catchRate, moves, abilities = []) {
+  const dex = KANTO_BY_SLUG[slug];
+  if (!dex) throw new Error(`Species "${slug}" is not Kanto #1–151`);
+  return {
+    slug,
+    number: dex.number,
+    look,
+    name: dex.name,
+    types,
+    catchRate,
+    abilities,
+    baseStats: { hp, atk, def, spa, spd, spe },
+    moves,
+  };
+}
+
+const M1 = (name) => [{ id: 1, name, power: 10 }];
+
+/** Kanto com sprites/stats no milestone (subset de #1–151). */
 export const SPECIES = {
-  bulbasaur: {
-    number: 1,
-    look: 1,
-    name: "Bulbasaur",
-    types: ["grass", "poison"],
-    catchRate: 10,
-    runOnHealth: 0,
-    baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 },
-    moves: [
-      { id: 1, name: "Vine Whip", power: 12 },
-      { id: 2, name: "Spore", power: 8 },
-    ],
-  },
-  charmander: {
-    number: 4,
-    look: 4,
-    name: "Charmander",
-    types: ["fire"],
-    catchRate: 50,
-    runOnHealth: 0,
-    baseStats: { hp: 39, atk: 52, def: 43, spa: 60, spd: 50, spe: 65 },
-    moves: [{ id: 1, name: "Scratch", power: 10 }],
-  },
-  squirtle: {
-    number: 7,
-    look: 7,
-    name: "Squirtle",
-    types: ["water"],
-    catchRate: 50,
-    runOnHealth: 0,
-    baseStats: { hp: 44, atk: 48, def: 65, spa: 50, spd: 64, spe: 43 },
-    moves: [{ id: 1, name: "Water Gun", power: 10 }],
-  },
-  caterpie: {
-    number: 10,
-    look: 10,
-    name: "Caterpie",
-    types: ["bug"],
-    catchRate: 50,
-    runOnHealth: 15,
-    baseStats: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 },
-    moves: [{ id: 1, name: "Tackle", power: 8 }],
-  },
+  bulbasaur: mon("bulbasaur", 25, ["grass", "poison"], 45, 49, 49, 65, 65, 45, 45, [
+    { id: 1, name: "Vine Whip", power: 10 },
+    { id: 2, name: "Spore", power: 8 },
+  ]),
+  ivysaur: mon("ivysaur", 24, ["grass", "poison"], 60, 62, 63, 80, 80, 60, 45, M1("Vine Whip")),
+  venusaur: mon("venusaur", 22, ["grass", "poison"], 80, 82, 83, 100, 100, 80, 45, M1("Vine Whip")),
+  charmander: mon("charmander", 29, ["fire"], 39, 52, 43, 60, 50, 65, 45, M1("Scratch")),
+  charmeleon: mon("charmeleon", 23, ["fire"], 58, 64, 58, 80, 65, 80, 45, M1("Scratch")),
+  charizard: mon("charizard", 67, ["fire", "flying"], 78, 84, 78, 109, 85, 100, 50, M1("Scratch"), ["fly"]),
+  squirtle: mon("squirtle", 2, ["water"], 44, 48, 65, 50, 64, 43, 45, M1("Water Gun")),
+  wartortle: mon("wartortle", 6, ["water"], 59, 63, 80, 65, 80, 58, 45, M1("Water Gun")),
+  blastoise: mon("blastoise", 55, ["water"], 79, 83, 100, 85, 105, 78, 45, M1("Water Gun"), ["surf"]),
+  caterpie: mon("caterpie", 32, ["bug"], 45, 30, 35, 20, 20, 45, 50, M1("Tackle")),
+  metapod: mon("metapod", 31, ["bug"], 50, 20, 55, 25, 25, 30, 45, M1("Tackle")),
+  butterfree: mon("butterfree", 40, ["bug", "flying"], 60, 45, 50, 90, 80, 70, 45, M1("Tackle")),
+  weedle: mon("weedle", 21, ["bug", "poison"], 40, 35, 30, 20, 20, 50, 45, M1("Tackle")),
+  kakuna: mon("kakuna", 60, ["bug", "poison"], 45, 25, 50, 25, 25, 35, 45, M1("Tackle")),
+  beedrill: mon("beedrill", 45, ["bug", "poison"], 65, 90, 40, 45, 80, 75, 45, M1("Tackle")),
+  pidgey: mon("pidgey", 30, ["normal", "flying"], 40, 45, 40, 35, 35, 56, 45, M1("Tackle")),
+  pidgeotto: mon("pidgeotto", 5, ["normal", "flying"], 63, 60, 55, 50, 50, 71, 45, M1("Tackle")),
+  pidgeot: mon("pidgeot", 80, ["normal", "flying"], 83, 80, 75, 70, 70, 101, 45, M1("Tackle")),
+  raticate: mon("raticate", 69, ["normal"], 55, 81, 60, 50, 70, 97, 45, M1("Tackle")),
+  rapidash: mon("rapidash", 220, ["fire"], 65, 100, 70, 80, 80, 105, 50, M1("Tackle"), ["ride"]),
 };
+
+export const PLAYABLE_KANTO_SLUGS = Object.keys(SPECIES);
+
+export const LOOK_NAME = Object.fromEntries(
+  Object.entries(SPECIES).map(([slug, s]) => [s.look, slug])
+);
+
+export function speciesKeyByLook(look) {
+  return LOOK_NAME[look] || "caterpie";
+}
 
 export const STARTERS = ["bulbasaur", "charmander", "squirtle"];
 
+/** OTP2072026 — Premierball client id 3030, ballsusage id 2 */
+export const CATCH_BALL_ITEMS = ["premierball", "ultraball", "masterball"];
+
 export const BALL = {
-  item: "pokeball",
-  rate: 1,
+  pokeball: { item: "pokeball", rate: 1 },
+  premierball: { item: "premierball", rate: 1, guaranteed: true, clientId: 3030 },
+  ultraball: { item: "ultraball", rate: 1, guaranteed: true },
+  masterball: { item: "masterball", rate: 1, guaranteed: true },
+};
+
+export const POTIONS = {
+  small_potion: { heal: 35 },
+  great_potion: { heal: 80 },
 };

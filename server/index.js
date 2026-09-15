@@ -2,12 +2,25 @@ import http from "node:http";
 import { WebSocketServer } from "ws";
 import { World } from "./game.js";
 import { STEP_MS } from "./species.js";
+import { handleMapHttp, resolveMapPath } from "./mapHttp.ts";
 
 const PORT = Number(process.env.PORT || 3001);
 const world = new World();
 
-const server = http.createServer((req, res) => {
-  if (req.url === "/health") {
+const server = http.createServer(async (req, res) => {
+  const path = (req.url || "/").split("?")[0];
+  const mapPath = resolveMapPath(req, path);
+  if (req.method === "OPTIONS" && (mapPath === "/api/map" || mapPath.startsWith("/api/map"))) {
+    res.writeHead(204, {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET,POST,OPTIONS",
+      "access-control-allow-headers": "content-type,x-map-filename",
+    });
+    res.end();
+    return;
+  }
+  if (await handleMapHttp(req, res, mapPath)) return;
+  if (path === "/health" || path === "/ws" || path === "/api/ws" || path === "/api/health") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
     return;
@@ -16,7 +29,8 @@ const server = http.createServer((req, res) => {
   res.end();
 });
 
-const wss = new WebSocketServer({ server, path: "/ws" });
+// No path filter: Vite proxies /ws locally; Vercel rewrites /ws -> /api/ws.
+const wss = new WebSocketServer({ server });
 
 wss.on("connection", (ws) => {
   world.attach(ws);
@@ -35,10 +49,6 @@ wss.on("connection", (ws) => {
 
 setInterval(() => world.tick(), STEP_MS);
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`OTPokemon server ws://0.0.0.0:${PORT}/ws`);
-});
-
 function shutdown() {
   for (const ws of wss.clients) {
     const client = world.clients.get(ws);
@@ -51,3 +61,12 @@ function shutdown() {
 
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
+
+if (!process.env.VERCEL) {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Pokebyt Online server ws://0.0.0.0:${PORT}/ws`);
+  });
+}
+
+export { server };
+export default server;

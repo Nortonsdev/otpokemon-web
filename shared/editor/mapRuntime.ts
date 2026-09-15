@@ -1,0 +1,366 @@
+/**
+ * OTBM (YATME/RME) → gameplay runtime for otpokemon-web server + Phaser client.
+ */
+
+import type { OtbmMap, OtbmTile } from "./otbm.ts";
+import {
+  tileKey,
+  ZONE_SPAWN,
+  ZONE_PVP,
+  ZONE_NOPVP,
+  ZONE_PROTECTION,
+  TILESTATE_PROTECTIONZONE,
+  TILESTATE_NOPVPZONE,
+  TILESTATE_PVPZONE,
+  applyPokeZoneToTile,
+  applyPzPadToTile,
+  applySpawnToTile,
+} from "./otbm.ts";
+import type { ClassicCatalog } from "./classicClient.ts";
+import {
+  BUILTIN_TILE_IDS,
+  GROUND,
+  groundIndexFromId,
+  isRoofId,
+  isWallId,
+  itemKindForId,
+} from "./tileCatalog.ts";
+import { parseSpeciesDexId } from "../kantoDex.js";
+
+export interface RuntimeMap {
+  w: number;
+  h: number;
+  z: number;
+  ground: number[][];
+  walls: number[][];
+  roofs: number[][];
+  items: Array<{ x: number; y: number; kind: string; itemId?: number }>;
+  cells: Array<Array<{ items: number[] }>>;
+  /** Remere TILESTATE flags per cell (PZ / NoPvP / PvP). */
+  flags: number[][];
+  /** House id per cell (0 = none). */
+  houses: number[][];
+  /** PokeZone habitat id per cell (0 = none). */
+  pokeZoneIds: number[][];
+  /** PZ pad id per cell (0 = none). */
+  pzIds: number[][];
+  pokeZones: PokeZoneRegion[];
+  pzPads: PzPadRegion[];
+  wildSpawns: Array<{
+    x: number;
+    y: number;
+    dexId?: string;
+    species?: string;
+    shiny?: boolean;
+    pzId?: number;
+    pokeZoneId?: number;
+    /** PokeZone wander radius from OTBM spawnMonster (editor). */
+    radius?: number;
+  }>;
+  spawn: { x: number; y: number; z: number };
+  tile: number;
+  towns: OtbmMap["towns"];
+  waypoints: OtbmMap["waypoints"];
+}
+
+export interface PokeZoneRegion {
+  id: number;
+  tiles: Array<{ x: number; y: number }>;
+}
+
+export interface PzPadRegion {
+  id: number;
+  pokeZoneId: number;
+  tiles: Array<{ x: number; y: number }>;
+}
+
+export function collectPokeZones(pokeZoneIds: number[][]): PokeZoneRegion[] {
+  const byId = new Map<number, PokeZoneRegion>();
+  for (let y = 0; y < pokeZoneIds.length; y++) {
+    const row = pokeZoneIds[y];
+    if (!row) continue;
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x];
+      if (!id) continue;
+      let region = byId.get(id);
+      if (!region) {
+        region = { id, tiles: [] };
+        byId.set(id, region);
+      }
+      region.tiles.push({ x, y });
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
+export function collectPzPads(pzIds: number[][], pokeZoneIds: number[][]): PzPadRegion[] {
+  const byId = new Map<number, PzPadRegion>();
+  for (let y = 0; y < pzIds.length; y++) {
+    const row = pzIds[y];
+    if (!row) continue;
+    for (let x = 0; x < row.length; x++) {
+      const id = row[x];
+      if (!id) continue;
+      let region = byId.get(id);
+      if (!region) {
+        region = { id, pokeZoneId: pokeZoneIds[y]?.[x] || 0, tiles: [] };
+        byId.set(id, region);
+      } else if (!region.pokeZoneId && pokeZoneIds[y]?.[x]) {
+        region.pokeZoneId = pokeZoneIds[y][x];
+      }
+      region.tiles.push({ x, y });
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
+export function habitatExport(runtime: RuntimeMap) {
+  return {
+    pokeZones: runtime.pokeZones ?? collectPokeZones(runtime.pokeZoneIds || []),
+    pzPads: runtime.pzPads ?? collectPzPads(runtime.pzIds || [], runtime.pokeZoneIds || []),
+    wildSpawns: runtime.wildSpawns ?? [],
+  };
+}
+
+export function pickPlayableZ(otbm: OtbmMap): number {
+  if (otbm.towns[0]) return otbm.towns[0].templeZ;
+  const counts = new Map<number, number>();
+  for (const t of otbm.tiles.values()) {
+    counts.set(t.z, (counts.get(t.z) || 0) + 1);
+  }
+  let best = 7;
+  let n = -1;
+  for (const [z, c] of counts) {
+    if (c > n) {
+      best = z;
+      n = c;
+    }
+  }
+  return best;
+}
+
+function emptyGrid(w: number, h: number): RuntimeMap {
+  const ground: number[][] = [];
+  const walls: number[][] = [];
+  const roofs: number[][] = [];
+  const flags: number[][] = [];
+  const houses: number[][] = [];
+  const pokeZoneIds: number[][] = [];
+  const pzIds: number[][] = [];
+  const cells: Array<Array<{ items: number[] }>> = [];
+  for (let y = 0; y < h; y++) {
+    ground[y] = [];
+    walls[y] = [];
+    roofs[y] = [];
+    flags[y] = [];
+    houses[y] = [];
+    pokeZoneIds[y] = [];
+    pzIds[y] = [];
+    cells[y] = [];
+    for (let x = 0; x < w; x++) {
+      ground[y][x] = GROUND.grass;
+      walls[y][x] = 0;
+      roofs[y][x] = 0;
+      flags[y][x] = 0;
+      houses[y][x] = 0;
+      pokeZoneIds[y][x] = 0;
+      pzIds[y][x] = 0;
+      cells[y][x] = { items: [BUILTIN_TILE_IDS.grass] };
+    }
+  }
+  return {
+    w,
+    h,
+    z: 7,
+    ground,
+    walls,
+    roofs,
+    items: [],
+    cells,
+    flags,
+    houses,
+    pokeZoneIds,
+    pzIds,
+    pokeZones: [],
+    pzPads: [],
+    wildSpawns: [],
+    spawn: { x: Math.floor(w / 2), y: Math.floor(h / 2), z: 7 },
+    tile: 32,
+    towns: [],
+    waypoints: [],
+  };
+}
+
+function applyStack(
+  runtime: RuntimeMap,
+  x: number,
+  y: number,
+  stack: number[],
+  catalog?: ClassicCatalog,
+) {
+  const ids = stack.length ? [...stack] : [BUILTIN_TILE_IDS.grass];
+  runtime.cells[y][x] = { items: ids };
+  let g = GROUND.grass;
+  let wall = 0;
+  let roof = 0;
+  const kinds: RuntimeMap["items"] = [];
+  for (const id of ids) {
+    const meta = catalog?.items.get(id);
+    if (isWallId(id) || meta?.blocks) {
+      wall = 1;
+      continue;
+    }
+    if (isRoofId(id)) {
+      roof = 1;
+      continue;
+    }
+    const kind = itemKindForId(id);
+    if (kind) {
+      kinds.push({ x, y, kind, itemId: id });
+      continue;
+    }
+    if (!meta || meta.isGround || !meta.blocks) g = groundIndexFromId(id);
+  }
+  runtime.ground[y][x] = g;
+  runtime.walls[y][x] = wall;
+  runtime.roofs[y][x] = roof;
+  runtime.items = runtime.items.filter((it) => !(it.x === x && it.y === y));
+  runtime.items.push(...kinds);
+}
+
+export function otbmMapToRuntime(otbm: OtbmMap, catalog?: ClassicCatalog, floorZ?: number): RuntimeMap {
+  let maxX = 0;
+  let maxY = 0;
+  for (const t of otbm.tiles.values()) {
+    maxX = Math.max(maxX, t.x);
+    maxY = Math.max(maxY, t.y);
+  }
+  const w = Math.max(otbm.width === 65535 ? 0 : otbm.width, maxX + 1, 1);
+  const h = Math.max(otbm.height === 65535 ? 0 : otbm.height, maxY + 1, 1);
+  const z = floorZ ?? pickPlayableZ(otbm);
+  const runtime = emptyGrid(w, h);
+  runtime.z = z;
+
+  for (const tile of otbm.tiles.values()) {
+    if (tile.z !== z) continue;
+    if (tile.x >= w || tile.y >= h || tile.x < 0 || tile.y < 0) continue;
+    applyStack(
+      runtime,
+      tile.x,
+      tile.y,
+      tile.items.map((it) => it.id),
+      catalog,
+    );
+    runtime.flags[tile.y][tile.x] = tile.flags || 0;
+    runtime.houses[tile.y][tile.x] = tile.houseId || 0;
+    runtime.pokeZoneIds[tile.y][tile.x] = tile.pokeZoneId || 0;
+    runtime.pzIds[tile.y][tile.x] = tile.pzId || 0;
+    if (tile.spawnMonster || tile.zones?.includes(ZONE_SPAWN)) {
+      const parsed = parseSpeciesDexId(tile.spawnMonster?.dexId);
+      const pzId = tile.spawnMonster?.pzId || tile.pzId;
+      const spawnRadius = tile.spawnMonster?.radius;
+      runtime.wildSpawns.push({
+        x: tile.x,
+        y: tile.y,
+        dexId: parsed?.id,
+        species: parsed?.slug,
+        shiny: parsed?.shiny,
+        ...(pzId ? { pzId } : {}),
+        ...(tile.pokeZoneId ? { pokeZoneId: tile.pokeZoneId } : {}),
+        ...(spawnRadius != null ? { radius: spawnRadius } : {}),
+      });
+    }
+  }
+
+  const temple = otbm.towns[0];
+  runtime.spawn = temple
+    ? { x: temple.templeX, y: temple.templeY, z: temple.templeZ }
+    : { x: Math.floor(w / 2), y: Math.floor(h / 2), z };
+  runtime.towns = otbm.towns;
+  runtime.waypoints = otbm.waypoints;
+  runtime.pokeZones = collectPokeZones(runtime.pokeZoneIds);
+  runtime.pzPads = collectPzPads(runtime.pzIds, runtime.pokeZoneIds);
+  return runtime;
+}
+
+export function runtimeTileAt(runtime: RuntimeMap, x: number, y: number, z: number): OtbmTile | null {
+  if (x < 0 || y < 0 || x >= runtime.w || y >= runtime.h) return null;
+  const items = runtime.cells[y][x].items.map((id) => ({ id }));
+  const houseId = runtime.houses?.[y]?.[x] || undefined;
+  const pokeZoneId = runtime.pokeZoneIds?.[y]?.[x] || undefined;
+  const pzId = runtime.pzIds?.[y]?.[x] || undefined;
+  return {
+    x,
+    y,
+    z,
+    flags: runtime.flags?.[y]?.[x] || 0,
+    houseId: houseId || undefined,
+    pokeZoneId: pokeZoneId || undefined,
+    pzId: pzId || undefined,
+    items,
+  };
+}
+
+export function setRuntimeCell(
+  runtime: RuntimeMap,
+  x: number,
+  y: number,
+  items: number[],
+  catalog?: ClassicCatalog,
+) {
+  applyStack(runtime, x, y, items, catalog);
+}
+
+export function runtimeToOtbm(runtime: RuntimeMap): OtbmMap {
+  const tiles = new Map<string, OtbmTile>();
+  const floorZ = runtime.z ?? 7;
+  for (let y = 0; y < runtime.h; y++) {
+    for (let x = 0; x < runtime.w; x++) {
+      const ids = runtime.cells[y][x].items.filter((id) => id > 0);
+      if (!ids.length) continue;
+      const flags = runtime.flags?.[y]?.[x] || 0;
+      const houseId = runtime.houses?.[y]?.[x] || undefined;
+      const pokeZoneId = runtime.pokeZoneIds?.[y]?.[x] || 0;
+      const pzId = runtime.pzIds?.[y]?.[x] || 0;
+      const zones: number[] = [];
+      if (flags & TILESTATE_PVPZONE) zones.push(ZONE_PVP);
+      if (flags & TILESTATE_NOPVPZONE) zones.push(ZONE_NOPVP);
+      if (flags & TILESTATE_PROTECTIONZONE) zones.push(ZONE_PROTECTION);
+      if (runtime.wildSpawns?.some((s) => s.x === x && s.y === y)) zones.push(ZONE_SPAWN);
+      const spawnSpot = runtime.wildSpawns?.find((s) => s.x === x && s.y === y);
+      const spawnDex = spawnSpot?.dexId && parseSpeciesDexId(spawnSpot.dexId)?.id;
+      const tile: OtbmTile = {
+        x,
+        y,
+        z: floorZ,
+        flags,
+        houseId,
+        items: ids.map((id) => ({ id })),
+        zones: zones.length ? zones : undefined,
+      };
+      if (pokeZoneId) applyPokeZoneToTile(tile, pokeZoneId);
+      if (pzId) applyPzPadToTile(tile, pzId, pokeZoneId || undefined);
+      if (zones.includes(ZONE_SPAWN) || spawnSpot) {
+        applySpawnToTile(tile, spawnDex || true, spawnSpot?.pzId || pzId || undefined);
+        if (tile.spawnMonster && spawnSpot?.radius != null) tile.spawnMonster.radius = spawnSpot.radius;
+      }
+      tiles.set(tileKey(x, y, floorZ), tile);
+    }
+  }
+  return {
+    version: 4,
+    width: runtime.w,
+    height: runtime.h,
+    majorItems: 4,
+    minorItems: 4,
+    description: "Saved with YATME",
+    rawDescriptions: ["Saved with YATME"],
+    spawnFile: "",
+    npcFile: "",
+    houseFile: "",
+    zoneFile: "",
+    tiles,
+    towns: runtime.towns ?? [],
+    waypoints: runtime.waypoints ?? [],
+  };
+}
