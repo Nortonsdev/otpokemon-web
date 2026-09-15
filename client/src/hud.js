@@ -1,5 +1,6 @@
 import { WindowManager } from "./windows.js";
 import { bindChatDock } from "./ui/chatDock.js";
+import { bindChatToolbar, getChatTypeFilter, isChatLogMode } from "./ui/chatToolbar.js";
 import { SPECIES } from "../../server/species.js";
 import { playerProgressFields, staminaClock } from "../../server/otpProgress.js";
 import { hpColorCss, hpPercent } from "./hpColor.js";
@@ -81,6 +82,9 @@ export class Hud {
     this.combatMoveSlot = 1;
     this.outCreatureId = null;
     this.orderBarOpen = false;
+    this.chatRole = "player";
+    this.chatLineSeq = 0;
+    this.chatHiddenKeys = new Set();
   }
 
   bindGame() {
@@ -88,6 +92,7 @@ export class Hud {
     this.bound = true;
     this.windows.bind();
     bindChatDock();
+    bindChatToolbar(this);
     const wm = this.windows;
     const applyAll = wm.applyAll.bind(wm);
     wm.applyAll = () => {
@@ -179,26 +184,120 @@ export class Hud {
     this.renderAttackBar(out);
   }
 
-  log(text, ch = "sistema") {
-    this.lines.push({ ch, text, ts: clock() });
-    if (this.lines.length > 200) this.lines.shift();
+  log(text, ch = "sistema", meta = {}) {
+    const key = meta.mid != null ? `mid:${meta.mid}` : `loc:${++this.chatLineSeq}`;
+    this.lines.push({ ch, text, ts: clock(), key, ...meta });
+    if (this.lines.length > 300) this.lines.shift();
     this.flushLog();
+  }
+
+  clearChatLocal() {
+    this.lines = [];
+    this.chatHiddenKeys.clear();
+    this.flushLog();
+  }
+
+  lineTypeFilter(ch) {
+    if (ch === "local" || ch === "global") return "player";
+    if (ch === "combate") return "combate";
+    return "sistema";
+  }
+
+  canDeleteForAll(line) {
+    const role = this.chatRole || "player";
+    return role === "admin" || role === "mod";
+  }
+
+  hideLineLocal(line) {
+    if (line.key) this.chatHiddenKeys.add(line.key);
+    this.flushLog();
+  }
+
+  deleteLine(line) {
+    if (line.mid != null && this.canDeleteForAll(line)) {
+      this.net.send({ t: "chatDel", mid: line.mid });
+      return;
+    }
+    this.hideLineLocal(line);
+  }
+
+  openChatContextMenu(line, x, y) {
+    let menu = document.getElementById("chat-ctx-menu");
+    if (!menu) {
+      menu = document.createElement("div");
+      menu.id = "chat-ctx-menu";
+      menu.className = "chat-ctx-menu hidden";
+      menu.setAttribute("role", "menu");
+      document.body.appendChild(menu);
+    }
+    menu.innerHTML = "";
+    const hideBtn = document.createElement("button");
+    hideBtn.type = "button";
+    hideBtn.textContent = "Apagar para mim";
+    hideBtn.addEventListener("click", () => {
+      this.hideLineLocal(line);
+      menu.classList.add("hidden");
+    });
+    menu.appendChild(hideBtn);
+    if (line.mid != null && this.canDeleteForAll(line)) {
+      const allBtn = document.createElement("button");
+      allBtn.type = "button";
+      allBtn.className = "danger";
+      allBtn.textContent = "Apagar para todos";
+      allBtn.addEventListener("click", () => {
+        this.net.send({ t: "chatDel", mid: line.mid });
+        menu.classList.add("hidden");
+      });
+      menu.appendChild(allBtn);
+    } else if (line.mid != null && line.authorId === this.you?.id) {
+      hideBtn.textContent = "Apagar (só para mim)";
+    }
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.classList.remove("hidden");
+    const close = (ev) => {
+      if (ev.target.closest("#chat-ctx-menu")) return;
+      menu.classList.add("hidden");
+      document.removeEventListener("click", close, true);
+    };
+    setTimeout(() => document.addEventListener("click", close, true), 0);
   }
 
   flushLog() {
     const log = document.getElementById("chat-log");
     if (!log) return;
+    const typeFilter = getChatTypeFilter();
+    const logMode = isChatLogMode();
     log.innerHTML = "";
     for (const line of this.lines) {
-      const show =
-        (this.channel === "global" && (line.ch === "global" || line.ch === "local")) ||
-        (this.channel === "local" && line.ch === "local") ||
-        (this.channel === "sistema" && line.ch === "sistema") ||
-        (this.channel === "combate" && line.ch === "combate");
+      if (line.key && this.chatHiddenKeys.has(line.key)) continue;
+      if (!typeFilter[this.lineTypeFilter(line.ch)]) continue;
+      const show = logMode
+        ? true
+        : (this.channel === "global" && (line.ch === "global" || line.ch === "local")) ||
+          (this.channel === "local" && line.ch === "local") ||
+          (this.channel === "sistema" && line.ch === "sistema") ||
+          (this.channel === "combate" && line.ch === "combate");
       if (!show) continue;
       const el = document.createElement("div");
       el.className = `line ch-${line.ch}`;
+      el.dataset.lineKey = line.key || "";
       el.innerHTML = `<span class="ts">${line.ts}</span>${line.text}`;
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "chat-del";
+      del.title = "Apagar mensagem";
+      del.textContent = "×";
+      del.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.deleteLine(line);
+      });
+      el.appendChild(del);
+      el.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        this.openChatContextMenu(line, e.clientX, e.clientY);
+      });
       log.appendChild(el);
     }
     log.scrollTop = log.scrollHeight;
@@ -230,6 +329,7 @@ export class Hud {
       this.mapData = msg.map;
       this.mapSpawn = msg.map?.spawn || null;
       if (msg.hud) this.windows.merge(msg.hud);
+      if (msg.chatRole) this.chatRole = msg.chatRole;
       if (this.bound) this.windows.applyAll();
       this.render();
       this.drawMinimap();
@@ -243,7 +343,19 @@ export class Hud {
       this.renderActivePokeStatus();
       this.render();
     }
-    if (msg.t === "say") this.log(`${msg.name}: ${msg.text}`, "local");
+    if (msg.t === "say") {
+      this.log(`${msg.name}: ${msg.text}`, "local", {
+        mid: msg.mid,
+        authorId: msg.id,
+        authorName: msg.name,
+      });
+    }
+    if (msg.t === "sayDel" && msg.mid != null) {
+      const key = `mid:${msg.mid}`;
+      this.chatHiddenKeys.add(key);
+      this.lines = this.lines.filter((l) => l.key !== key);
+      this.flushLog();
+    }
     if (msg.t === "info") this.log(msg.text, /causou |Catch successful|escapou|vivo|derrotado|Fly|Ride|Hide|Surf|curou|Recovery/.test(msg.text) ? "combate" : "sistema");
     if (msg.t === "err") this.log(msg.text, "sistema");
     if (msg.t === "moved" && this.you && msg.id === this.you.id) {

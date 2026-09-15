@@ -51,14 +51,9 @@ export function bindChatDock() {
   applyChatHidden();
   document.getElementById("chat-tabs")?.addEventListener("click", (e) => {
     if (!isChatHidden()) return;
-    if (e.target.closest("#chat-hide-toggle")) return;
+    if (e.target.closest("#chat-hide-toggle, .chat-console-tools")) return;
     e.preventDefault();
     setChatHidden(false);
-  });
-  document.getElementById("chat-hide-toggle")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    toggleChatHidden();
   });
   window.addEventListener("keydown", (e) => {
     if (e.key !== "c" && e.key !== "C") return;
