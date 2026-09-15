@@ -15,6 +15,9 @@ import { BALL_REGISTRY, CATCH_BALL_ITEMS, ballIconHtml } from "./ballIcons.js";
 
 const CATCH_REGISTRY = CATCH_BALL_ITEMS;
 
+/** Barra FLY/RIDE flutuando sobre o mapa. false = só via slot Order do inventário. */
+const WORLD_FLOATING_ORDER_BAR = false;
+
 const ITEM_META = {
   premierball: { label: "Premier Ball", catch: true },
   ultraball: { label: "Ultra Ball", catch: true },
@@ -81,6 +84,7 @@ export class Hud {
     this.moveCdUntil = 0;
     this.outCreatureId = null;
     this.invRodIndex = 0;
+    this.orderBarOpen = false;
   }
 
   bindGame() {
@@ -142,12 +146,8 @@ export class Hud {
       btn.addEventListener("click", (e) => {
         e.stopPropagation();
         if (btn.dataset.invAction === "order") {
-          const bar = document.getElementById("order-bar");
-          if (bar) {
-            bar.classList.toggle("inv-order-flash");
-            bar.classList.remove("hidden");
-            this.renderOrders();
-          }
+          this.orderBarOpen = !this.orderBarOpen;
+          this.renderOrders();
         }
       });
     });
@@ -481,10 +481,10 @@ export class Hud {
     const abs = (specKey && SPECIES[specKey]?.abilities) || [];
     bar.innerHTML = "";
     if (!abs.length) {
+      this.orderBarOpen = false;
       bar.classList.add("hidden");
       return;
     }
-    bar.classList.remove("hidden");
     for (const ab of abs) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -494,6 +494,8 @@ export class Hud {
       btn.onclick = () => this.net.send({ t: "order", ability: ab });
       bar.appendChild(btn);
     }
+    const show = WORLD_FLOATING_ORDER_BAR || this.orderBarOpen;
+    bar.classList.toggle("hidden", !show);
   }
 
   renderActivePokeStatus() {
