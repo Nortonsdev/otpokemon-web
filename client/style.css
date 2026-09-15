@@ -1586,13 +1586,19 @@ body.use-with #game,
 }
 .attack-bar {
   pointer-events: auto;
-  z-index: 25;
+  z-index: 30;
   display: flex;
   justify-content: center;
   gap: 8px;
   padding: 2px 4px 0;
   flex-wrap: nowrap;
   max-width: min(880px, calc(100vw - 240px));
+}
+.attack-bar:not(.hidden) {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 .attack-bar.hidden { display: none !important; }
 .attack-slot {

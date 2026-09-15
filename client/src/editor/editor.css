@@ -117,10 +117,11 @@ body,
 }
 
 .brush-tabs button.active {
-  background: #2a2620;
+  background: #1a3268;
   color: var(--ed-fg);
 }
 
+#tileset-filter.hidden { display: none !important; }
 #tileset-filter,
 .brushes-panel .search {
   margin: 0 10px 8px;
@@ -143,12 +144,15 @@ body,
 }
 
 .palette-item {
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(90, 140, 220, 0.22);
   border-radius: 8px;
   padding: 4px 3px 3px;
   text-align: center;
   cursor: pointer;
-  background: #141210;
+  background: #0c1838;
+}
+.palette-item.spawn-mon {
+  min-height: 58px;
 }
 
 .palette-item.selected {
@@ -183,6 +187,13 @@ body,
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.spawn-dex-num {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e8c05e;
+  margin: 8px 0 4px;
 }
 
 .palette-item span {

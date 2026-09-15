@@ -217,9 +217,10 @@ export class Hud {
   selectItem(item) {
     if (item && !this.lootBag.find((i) => i.item === item && i.count > 0)) item = null;
     this.selectedItem = item || null;
-    const useWith = !!this.selectedItem;
-    document.body.classList.toggle("use-with", useWith);
-    document.getElementById("game")?.classList.toggle("use-with-aim", useWith);
+    const catching =
+      this.selectedItem === "pokeball" || CATCH_BALL_ITEMS.includes(this.selectedItem);
+    document.body.classList.toggle("use-with", catching);
+    document.getElementById("game")?.classList.toggle("use-with-aim", catching);
     this.renderItemWindows();
     const out = this.party.out != null ? this.party.slots[this.party.out] : null;
     this.renderHotbar(out);
@@ -790,6 +791,8 @@ export class Hud {
       const label = c.dead ? `${c.name} (corpo)` : c.plate || c.name;
       el.innerHTML = `<span>${label}</span><span class="battle-hp"><span style="width:${ratio * 100}%"></span></span>`;
       el.onclick = () => {
+        this.setTarget(c);
+        this.scene?.setTarget?.(c.id);
         this.net.send({ t: "target", id: c.id });
         if (!c.dead) this.net.send({ t: "walkTo", x: c.x, y: c.y });
       };
@@ -1010,14 +1013,16 @@ export class Hud {
     const bar = document.getElementById("attack-bar");
     if (!bar) return;
     this.syncOutCreatureId();
-    const hasOut = out != null && this.party.out != null;
+    const fromParty = this.party.out != null ? this.party.slots?.[this.party.out] : null;
+    const mon = out || fromParty;
+    const hasOut = mon != null && this.party.out != null;
     bar.classList.toggle("hidden", !hasOut);
     bar.setAttribute("aria-hidden", hasOut ? "false" : "true");
     bar.innerHTML = "";
     if (!hasOut) return;
 
-    const moves = out.barMoves || [];
-    const slotCount = moves.length || attackSlotCount(out.species);
+    const moves = mon.barMoves || [];
+    const slotCount = moves.length || attackSlotCount(mon.species);
     const sheet = moveSheetCss();
     bar.style.setProperty("--move-sheet-w", `${sheet.width}px`);
     bar.style.setProperty("--move-sheet-h", `${sheet.height}px`);

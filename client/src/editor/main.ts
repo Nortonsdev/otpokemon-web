@@ -427,9 +427,8 @@ class EditorApp {
         this.root.querySelectorAll("[data-tab]").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         if (this.paletteTab === "spawn") {
-          this.tool = "spawn";
-          this.stamp = "spawn";
-          this.highlightTools();
+          this.setTool("spawn");
+          return;
         }
         this.refreshPalette();
       });
@@ -477,9 +476,17 @@ class EditorApp {
         const parsed = parseSpeciesDexId(el.value || "0025");
         if (parsed) el.value = speciesDexId(parsed.slug, shiny) || el.value;
       }
-      this.refreshPalette();
+      this.setTool("spawn");
     });
-    document.getElementById("spawn-dex")?.addEventListener("change", () => this.refreshPalette());
+    const spawnDex = document.getElementById("spawn-dex");
+    const openSpawnPicker = () => this.setTool("spawn");
+    spawnDex?.addEventListener("focus", openSpawnPicker);
+    spawnDex?.addEventListener("click", openSpawnPicker);
+    spawnDex?.addEventListener("change", openSpawnPicker);
+    spawnDex?.addEventListener("input", () => {
+      if (this.paletteTab !== "spawn") this.setTool("spawn");
+      else this.refreshPalette();
+    });
     document.getElementById("floor-up")!.addEventListener("click", () => this.setFloor(this.floor - 1));
     document.getElementById("floor-down")!.addEventListener("click", () => this.setFloor(this.floor + 1));
     document.getElementById("btn-grid")!.addEventListener("click", () => this.toggleGrid());
@@ -877,8 +884,13 @@ class EditorApp {
 
   refreshPalette() {
     const shinyRow = document.getElementById("spawn-shiny-row");
-    shinyRow?.classList.toggle("hidden", this.paletteTab !== "spawn");
-    if (this.paletteTab === "spawn") {
+    const tileset = document.getElementById("tileset-filter");
+    const search = document.getElementById("palette-search") as HTMLInputElement | null;
+    const spawnMode = this.paletteTab === "spawn";
+    shinyRow?.classList.toggle("hidden", !spawnMode);
+    tileset?.classList.toggle("hidden", spawnMode);
+    if (search) search.placeholder = spawnMode ? "Buscar Pokémon 1–151 / NNNN-1…" : "Search brushes...";
+    if (spawnMode) {
       const shiny = !!(document.getElementById("spawn-shiny") as HTMLInputElement | null)?.checked;
       renderSpawnPalette({
         filter: this.paletteFilter,
@@ -887,7 +899,9 @@ class EditorApp {
         onPick: (dexId) => {
           const el = document.getElementById("spawn-dex") as HTMLInputElement | null;
           if (el) el.value = dexId;
-          this.setTool("spawn");
+          this.tool = "spawn";
+          this.stamp = "spawn";
+          this.highlightTools();
           this.refreshPalette();
           this.msg(`Spawn ${dexId}`);
         },
@@ -900,7 +914,7 @@ class EditorApp {
       catalog: this.catalog,
       customSprites: this.customSprites,
       filter: this.paletteFilter,
-      tab: this.paletteTab,
+      tab: this.paletteTab === "raw" ? "raw" : this.paletteTab === "all" ? "all" : this.paletteTab === "doodad" ? "doodad" : this.paletteTab === "items" ? "items" : "terrain",
       onPick: (id) => {
         this.selectedId = id;
         this.stamp = "item";

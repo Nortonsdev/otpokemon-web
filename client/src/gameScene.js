@@ -211,7 +211,11 @@ export class GameScene extends Phaser.Scene {
     document.addEventListener("contextmenu", onRight, true);
     this.input.on("pointerdown", (p) => {
       const t = p.event?.target;
-      if (t?.closest?.(".attack-bar, .ot-window, .chat-dock, .otp-top-btn, .hud-top-icons, input, textarea, select")) {
+      if (
+        t?.closest?.(
+          ".attack-bar, #attack-bar, .attack-slot, .ot-window, .chat-dock, .otp-top-btn, .hud-top-icons, .hud-bottom-stack, input, textarea, select, button"
+        )
+      ) {
         return;
       }
       document.getElementById("chat-input")?.blur();
@@ -375,6 +379,7 @@ export class GameScene extends Phaser.Scene {
     sprite.setOrigin(0.5, 0.5);
     sprite.setDisplaySize(CROSSHAIR_PX, CROSSHAIR_PX);
     sprite.setAlpha(0.95);
+    if (typeof sprite.disableInteractive === "function") sprite.disableInteractive();
   }
 
   tileCrosshairPoint(d) {
@@ -1054,33 +1059,32 @@ export class GameScene extends Phaser.Scene {
     }
     const item = this.hud?.selectedItem;
     const catching = item === "pokeball" || CATCH_BALL_ITEMS.includes(item);
+    // Catch is corpse-only. Live targets always go to selection/combat — never
+    // let use-with/crosshair swallow the attack bar or auto-combat.
     if (catching && who && who.wild && who.dead) {
       if (this.catchBusy) return;
       this.net.send({ t: "use", item, id: who.id });
       this.hud.selectItem(null);
       return;
     }
-    if (item === "small_potion" || item === "great_potion") {
-      if (who && this.isOwnCreature(who) && who.id !== this.youId) {
-        this.net.send({ t: "use", item, id: who.id });
-      }
-      return;
-    }
-    if (who && who.wild && !who.dead && this.isValidTarget(who)) {
-      this.setTarget(who.id);
-      this.net.send({ t: "target", id: who.id });
-      this.net.send({ t: "walkTo", x: who.x, y: who.y });
+    if (
+      (item === "small_potion" || item === "great_potion") &&
+      who &&
+      this.isOwnCreature(who) &&
+      who.id !== this.youId
+    ) {
+      this.net.send({ t: "use", item, id: who.id });
       return;
     }
     if (this.isValidTarget(who)) {
       this.setTarget(who.id);
       this.net.send({ t: "target", id: who.id });
+      if (who.wild && !who.dead) this.net.send({ t: "walkTo", x: who.x, y: who.y });
       return;
     }
     if (this.isOwnCreature(who) && who.id !== this.youId) {
       return;
     }
-    if (catching) return;
     this.clearTarget();
     this.net.send({ t: "walkTo", x: tx, y: ty });
   }
@@ -1153,6 +1157,7 @@ export class GameScene extends Phaser.Scene {
 
   tickAutoCombat() {
     if (this.catchBusy) return;
+    // selectedItem / crosshair cursor must never pause combat
     const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
     if (!tgt || !tgt.wild || tgt.dead) {
       return;

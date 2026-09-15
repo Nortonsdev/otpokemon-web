@@ -72,13 +72,25 @@ export function renderSpawnPalette(opts: {
     div.className = "palette-item spawn-mon" + (opts.selectedId === dexId ? " selected" : "");
     div.title = `${dexId} ${opts.shiny ? "Shiny " : ""}${e.name}`;
     const img = document.createElement("img");
-    img.src = `/assets/pokemon/${e.slug}/portrait.png`;
+    const folderPortrait = `/assets/pokemon/${e.slug}/portrait.png`;
+    const flatPortrait = `/assets/pokemon/${e.slug}_portrait.png`;
+    img.src = folderPortrait;
     img.alt = e.name;
     img.width = 32;
     img.height = 32;
     img.className = opts.shiny ? "spawn-portrait shiny" : "spawn-portrait";
     img.onerror = () => {
-      img.replaceWith(Object.assign(document.createElement("span"), { textContent: `#${e.number}` }));
+      if (img.dataset.fallback !== "1") {
+        img.dataset.fallback = "1";
+        img.src = flatPortrait;
+        return;
+      }
+      img.replaceWith(
+        Object.assign(document.createElement("span"), {
+          className: "spawn-dex-num",
+          textContent: dexId,
+        })
+      );
     };
     div.appendChild(img);
     const span = document.createElement("span");
