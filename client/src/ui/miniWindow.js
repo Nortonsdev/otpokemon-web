@@ -256,6 +256,14 @@ export class WindowManager {
     }
     el.addEventListener("mousedown", () => this.raise(def.id), true);
     head.addEventListener("mousedown", (e) => this.onHeadDown(def.id, e));
+    if (def.id === "status") {
+      const body = el.querySelector(".pi-body");
+      body?.addEventListener("mousedown", (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest(".pi-row")) return;
+        this.onHeadDown(def.id, e);
+      });
+    }
     head.addEventListener("dblclick", (e) => {
       if (e.target.closest("[data-act]")) return;
       e.preventDefault();
