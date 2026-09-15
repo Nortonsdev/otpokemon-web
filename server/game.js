@@ -131,12 +131,32 @@ export class World {
 
   vacate(creature) {
     const k = this.key(creature.x, creature.y);
-    if (this.occupancy.get(k) === creature.id) this.occupancy.delete(k);
+    if (this.occupancy.get(k) !== creature.id) return;
+    this.occupancy.delete(k);
+    for (const c of this.creatures.values()) {
+      if (c.id === creature.id || c.dead) continue;
+      if (c.x === creature.x && c.y === creature.y) {
+        this.occupancy.set(k, c.id);
+        break;
+      }
+    }
   }
 
   occupant(x, y) {
     const id = this.occupancy.get(this.key(x, y));
     return id ? this.creatures.get(id) : null;
+  }
+
+  /** OTClient-style: só NPCs bloqueiam passo; players/wilds/pokémon fora passam uns pelos outros. */
+  isSolidCreature(c) {
+    return !!c && !c.dead && c.kind === "npc";
+  }
+
+  blockingOccupant(x, y) {
+    for (const c of this.creatures.values()) {
+      if (c.x === x && c.y === y && this.isSolidCreature(c)) return c;
+    }
+    return null;
   }
 
   persist() {
@@ -701,7 +721,7 @@ export class World {
     if (
       !this.canWildEnterTile(creature, nx, ny) ||
       !walkable(nx, ny, { surf: creature.mount?.ability === "surf" }) ||
-      this.occupant(nx, ny)
+      this.blockingOccupant(nx, ny)
     ) {
       this.broadcastArea({ t: "turn", id: creature.id, dir });
       if (creature.kind === "player") this.snapshotPlayer(creature);
@@ -742,7 +762,7 @@ export class World {
     for (let dir = 0; dir < 8; dir++) {
       const nx = wild.x + DELTA[dir].x;
       const ny = wild.y + DELTA[dir].y;
-      if (!walkable(nx, ny) || this.occupant(nx, ny)) continue;
+      if (!walkable(nx, ny) || this.blockingOccupant(nx, ny)) continue;
       if (!this.canWildEnterTile(wild, nx, ny)) continue;
       opts.push(dir);
     }
@@ -761,7 +781,7 @@ export class World {
     for (let dir = 0; dir < 8; dir++) {
       const nx = wild.x + DELTA[dir].x;
       const ny = wild.y + DELTA[dir].y;
-      if (!walkable(nx, ny) || this.occupant(nx, ny)) continue;
+      if (!walkable(nx, ny) || this.blockingOccupant(nx, ny)) continue;
       if (!this.canWildEnterTile(wild, nx, ny)) continue;
       const distNow = Math.max(Math.abs(ax - wild.x), Math.abs(ay - wild.y));
       const distNew = Math.max(Math.abs(ax - nx), Math.abs(ay - ny));
@@ -948,9 +968,9 @@ export class World {
         c.walkTo = null;
         continue;
       }
-      const destOcc = this.occupant(x, y);
+      const destBlock = this.blockingOccupant(x, y);
       const dist = Math.max(Math.abs(x - c.x), Math.abs(y - c.y));
-      if (destOcc && dist <= 1) {
+      if (destBlock && dist <= 1) {
         c.walkTo = null;
         continue;
       }
@@ -1139,7 +1159,7 @@ export class World {
   }
 
   summonTile(player) {
-    const trySpot = (x, y) => walkable(x, y) && !this.occupant(x, y) && !isProtectionZone(x, y);
+    const trySpot = (x, y) => walkable(x, y) && !this.blockingOccupant(x, y) && !isProtectionZone(x, y);
     const b = behind(player.x, player.y, player.dir);
     if (trySpot(b.x, b.y)) return b;
     for (let r = 1; r <= 3; r++) {
@@ -1385,8 +1405,7 @@ export class World {
       const nx = x + DELTA[dir].x;
       const ny = y + DELTA[dir].y;
       if (!walkable(nx, ny, { surf: false })) continue;
-      const occ = this.occupant(nx, ny);
-      if (occ && occ.id !== selfId) continue;
+      if (this.blockingOccupant(nx, ny)) continue;
       const dist = Math.max(Math.abs(tx - nx), Math.abs(ty - ny));
       const cur = Math.max(Math.abs(tx - x), Math.abs(ty - y));
       if (dist <= cur) opts.push({ dir, dist, diag: dir % 2 });
@@ -1398,13 +1417,13 @@ export class World {
   spawnNpc(def) {
     if ([...this.creatures.values()].some((c) => c.kind === "npc" && c.name === def.name)) return;
     let { x, y } = def;
-    if (!walkable(x, y) || this.occupant(x, y)) {
+    if (!walkable(x, y) || this.blockingOccupant(x, y)) {
       const nearby = [];
       for (let dy = -2; dy <= 2; dy++) {
         for (let dx = -2; dx <= 2; dx++) {
           const nx = def.x + dx;
           const ny = def.y + dy;
-          if (walkable(nx, ny) && !this.occupant(nx, ny)) nearby.push({ x: nx, y: ny });
+          if (walkable(nx, ny) && !this.blockingOccupant(nx, ny)) nearby.push({ x: nx, y: ny });
         }
       }
       if (!nearby.length) return;
@@ -1494,7 +1513,7 @@ export class World {
   spawnWildAt(species, x, y, shinyForced) {
     const key = String(species || "").toLowerCase();
     if (!isKantoSlug(key) || !SPECIES[key]) return;
-    if (!walkable(x, y) || this.occupant(x, y) || isProtectionZone(x, y) || MAP.houses?.[y]?.[x]) return;
+    if (!walkable(x, y) || this.blockingOccupant(x, y) || isProtectionZone(x, y) || MAP.houses?.[y]?.[x]) return;
     const spec = SPECIES[key];
     const shiny = shinyForced == null ? randomInt(1, SHINY_RATE + 1) === 1 : !!shinyForced;
     const sample = this.makeMon(key, 2, { shiny });
