@@ -1134,8 +1134,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   inset: 0;
   pointer-events: none;
 }
-.inv-otp-slot,
-.inv-otp-rod-cycle {
+.inv-otp-slot {
   pointer-events: auto;
   margin: 0;
   padding: 0;
@@ -1144,6 +1143,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   cursor: pointer;
   line-height: 0;
   image-rendering: pixelated;
+  position: absolute;
 }
 .inv-otp-slot img,
 .inv-otp-ball img {
@@ -1156,49 +1156,22 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .inv-otp-slot.on img {
   filter: brightness(1.15) saturate(1.1);
 }
-.inv-otp-slot:hover img,
-.inv-otp-rod-cycle:hover {
+.inv-otp-slot:hover img {
   filter: brightness(1.12);
 }
-.inv-otp-rod-cycle {
-  position: absolute;
-  left: 5px;
-  top: 11px;
-  width: 24px;
-  height: 20px;
-  background: url(/assets/hud/inventory/combobox.png) no-repeat 0 0;
-  image-rendering: pixelated;
-}
-.inv-otp-rod-cycle:active {
-  background-position: 0 -20px;
-}
-#inv-rod-btn {
-  position: absolute;
-  left: 49px;
-  top: 5px;
-}
-.inv-otp-grid .inv-otp-slot:nth-of-type(3) {
-  position: absolute;
+.inv-otp-pos-bike {
   left: 88px;
   top: 5px;
 }
-.inv-otp-grid .inv-otp-slot:nth-of-type(4) {
-  position: absolute;
+.inv-otp-pos-pokebag {
   left: 30px;
   top: 43px;
 }
-.inv-otp-grid .inv-otp-slot:nth-of-type(5) {
-  position: absolute;
+.inv-otp-pos-coins {
   left: 69px;
   top: 43px;
 }
-.inv-otp-grid .inv-otp-slot:nth-of-type(6) {
-  position: absolute;
-  left: 108px;
-  top: 43px;
-}
-.inv-otp-grid .inv-otp-slot:nth-of-type(7) {
-  position: absolute;
+.inv-otp-pos-bag {
   left: 30px;
   top: 82px;
 }
@@ -1220,13 +1193,11 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   display: block;
   image-rendering: pixelated;
 }
-.inv-otp-grid .inv-otp-slot:nth-of-type(8) {
-  position: absolute;
+.inv-otp-pos-order {
   left: 108px;
   top: 82px;
 }
-.inv-otp-grid .inv-otp-slot:nth-of-type(9) {
-  position: absolute;
+.inv-otp-pos-catch {
   left: 30px;
   top: 121px;
 }
@@ -1238,8 +1209,7 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   height: 34px;
   pointer-events: none;
 }
-.inv-otp-grid .inv-otp-slot:nth-of-type(10) {
-  position: absolute;
+.inv-otp-pos-pokedex {
   left: 108px;
   top: 121px;
 }
@@ -1249,10 +1219,6 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   flex-direction: column;
   gap: 10px;
   pointer-events: none;
-}
-.inv-otp-rail-left {
-  left: 6px;
-  bottom: 6px;
 }
 .inv-otp-rail-right {
   right: 4px;
