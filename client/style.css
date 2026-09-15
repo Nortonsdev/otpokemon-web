@@ -576,7 +576,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   background-size: 198px 319px;
 }
 .player-info {
-  width: 220px;
+  width: 253px;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -600,26 +600,61 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   pointer-events: none;
 }
 .player-info.miniwindow {
-  width: 228px;
-  background: transparent;
+  width: 253px;
+  padding: 0;
+  border: none !important;
+  border-width: 0 !important;
+  border-image: none !important;
+  background: transparent !important;
+  overflow: visible;
 }
-.player-info.miniwindow > .win-head {
-  left: 0;
-  right: 0;
-  top: -23px;
-  height: 23px;
-  padding: 0 4px 0 6px;
+html.mw-ready .player-info.miniwindow {
+  border-image: none !important;
+  background: transparent !important;
 }
-.player-info.miniwindow .win-title {
-  opacity: 1;
+.player-info.miniwindow > .win-body {
+  border: none !important;
+  border-image: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.player-info.miniwindow:not(.win-min):not(.win-strip) > .win-head {
+  display: none !important;
+}
+.player-info.miniwindow .mw-icon,
+.player-info.miniwindow .win-tools {
+  display: none !important;
+}
+.player-info.miniwindow .pi-body {
+  cursor: move;
+}
+.player-info.miniwindow.win-min > .win-head,
+.player-info.miniwindow.win-strip > .win-head {
+  top: 0;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 8px;
+  cursor: pointer;
+  background: rgba(14, 18, 22, 0.94);
+  border: 1px solid #c42830;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+.player-info.miniwindow.win-min .win-title,
+.player-info.miniwindow.win-strip .win-title {
+  display: block !important;
+  opacity: 1 !important;
   pointer-events: none;
+  color: #f3f6fa;
+  font-size: 10px;
+  font-weight: 700;
 }
 .miniwindow > .win-body.pi-body,
 .player-info.miniwindow .pi-body {
   padding: 0;
   overflow: visible;
-  width: 220px;
-  height: 98px;
+  width: 253px;
+  min-height: 112px;
   border: 0;
   background: transparent;
 }
@@ -654,7 +689,7 @@ hr { border: 0; border-top: 1px solid #3b4261; margin: 12px 0; }
   border-radius: 0;
   backdrop-filter: none;
 }
-html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win) {
+html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win):not(.player-info) {
   border-color: transparent;
   border-image-source: var(--mw-bg);
   border-image-slice: 23 4 4 4 fill;
@@ -747,7 +782,7 @@ html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win) {
   border: 4px solid #2a2c2e;
   background: #2a2c2e;
 }
-html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win) > .win-body {
+html.mw-ready .miniwindow:not(.inv-otp):not(.item-box-win):not(.player-info) > .win-body {
   border-color: transparent;
   border-image-source: var(--mw-fg);
   border-image-slice: 4 fill;
@@ -1013,14 +1048,12 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .battle-hp > span { display: block; height: 100%; background: var(--ot-hp); border-radius: 2px; }
 
 /* ── RIGHT COLUMN ── */
-#hud-pokeinfo { top: 28px; right: 6px; width: 228px; }
-.pi-body { padding: 0; overflow: visible; width: 220px; height: 98px; }
+#hud-pokeinfo { top: 28px; right: 6px; width: 253px; }
+.pi-body { padding: 0; overflow: visible; width: 253px; min-height: 112px; }
 .pi-wrap {
   position: relative;
   width: 253px;
-  height: 112px;
-  transform: scale(0.87);
-  transform-origin: top left;
+  min-height: 112px;
   background: url(/assets/hud/playerinfo/HealthInfo.png) no-repeat 0 0;
   background-size: 253px 103px;
 }
@@ -1136,16 +1169,22 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 .pi-ball.faint { background: #4a5056; }
 .pi-chips {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
+  flex-wrap: wrap;
 }
 .pi-chip {
   display: flex;
   align-items: center;
-  gap: 2px;
-  color: #dce4f0;
+  gap: 3px;
+  color: #f0f4fa;
   font-size: 8px;
   font-weight: 700;
+  padding: 1px 6px 2px;
+  background: rgba(10, 14, 18, 0.92);
+  border: 1px solid #c42830;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 .pi-chip img {
   width: 10px;
@@ -1927,6 +1966,6 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
 body.in-game #world-scrim { display: none; }
 
 @media (max-width: 900px) {
-  #hud-pokeinfo { width: 228px; }
+  #hud-pokeinfo { width: 253px; }
   .hud-bottom-stack { width: calc(100vw - 12px); }
 }
