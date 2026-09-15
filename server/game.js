@@ -1083,6 +1083,7 @@ export class World {
       this.sys(player, "No space to release.");
       return;
     }
+    ensureBarMoves(mon);
     const poke = {
       id: cid(),
       kind: "pokemon",
@@ -1105,6 +1106,7 @@ export class World {
       masterId: player.id,
       busyUntil: 0,
       uid: mon.uid,
+      barMoves: (mon.barMoves || []).map((m) => ({ ...m })),
     };
     this.creatures.set(poke.id, poke);
     this.occupy(poke);
@@ -1234,7 +1236,12 @@ export class World {
       this.sys(player, "Você precisa ter um Pokémon fora.");
       return;
     }
-    const move = barMoveAt(poke, n);
+    const partyMon = Number.isInteger(player.outSlot) ? player.party[player.outSlot] : null;
+    if (partyMon) ensureBarMoves(partyMon);
+    if (partyMon?.barMoves?.length && !poke.barMoves?.length) {
+      poke.barMoves = partyMon.barMoves.map((m) => ({ ...m }));
+    }
+    const move = barMoveAt(poke, n) || barMoveAt(partyMon, n);
     if (!move) return;
     const target = player.targetId ? this.creatures.get(player.targetId) : null;
     if (!target || this.isForbiddenTarget(player, target) || target.id === poke.id) {

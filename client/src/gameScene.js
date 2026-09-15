@@ -211,9 +211,12 @@ export class GameScene extends Phaser.Scene {
     document.addEventListener("contextmenu", onRight, true);
     this.input.on("pointerdown", (p) => {
       const t = p.event?.target;
+      const canvas = this.game?.canvas;
+      const onCanvas = canvas && t && (t === canvas || canvas.contains?.(t));
       if (
+        !onCanvas &&
         t?.closest?.(
-          ".attack-bar, #attack-bar, .attack-slot, .ot-window, .chat-dock, .otp-top-btn, .hud-top-icons, .hud-bottom-stack, input, textarea, select, button"
+          ".attack-bar, #attack-bar, .attack-slot, .ot-window, .chat-dock, .otp-top-btn, .hud-top-icons, input, textarea, select, button"
         )
       ) {
         return;
@@ -487,6 +490,7 @@ export class GameScene extends Phaser.Scene {
     this.layoutAll();
     this.lockCamera();
     this.updateRoofs();
+    this.hud?.renderAttackBar?.(this.hud.outMon?.());
   }
 
   drawMap() {
@@ -897,24 +901,17 @@ export class GameScene extends Phaser.Scene {
     const y = d.y * TILE - 4;
     const own = this.isOwnCreature(st);
     const color = own ? "#ff6a4a" : "#ffe14a";
-    let txt;
-    if (this.cache.bitmapFont.exists("otpfont")) {
-      txt = this.add.bitmapText(x, y, "otpfont", `-${dmg}`, 16);
-      txt.setOrigin(0.5, 1);
-      txt.setTint(own ? 0xff5a4a : 0xffe14a);
-    } else {
-      txt = this.add
-        .text(x, y, `-${dmg}`, {
-          fontFamily: "MonaKo, Times OTP, Times, serif",
-          fontSize: "14px",
-          fontStyle: "bold",
-          color,
-          stroke: "#000000",
-          strokeThickness: 4,
-          resolution: 2,
-        })
-        .setOrigin(0.5, 1);
-    }
+    const txt = this.add
+      .text(x, y, `-${dmg}`, {
+        fontFamily: "MonaKo, Times OTP, Times, serif",
+        fontSize: "16px",
+        fontStyle: "bold",
+        color,
+        stroke: "#000000",
+        strokeThickness: 5,
+        resolution: 2,
+      })
+      .setOrigin(0.5, 1);
     txt.setScale(ui);
     txt.setDepth(2000);
     this.addActor(txt);
@@ -1079,7 +1076,6 @@ export class GameScene extends Phaser.Scene {
     if (this.isValidTarget(who)) {
       this.setTarget(who.id);
       this.net.send({ t: "target", id: who.id });
-      if (who.wild && !who.dead) this.net.send({ t: "walkTo", x: who.x, y: who.y });
       return;
     }
     if (this.isOwnCreature(who) && who.id !== this.youId) {
@@ -1157,30 +1153,22 @@ export class GameScene extends Phaser.Scene {
 
   tickAutoCombat() {
     if (this.catchBusy) return;
-    // selectedItem / crosshair cursor must never pause combat
     const tgt = this.targetId != null ? this.state.get(this.targetId) : null;
     if (!tgt || !tgt.wild || tgt.dead) {
       return;
     }
     const out = this.outCreatureState();
-    const you = this.state.get(this.youId);
-    if (!out || !you) return;
-    const dist = Math.max(Math.abs(out.x - tgt.x), Math.abs(out.y - tgt.y));
-    if (dist > 1) {
-      this.net.send({ t: "walkTo", x: tgt.x, y: tgt.y });
-      return;
-    }
+    if (!out) return;
     const now = Date.now();
     if (now < this.nextAutoAtk || now < (this.hud?.moveCdUntil || 0)) return;
-    const partyOut =
-      this.hud?.party?.out != null ? this.hud.party.slots?.[this.hud.party.out] : null;
+    const partyOut = this.hud?.outMon?.();
     const maxMoves = partyOut?.barMoves?.length || 4;
     const slot = Math.min(Math.max(1, this.hud?.combatMoveSlot || this.hud?.lastMoveSlot || 1), maxMoves);
     this.nextAutoAtk = now + ATK_MS;
-    if (this.hud) this.hud.lastMoveSlot = slot;
     if (this.targetId !== tgt.id) {
       this.net.send({ t: "target", id: tgt.id });
     }
-    this.net.send({ t: "move", n: slot });
+    if (this.hud?.tryUseMove) this.hud.tryUseMove(slot);
+    else this.net.send({ t: "move", n: slot });
   }
 }

@@ -17,7 +17,7 @@
     "build:all": "npm run build:balls && vite build && node tools/bundle-api.mjs",
     "bundle:api": "node tools/bundle-api.mjs",
     "build:attack-data": "node tools/build_attack_data.mjs",
-    "test": "node --import tsx tools/test-otbm.mjs && node tools/test-kanto.mjs && node tools/bundle-api.mjs && node tools/test-api-bundle.mjs && node --import tsx tools/test-walk-collision.mjs",
+    "test": "node --import tsx tools/test-otbm.mjs && node tools/test-kanto.mjs && node tools/test-combat-bar.mjs && node tools/bundle-api.mjs && node tools/test-api-bundle.mjs && node --import tsx tools/test-walk-collision.mjs",
     "test:smoke": "node tools/smoketest.mjs"
   },
   "dependencies": {

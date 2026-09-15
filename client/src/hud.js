@@ -166,6 +166,15 @@ export class Hud {
         this.setTarget(null);
         this.net.send({ t: "target", id: null });
         document.getElementById("chat-input")?.blur();
+        return;
+      }
+      if (e.repeat) return;
+      const typing = e.target?.closest?.("input, textarea, select") || e.target?.isContentEditable;
+      if (typing) return;
+      const n = e.code?.startsWith("Digit") ? Number(e.code.slice(5)) : Number(e.key);
+      if (n >= 1 && n <= 8) {
+        e.preventDefault();
+        this.tryUseMove(n);
       }
     });
   }
@@ -196,13 +205,51 @@ export class Hud {
   }
 
   syncOutCreatureId() {
-    if (!this.you) return;
+    if (!this.you) {
+      this.outCreatureId = null;
+      return null;
+    }
     for (const c of this.creatures.values()) {
       if (c.masterId === this.you.id && !c.dead) {
         this.outCreatureId = c.id;
-        return;
+        return c;
       }
     }
+    this.outCreatureId = null;
+    return null;
+  }
+
+  liveOutCreature() {
+    return this.syncOutCreatureId();
+  }
+
+  outMon() {
+    if (this.party?.out != null && this.party.slots?.[this.party.out]) {
+      return this.party.slots[this.party.out];
+    }
+    const live = this.liveOutCreature();
+    if (!live) return null;
+    const slots = this.party?.slots || [];
+    return (
+      slots.find((p) => p && live.uid && p.uid === live.uid) ||
+      slots.find((p) => p && p.species === live.species) ||
+      null
+    );
+  }
+
+  hasPokeOut() {
+    return this.outMon() != null || this.liveOutCreature() != null;
+  }
+
+  beginMoveCooldown(n) {
+    const slot = Math.max(1, Number(n) || this.lastMoveSlot || 1);
+    this.lastMoveSlot = slot;
+    this.combatMoveSlot = slot;
+    this.moveCdSlot = slot;
+    this.moveCdUntil = Date.now() + this.moveCdMs;
+    const mon = this.outMon();
+    this.renderHotbar(mon);
+    this.renderAttackBar(mon);
   }
 
   noteCatchAttempt(ballItem, ok) {
@@ -222,7 +269,7 @@ export class Hud {
     document.body.classList.toggle("use-with", catching);
     document.getElementById("game")?.classList.toggle("use-with-aim", catching);
     this.renderItemWindows();
-    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
+    const out = this.outMon();
     this.renderHotbar(out);
     this.renderAttackBar(out);
   }
@@ -453,12 +500,12 @@ export class Hud {
       this.drawMinimap();
     }
     if (msg.t === "fx") {
-      if (this.outCreatureId != null && msg.from === this.outCreatureId) {
-        this.moveCdUntil = Date.now() + this.moveCdMs;
-        this.moveCdSlot = this.lastMoveSlot || this.combatMoveSlot || 1;
-        const outMon = this.party.out != null ? this.party.slots[this.party.out] : null;
-        this.renderHotbar(outMon);
-        this.renderAttackBar(outMon);
+      const from = this.creatures.get(msg.from);
+      const fromOurs =
+        (this.outCreatureId != null && msg.from === this.outCreatureId) ||
+        (from && this.you && from.masterId === this.you.id);
+      if (fromOurs && !msg.retaliate && Date.now() >= this.moveCdUntil) {
+        this.beginMoveCooldown(this.lastMoveSlot || this.combatMoveSlot || 1);
       }
       const c = this.creatures.get(msg.to);
       if (c && msg.hp != null) {
@@ -615,21 +662,19 @@ export class Hud {
     this.renderItemWindows();
     this.renderInvOtp();
     this.syncInvShortcutState();
-    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
+    const out = this.outMon();
     this.renderHotbar(out);
     this.renderAttackBar(out);
     this.renderOrders();
   }
 
   tryUseMove(n) {
-    const outIdx = this.party.out;
-    if (outIdx == null) return;
-    const out = this.party.slots?.[outIdx];
+    if (!this.hasPokeOut()) return;
+    const out = this.outMon();
     const max = out?.barMoves?.length || attackSlotCount(out?.species);
-    if (!out || !n || n < 1 || n > max) return;
+    if (!n || n < 1 || n > Math.max(1, max || 4)) return;
     if (Date.now() < this.moveCdUntil) return;
-    this.lastMoveSlot = n;
-    this.combatMoveSlot = n;
+    this.beginMoveCooldown(n);
     this.net.send({ t: "move", n });
   }
 
@@ -637,7 +682,7 @@ export class Hud {
     const bar = document.getElementById("order-bar");
     if (!bar) return;
     const mount = this.party.mount;
-    const out = this.party.out != null ? this.party.slots[this.party.out] : null;
+    const out = this.outMon();
     const specKey = mount?.species || out?.species;
     const abs = (specKey && SPECIES[specKey]?.abilities) || [];
     bar.innerHTML = "";
@@ -662,8 +707,7 @@ export class Hud {
   renderActivePokeStatus() {
     const el = document.getElementById("poke-active-status");
     if (!el) return;
-    const outIdx = this.party.out;
-    const p = outIdx != null ? this.party.slots?.[outIdx] : null;
+    const p = this.outMon();
     if (!p) {
       el.classList.add("hidden");
       el.innerHTML = "";
@@ -794,7 +838,6 @@ export class Hud {
         this.setTarget(c);
         this.scene?.setTarget?.(c.id);
         this.net.send({ t: "target", id: c.id });
-        if (!c.dead) this.net.send({ t: "walkTo", x: c.x, y: c.y });
       };
       list.appendChild(el);
     }
@@ -811,8 +854,7 @@ export class Hud {
   renderInvOtp() {
     const slot = document.getElementById("inv-otp-portrait");
     if (!slot) return;
-    const outIdx = this.party.out;
-    const p = outIdx != null ? this.party.slots?.[outIdx] : null;
+    const p = this.outMon();
     if (!p) {
       slot.innerHTML = "";
       return;
@@ -1012,17 +1054,16 @@ export class Hud {
   renderAttackBar(out) {
     const bar = document.getElementById("attack-bar");
     if (!bar) return;
-    this.syncOutCreatureId();
-    const fromParty = this.party.out != null ? this.party.slots?.[this.party.out] : null;
-    const mon = out || fromParty;
-    const hasOut = mon != null && this.party.out != null;
+    const mon = out || this.outMon();
+    const live = this.liveOutCreature();
+    const hasOut = mon != null || live != null;
     bar.classList.toggle("hidden", !hasOut);
     bar.setAttribute("aria-hidden", hasOut ? "false" : "true");
     bar.innerHTML = "";
     if (!hasOut) return;
 
-    const moves = mon.barMoves || [];
-    const slotCount = moves.length || attackSlotCount(mon.species);
+    const moves = mon?.barMoves || [];
+    const slotCount = moves.length || attackSlotCount(mon?.species || live?.species);
     const sheet = moveSheetCss();
     bar.style.setProperty("--move-sheet-w", `${sheet.width}px`);
     bar.style.setProperty("--move-sheet-h", `${sheet.height}px`);
@@ -1064,8 +1105,8 @@ export class Hud {
       if (this._attackCdRaf) cancelAnimationFrame(this._attackCdRaf);
       this._attackCdRaf = requestAnimationFrame(() => {
         this._attackCdRaf = null;
-        const cur = this.party.out != null ? this.party.slots[this.party.out] : null;
-        if (cur) this.renderAttackBar(cur);
+        const cur = this.outMon();
+        if (cur || this.hasPokeOut()) this.renderAttackBar(cur);
       });
     }
   }
