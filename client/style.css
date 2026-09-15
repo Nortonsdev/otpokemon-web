@@ -1309,7 +1309,17 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
 }
 
 .item-box-win {
-  width: 158px;
+  --item-box-cols: 5;
+  --item-box-cell: 28px;
+  --item-box-gap: 2px;
+  --item-box-grid-pad: 2px;
+  --item-box-scroll-w: 6px;
+  --item-box-grid-w: calc(
+    var(--item-box-cols) * var(--item-box-cell) +
+    (var(--item-box-cols) - 1) * var(--item-box-gap) +
+    2 * var(--item-box-grid-pad)
+  );
+  width: calc(var(--item-box-grid-w) + var(--item-box-scroll-w) + 12px);
   z-index: 14;
 }
 #hud-bag .mw-icon {
@@ -1330,31 +1340,44 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   background-size: contain !important;
 }
 .item-box-win.miniwindow > .win-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   padding: 2px;
   max-height: min(220px, calc(100vh - 100px));
   overflow: hidden;
 }
-.item-box-grid {
+/* Scroll à direita do grid — gutter fixo; slots mantêm 28px × N colunas. */
+.item-box-win .item-box-scroll {
   --item-row-h: 30px;
-  display: grid;
-  grid-template-columns: repeat(5, 28px);
-  gap: 2px;
-  padding: 2px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: calc(var(--item-box-grid-w) + var(--item-box-scroll-w));
   max-height: calc(var(--item-box-rows-compact, 5) * var(--item-row-h));
-  overflow-y: auto;
   overflow-x: hidden;
+  overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #3d5ca0 var(--otp-inv-card-deep);
+  scrollbar-color: #3d5ca0 transparent;
 }
-.item-box-win.item-box-expanded .item-box-grid {
+.item-box-win.item-box-expanded .item-box-scroll {
   max-height: calc(var(--item-box-rows-total, 6) * var(--item-row-h));
 }
-.item-box-grid::-webkit-scrollbar { width: 8px; }
-.item-box-grid::-webkit-scrollbar-track { background: var(--otp-inv-card-deep); border-radius: 0; }
-.item-box-grid::-webkit-scrollbar-thumb {
+.item-box-win .item-box-scroll::-webkit-scrollbar { width: var(--item-box-scroll-w); }
+.item-box-win .item-box-scroll::-webkit-scrollbar-track { background: transparent; }
+.item-box-win .item-box-scroll::-webkit-scrollbar-thumb {
   background: #3d5ca0;
   border-radius: 0;
   border: 1px solid #2a4070;
+}
+.item-box-grid {
+  --item-row-h: 30px;
+  display: grid;
+  grid-template-columns: repeat(var(--item-box-cols), var(--item-box-cell));
+  gap: var(--item-box-gap);
+  width: var(--item-box-grid-w);
+  padding: var(--item-box-grid-pad);
+  overflow: visible;
+  flex-shrink: 0;
 }
 .item-box-cell {
   position: relative;
@@ -1433,10 +1456,12 @@ body.pokebar-reorder .poke-slot { cursor: grab; }
   flex-wrap: wrap;
   align-items: center;
   gap: 3px;
+  width: calc(var(--item-box-grid-w) + var(--item-box-scroll-w));
   padding: 4px 2px 2px;
   border-top: 1px solid rgba(90, 120, 170, 0.25);
   font-size: 8px;
   color: var(--ot-muted);
+  box-sizing: border-box;
 }
 .catch-swap-bar.hidden { display: none; }
 .catch-swap-bar button {
