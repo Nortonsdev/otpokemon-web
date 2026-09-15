@@ -1,4 +1,5 @@
 import { ITEM_BOX_IDS } from "../../../shared/itemBoxCaps.js";
+import { showChatPanel } from "./chatDock.js";
 
 const LEGACY_KEY = "otpokemon-hud-v4";
 const POS_PREFIX = "poketibia.win.";
@@ -297,6 +298,7 @@ export class WindowManager {
     if (!w) return;
     w.open = true;
     w.min = false;
+    if (id === "chat") showChatPanel();
     this.raise(id);
     this.applyAll();
     this.persist();

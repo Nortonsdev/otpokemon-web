@@ -274,6 +274,17 @@
         <div id="hud-bottom-stack" class="hud-bottom-stack">
           <div id="attack-bar" class="attack-bar hidden" aria-label="Ataques do Pokémon" aria-hidden="true"></div>
           <footer id="chat-dock" class="chat-dock" data-win="chat">
+          <div class="chat-head">
+            <span class="chat-head-title">Chat</span>
+            <button
+              type="button"
+              id="chat-hide-toggle"
+              class="mw-tool mw-min chat-hide-btn"
+              title="Ocultar chat (Ctrl+Shift+C)"
+              aria-label="Ocultar chat"
+              aria-pressed="false"
+            ></button>
+          </div>
           <div class="chat-tabs" id="chat-tabs">
             <button type="button" data-ch="global">Servidor</button>
             <button type="button" data-ch="local" class="active">Padrão</button>

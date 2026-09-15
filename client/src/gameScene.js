@@ -11,6 +11,7 @@ const PREVIEW_MAP = buildLegacyMap();
 import { LOOK_NAME, STEP_MS } from "../../server/species.js";
 import { playCatchSequence } from "./catchVfx.js";
 import { CATCH_BALL_ITEMS } from "./ballIcons.js";
+import { isChatHidden, showChatPanel } from "./ui/chatDock.js";
 import { pokemonPlateText, speciesAssetSlug } from "../../shared/kantoDex.js";
 
 const TILE = 32;
@@ -1167,6 +1168,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.input.keyboard.enabled = true;
     if (this.keys.ENTER && Phaser.Input.Keyboard.JustDown(this.keys.ENTER)) {
+      if (isChatHidden()) showChatPanel();
       document.getElementById("chat-input")?.focus();
       return;
     }

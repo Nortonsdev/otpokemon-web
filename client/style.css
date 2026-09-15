@@ -1635,6 +1635,28 @@ body.use-with, body.use-with * { cursor: crosshair !important; }
   border-radius: 5px 5px 0 0; backdrop-filter: blur(2px);
 }
 .chat-dock.win-closed { display: none !important; }
+.chat-dock.chat-hidden { display: none !important; }
+.chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 6px 0 10px;
+  border-bottom: 1px solid var(--ot-border-dim);
+  min-height: 20px;
+}
+.chat-head-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ot-muted);
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+.chat-hide-btn {
+  flex: none;
+  opacity: 0.92;
+}
+.chat-hide-btn:hover { filter: brightness(1.2); }
 .chat-tabs {
   display: flex; gap: 0; padding: 2px 10px 0;
   border-bottom: 1px solid var(--ot-border-dim);
